@@ -6,9 +6,9 @@ use cpal::{
     Device, FromSample, HostId, Sample, SampleFormat, SampleRate, SizedSample,
     SupportedStreamConfig,
 };
-use futures::{FutureExt, Sink, SinkExt, Stream, StreamExt};
+use futures::{FutureExt, SinkExt, Stream, StreamExt};
 use hound::{WavSpec, WavWriter};
-use rodio::{Decoder, OutputStream, Source};
+use rodio::{Decoder, OutputStream, Sink, Source};
 use std::{
     fs::File,
     io::BufWriter,
@@ -25,9 +25,8 @@ use tokio::{
     task, time,
 };
 
-mod build_test;
-use build_test::build_test;
+mod cs120_asio;
 
 fn main() {
-    build_test();
+    cs120_asio::play_wav_until_end("audio/hallelujah.wav");
 }
