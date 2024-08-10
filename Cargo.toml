@@ -4,3 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+anyhow = "*"
+futures = "*"
+hound = "*"
+tokio = { version = "*", features = ["full"] }
+rodio = "*"
+cpal = { version = "*", features = ["asio"] }
