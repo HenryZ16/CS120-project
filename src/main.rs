@@ -3,6 +3,7 @@ mod pa0;
 mod symrs;
 mod tests;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     pa0::pa0();
 }

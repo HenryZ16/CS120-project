@@ -173,3 +173,14 @@ impl Div for Expr {
         Expr::Div(Box::new(self), Box::new(other))
     }
 }
+
+impl Expr {
+    pub fn freq(&self) -> f64 {
+        match self {
+            Expr::IntNumber(n) => *n as f64,
+            Expr::FixedNumber(n, d) => *n as f64 + *d as f64 / 10.0,
+            Expr::FloatNumber(n) => *n,
+            _ => panic!("Invalid frequency expression"),
+        }
+    }
+}

@@ -3,7 +3,7 @@ use cpal::{
     traits::{DeviceTrait, StreamTrait},
     Device, FromSample, Sample, SampleFormat,
 };
-use futures::{FutureExt, Sink, Stream};
+use futures::{FutureExt, Sink, SinkExt, Stream};
 use rodio::{OutputStream, Source, SupportedStreamConfig};
 use std::{iter::ExactSizeIterator, time::Duration};
 use tokio::{
@@ -136,7 +136,8 @@ impl Stream for InputAudioStream {
 description: This struct is used to create an output audio stream.
 fields:
 - stream: OutputStream
-- sender: UnboundedSender<f32>
+- sender: UnboundedSender<(AudioTrack<I>, Sender<()>)>
+- task: Option<Receiver<()>>
 impl:
 - new(
     device: &Device,
@@ -242,4 +243,61 @@ where
         self.as_mut().task = Some(receiver);
         return Ok(());
     }
+}
+
+pub async fn read_wav_and_play(filename: &str) {
+    use cpal::{
+        traits::{DeviceTrait, HostTrait},
+        HostId,
+    };
+    use cpal::{SampleRate, SupportedStreamConfig};
+
+    let mut reader = hound::WavReader::open(filename).unwrap();
+    let spec = reader.spec();
+
+    println!(
+        "Read {filename} with sample format: {} and sample rate: {}",
+        match spec.sample_format {
+            hound::SampleFormat::Int => match spec.bits_per_sample {
+                8 => "i8",
+                16 => "i16",
+                _ => panic!("unsupported bits per sample"),
+            },
+            hound::SampleFormat::Float => "f32",
+        },
+        spec.sample_rate
+    );
+    let samples: Vec<f32> = match spec.sample_format {
+        hound::SampleFormat::Int => match spec.bits_per_sample {
+            8 => {
+                let samples: Vec<i8> = reader.samples::<i8>().map(|s| s.unwrap()).collect();
+                samples.iter().map(|&s| s as f32 / i8::MAX as f32).collect()
+            }
+            16 => {
+                let samples: Vec<i16> = reader.samples::<i16>().map(|s| s.unwrap()).collect();
+                samples
+                    .iter()
+                    .map(|&s| s as f32 / i16::MAX as f32)
+                    .collect()
+            }
+            _ => panic!("unsupported bits per sample"),
+        },
+        hound::SampleFormat::Float => reader.samples::<f32>().map(|s| s.unwrap()).collect(),
+    };
+
+    let host = cpal::host_from_id(HostId::Asio).expect("failed to initialise ASIO host");
+    let device = host
+        .default_input_device()
+        .expect("failed to find input device");
+    let default_config = device.default_input_config().unwrap();
+    let config = SupportedStreamConfig::new(
+        1,                            // mono
+        SampleRate(spec.sample_rate), // sample rate
+        default_config.buffer_size().clone(),
+        default_config.sample_format(),
+    );
+
+    let track = AudioTrack::new(samples.clone().into_iter(), config.clone());
+    let mut output_stream = OutputAudioStream::new(&device, config);
+    output_stream.send(track).await.unwrap();
 }
