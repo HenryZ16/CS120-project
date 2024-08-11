@@ -6,4 +6,5 @@ mod tests;
 #[tokio::main]
 async fn main() {
     pa0::pa0();
+    // block_on(asio_stream::read_wav_and_play("./audio/hallelujah.wav"));
 }

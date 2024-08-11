@@ -96,11 +96,11 @@ pub struct InputAudioStream {
 impl InputAudioStream {
     pub fn new(device: &Device, config: SupportedStreamConfig) -> Self {
         let (sender, receiver) = mpsc::unbounded_channel();
-        if let SampleFormat::I8 = config.sample_format() {
+        if let SampleFormat::I32 = config.sample_format() {
             let stream = device
                 .build_input_stream(
                     &config.config(),
-                    move |data: &[i8], _: &_| {
+                    move |data: &[i32], _: &_| {
                         let data = data
                             .iter()
                             .map(|&x| f32::from_sample(x))
@@ -115,7 +115,7 @@ impl InputAudioStream {
                 .unwrap();
             return Self { stream, receiver };
         } else {
-            panic!("Sample format is not I8");
+            panic!("Sample format is not I32");
         }
     }
 }
