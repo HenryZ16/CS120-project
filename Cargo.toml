@@ -7,6 +7,6 @@ edition = "2021"
 anyhow = "*"
 futures = "*"
 hound = "*"
-tokio = { version = "*", features = ["full"] }
-rodio = "*"
+tokio = { version = "1", features = ["full"] }
+rodio = "0.19"
 cpal = { version = "*", features = ["asio"] }
