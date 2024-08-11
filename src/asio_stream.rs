@@ -1,7 +1,7 @@
-use anyhow::Error;
+use anyhow::{Error, Result};
 use cpal::{
     traits::{DeviceTrait, StreamTrait},
-    Device, FromSample, Sample, SampleFormat,
+    Device, FromSample, Sample, SampleFormat, SizedSample,
 };
 use futures::{FutureExt, Sink, SinkExt, Stream};
 use rodio::{OutputStream, Source, SupportedStreamConfig};
@@ -93,30 +93,44 @@ pub struct InputAudioStream {
     receiver: UnboundedReceiver<Vec<f32>>,
 }
 
+fn build_input_stream<T>(
+    device: &Device,
+    config: SupportedStreamConfig,
+    sender: UnboundedSender<Vec<f32>>,
+) -> Result<cpal::Stream>
+where
+    T: SizedSample,
+    f32: FromSample<T>,
+{
+    let stream = device.build_input_stream(
+        &config.config(),
+        move |data: &[T], _: &_| {
+            let data = data
+                .iter()
+                .map(|&sample| f32::from_sample(sample))
+                .collect::<Vec<f32>>();
+            sender.send(data).unwrap();
+        },
+        |err| eprintln!("an error occurred on stream: {}", err),
+        None,
+    )?;
+    Ok(stream)
+}
+
 impl InputAudioStream {
     pub fn new(device: &Device, config: SupportedStreamConfig) -> Self {
         let (sender, receiver) = mpsc::unbounded_channel();
-        if let SampleFormat::I32 = config.sample_format() {
-            let stream = device
-                .build_input_stream(
-                    &config.config(),
-                    move |data: &[i32], _: &_| {
-                        let data = data
-                            .iter()
-                            .map(|&x| f32::from_sample(x))
-                            .collect::<Vec<f32>>();
-                        sender.send(data).unwrap();
-                    },
-                    move |err| {
-                        eprintln!("an error occurred on stream: {}", err);
-                    },
-                    None,
-                )
-                .unwrap();
-            return Self { stream, receiver };
-        } else {
-            panic!("Sample format is not I32");
-        }
+        let stream = match config.sample_format() {
+            SampleFormat::I8 => build_input_stream::<i8>(device, config, sender).unwrap(),
+            SampleFormat::U8 => build_input_stream::<u8>(device, config, sender).unwrap(),
+            SampleFormat::I16 => build_input_stream::<i16>(device, config, sender).unwrap(),
+            SampleFormat::U16 => build_input_stream::<u16>(device, config, sender).unwrap(),
+            SampleFormat::I32 => build_input_stream::<i32>(device, config, sender).unwrap(),
+            SampleFormat::U32 => build_input_stream::<u32>(device, config, sender).unwrap(),
+            SampleFormat::F32 => build_input_stream::<f32>(device, config, sender).unwrap(),
+            _ => panic!("unsupported sample format"),
+        };
+        return Self { stream, receiver };
     }
 }
 
@@ -126,7 +140,7 @@ impl Stream for InputAudioStream {
     fn poll_next(
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Option<Self::Item>> {
+    ) -> futures::task::Poll<Option<Self::Item>> {
         self.stream.play().unwrap();
         self.receiver.poll_recv(cx)
     }
