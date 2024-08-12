@@ -8,5 +8,6 @@ anyhow = "*"
 futures = "*"
 hound = "*"
 tokio = { version = "1", features = ["full"] }
+tokio-util = { version = "*", features = ["full"] }
 rodio = "0.19"
 cpal = { version = "*", features = ["asio"] }

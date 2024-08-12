@@ -128,6 +128,9 @@ impl InputAudioStream {
             SampleFormat::I32 => build_input_stream::<i32>(device, config, sender).unwrap(),
             SampleFormat::U32 => build_input_stream::<u32>(device, config, sender).unwrap(),
             SampleFormat::F32 => build_input_stream::<f32>(device, config, sender).unwrap(),
+            SampleFormat::F64 => build_input_stream::<f64>(device, config, sender).unwrap(),
+            SampleFormat::I64 => build_input_stream::<i64>(device, config, sender).unwrap(),
+            SampleFormat::U64 => build_input_stream::<u64>(device, config, sender).unwrap(),
             _ => panic!("unsupported sample format"),
         };
         return Self { stream, receiver };

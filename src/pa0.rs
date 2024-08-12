@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use cpal::{
     traits::{DeviceTrait, HostTrait},
@@ -29,15 +29,20 @@ async fn obj_1(host: &Host) {
     let mut input_stream = asio_stream::InputAudioStream::new(&device, config.clone());
     let mut input = vec![];
     println!("start record");
-    time::timeout(Duration::from_secs(5), async {
-        println!("get into async");
+    let start = Instant::now();
+
+    time::timeout(Duration::from_secs(10), async {
+        let mut count = 1;
         while let Some(samples) = input_stream.next().await {
-            println!("get samples");
             input.extend(samples);
+            count += 1;
         }
     })
     .await
     .ok();
+
+    let duration = start.elapsed();
+    println!("Time elapsed in recording is: {:?}", duration);
 
     println!("start replay");
     let track = AudioTrack::new(input.into_iter(), config.clone());
@@ -55,8 +60,8 @@ fn obj_2(host: &Host) {
         .expect("failed to get default input device");
 }
 
-pub fn pa0() {
+pub async fn pa0() {
     let host = cpal::host_from_id(HostId::Asio).expect("failed to initialise ASIO host");
-    block_on(obj_1(&host));
+    obj_1(&host).await;
     // obj_2(&host);
 }
