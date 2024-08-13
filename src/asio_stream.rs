@@ -372,7 +372,7 @@ pub async fn read_wav_and_play(filename: &str) {
         HostId,
     };
     use cpal::{SampleRate, SupportedStreamConfig};
-    let (track, sample_rate) = read_wav(filename);
+    let (track, sample_rate) = read_wav(filename).await;
 
     let host = cpal::host_from_id(HostId::Asio).expect("failed to initialise ASIO host");
     let device = host
