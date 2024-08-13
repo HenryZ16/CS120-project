@@ -43,11 +43,16 @@ async fn obj_1(host: &Host) {
 
     let duration = start.elapsed();
     println!("Time elapsed in recording is: {:?}", duration);
+    println!("Length of input: {}", input.len());
 
     println!("start replay");
     let track = AudioTrack::new(input.into_iter(), config.clone());
     let mut output_stream = asio_stream::OutputAudioStream::new(&device, config);
+
+    let start = Instant::now();
     output_stream.send(track).await.unwrap();
+    let duration = start.elapsed();
+    println!("Time elapsed in replaying is: {:?}", duration);
 }
 
 // Objective 2 (1.5 points): NODE1 must simultaneously play a predefined sound wave (e.g., a song) and record the playing sound.

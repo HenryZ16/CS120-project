@@ -41,6 +41,10 @@ where
     pub fn new(iter: I, config: SupportedStreamConfig) -> Self {
         return Self { iter, config };
     }
+
+    pub fn Len(&self) -> usize {
+        return self.iter.len();
+    }
 }
 
 impl<I: ExactSizeIterator> Iterator for AudioTrack<I>
@@ -262,7 +266,7 @@ where
     }
 }
 
-pub async fn read_wav_and_play(filename: &str) {
+pub async fn read_wav(filename: &str) -> (AudioTrack<std::vec::IntoIter<f32>>, u32) {
     use cpal::{
         traits::{DeviceTrait, HostTrait},
         HostId,
@@ -314,7 +318,32 @@ pub async fn read_wav_and_play(filename: &str) {
         default_config.sample_format(),
     );
 
-    let track = AudioTrack::new(samples.clone().into_iter(), config.clone());
+    return (
+        AudioTrack::new(samples.clone().into_iter(), config.clone()),
+        spec.sample_rate,
+    );
+}
+
+pub async fn read_wav_and_play(filename: &str) {
+    use cpal::{
+        traits::{DeviceTrait, HostTrait},
+        HostId,
+    };
+    use cpal::{SampleRate, SupportedStreamConfig};
+    let (track, sample_rate) = read_wav(filename).await;
+
+    let host = cpal::host_from_id(HostId::Asio).expect("failed to initialise ASIO host");
+    let device = host
+        .default_input_device()
+        .expect("failed to find input device");
+    let default_config = device.default_input_config().unwrap();
+    let config = SupportedStreamConfig::new(
+        1,                       // mono
+        SampleRate(sample_rate), // sample rate
+        default_config.buffer_size().clone(),
+        default_config.sample_format(),
+    );
+
     let mut output_stream = OutputAudioStream::new(&device, config);
     output_stream.send(track).await.unwrap();
 }

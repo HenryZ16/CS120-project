@@ -5,7 +5,6 @@ Input data
 */
 
 const sampleRate: i32 = 48000;
-const leastCarrierFrequency: i32 = 2000;
 
 pub struct OutputWave {
     carrierFrequency: i32,
