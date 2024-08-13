@@ -1,7 +1,7 @@
 use anyhow::{Error, Result};
 use cpal::{
     traits::{DeviceTrait, StreamTrait},
-    Device, FromSample, Sample, SampleFormat, SampleRate, SizedSample,
+    Device, FromSample, Sample, SampleFormat, SizedSample,
 };
 use futures::{FutureExt, Sink, SinkExt, Stream};
 use rodio::{OutputStream, Source, SupportedStreamConfig};

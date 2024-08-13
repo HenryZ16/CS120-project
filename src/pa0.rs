@@ -1,10 +1,10 @@
-use std::time::{Duration, Instant};
-
+use anyhow::{Error, Result};
 use cpal::{
     traits::{DeviceTrait, HostTrait},
     Device, Host, HostId, SampleRate, SupportedStreamConfig,
 };
 use futures::{executor::block_on, SinkExt, StreamExt};
+use std::time::{Duration, Instant};
 use tokio::time;
 
 use crate::asio_stream::{self, AudioTrack};
@@ -93,12 +93,14 @@ async fn obj_2(host: &Host) {
         while let Some(samples) = input_stream.next().await {
             input.extend(samples);
         }
-    }).await.ok();
-    
+    })
+    .await
+    .ok();
+
     let duration = start.elapsed();
-    
+
     println!("Time elapsed in recording is: {:?}", duration);
-    
+
     println!("start replay");
     let mut output_stream = asio_stream::OutputAudioStream::new(&output_device, config.clone());
     let track = AudioTrack::new(input.into_iter(), config.clone());
@@ -106,16 +108,27 @@ async fn obj_2(host: &Host) {
     output_stream.send(track).await.unwrap();
     let duration = start.elapsed();
     println!("Time elapsed in replaying is: {:?}", duration);
-
 }
 
-pub async fn pa0() {
-    let host = cpal::host_from_id(HostId::Asio).expect("failed to initialise ASIO host");
-    println!("Objective 1 start");
-    obj_1(&host).await;
-    println!("Objective 1 end");
+pub async fn pa0(sel: u32) -> Result<u32> {
+    let available_sel = vec![0, 1, 2];
+    if !available_sel.contains(&sel) {
+        return Err(Error::msg("Invalid selection"));
+    }
 
-    println!("Objective 2 start");
-    obj_2(&host).await;
-    println!("Objective 2 end");
+    let host = cpal::host_from_id(HostId::Asio).expect("failed to initialise ASIO host");
+
+    if sel == 0 || sel == 1 {
+        println!("Objective 1 start");
+        obj_1(&host).await;
+        println!("Objective 1 end");
+    }
+
+    if sel == 0 || sel == 2 {
+        println!("Objective 2 start");
+        obj_2(&host).await;
+        println!("Objective 2 end");
+    }
+
+    return Ok(0);
 }
