@@ -307,9 +307,9 @@ where
 
 pub fn show_devices() {
     // show available devices
-    let host = cpal::default_host();
+    let host = cpal::host_from_id(cpal::HostId::Asio).expect("failed to initialise ASIO host");
     let devices = host.devices().unwrap();
-    println!("Available devices:");
+    println!("Available ASIO devices:");
     for device in devices {
         println!("  {:?}", device.name().unwrap());
     }

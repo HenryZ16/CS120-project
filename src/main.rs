@@ -11,7 +11,7 @@ fn help() {
     println!("  -h, --help: Show this help message");
     println!("  -p=N, --pa=N: Select PA N to demonstrate");
     println!("  -o, --objective=N: Select an objective N in a specified PA to demonstrate. If no PA specified, this will be ignored.");
-    println!("  -d, -device: Show available devices");
+    println!("  -d, -device: Show available ASIO devices");
 }
 
 fn arg_parser(args: Vec<String>) -> Option<(i32, i32)> {
