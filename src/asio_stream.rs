@@ -42,7 +42,7 @@ where
         return Self { iter, config };
     }
 
-    pub fn Len(&self) -> usize {
+    pub fn len(&self) -> usize {
         return self.iter.len();
     }
 }

@@ -13,8 +13,7 @@ use futures::SinkExt;
 const SAMPLE_RATE: u32 = 48000;
 
 pub struct Modulator {
-    carrier_freq: Vec<u32>,
-    carrier: Vec<Vec<f32>>,
+    carrier_freq: Vec<f32>,
     sample_rate: u32,
     enable_ofdm: bool,
     output_stream: OutputAudioStream<std::vec::IntoIter<f32>>,
@@ -22,15 +21,7 @@ pub struct Modulator {
 }
 
 impl Modulator {
-    pub fn new(carrier_freq: Vec<u32>, sample_rate: u32, enable_ofdm: bool) -> Self {
-        let mut carrier = vec![];
-        for c in &carrier_freq {
-            let name = format!("audio/freq-{}.wav", c);
-            let (samples, rate) = block_on(read_wav_into_vec(&name));
-            assert_eq!(rate, SAMPLE_RATE);
-            carrier.push(samples);
-        }
-
+    pub fn new(carrier_freq: Vec<f32>, sample_rate: u32, enable_ofdm: bool) -> Self {
         let host = cpal::host_from_id(HostId::Asio).expect("failed to initialise ASIO host");
         let device = host
             .default_input_device()
@@ -47,7 +38,6 @@ impl Modulator {
 
         Modulator {
             carrier_freq,
-            carrier,
             sample_rate,
             enable_ofdm,
             output_stream,
@@ -55,21 +45,24 @@ impl Modulator {
         }
     }
 
-    pub async fn test_wave(&mut self) {
-        let mut lcm_freq = 1;
-        for c in &self.carrier_freq {
-            lcm_freq = lcm(lcm_freq, *c as u64);
-        }
-        let mut wave = vec![0.0; lcm_freq as usize];
-        for c in &self.carrier {
-            for i in 0..wave.len() {
-                wave[i] += c[i % c.len()];
+    pub async fn test_carrier_wave(&mut self) {
+        // use sin to generate a carrier wave
+        let duration = 5.0; // seconds
+        let sample_count = (duration * self.sample_rate as f32) as usize;
+        let mut wave = vec![];
+
+        for i in 0..sample_count {
+            let mut sample = 0.0;
+            for freq in &self.carrier_freq {
+                sample += (2.0 * std::f64::consts::PI * freq.clone() as f64 * i as f64
+                    / self.sample_rate as f64)
+                    .sin();
             }
+            sample /= self.carrier_freq.len() as f64;
+            wave.push(sample as f32);
         }
 
-        let duration = 5;
-        let max_len: usize = (self.sample_rate * duration) as usize;
-        let mut wave = wave.into_iter().cycle().take(max_len).collect::<Vec<_>>();
+        println!("wave length: {:?}", wave.len());
 
         self.output_stream
             .send(AudioTrack::new(wave.into_iter(), self.config.clone()))
