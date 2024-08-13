@@ -110,7 +110,7 @@ async fn obj_2(host: &Host) {
     println!("Time elapsed in replaying is: {:?}", duration);
 }
 
-pub async fn pa0(sel: u32) -> Result<u32> {
+pub async fn pa0(sel: i32) -> Result<u32> {
     let host = cpal::default_host();
     let available_sel = vec![0, 1, 2];
     if !available_sel.contains(&sel) {

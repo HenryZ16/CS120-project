@@ -12,13 +12,13 @@ pub async fn obj_2(host: &Host) -> Result<u32> {
     return Ok(0);
 }
 
-pub async fn pa1(sel: u32) -> Result<u32> {
+pub async fn pa1(sel: i32) -> Result<u32> {
     let available_sel = vec![0, 1, 2];
     if !available_sel.contains(&sel) {
         return Err(Error::msg("Invalid selection"));
     }
 
-    let host = cpal::host_from_id(HostId::Asio).expect("failed to initialise ASIO host");
+    let host = cpal::default_host();
 
     if sel == 0 || sel == 1 {
         println!("Objective 1 start");

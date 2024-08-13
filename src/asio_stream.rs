@@ -1,6 +1,6 @@
 use anyhow::{Error, Result};
 use cpal::{
-    traits::{DeviceTrait, StreamTrait},
+    traits::{DeviceTrait, HostTrait, StreamTrait},
     Device, FromSample, Sample, SampleFormat, SizedSample,
 };
 use futures::{FutureExt, Sink, SinkExt, Stream};
@@ -302,6 +302,16 @@ where
         self.sender.send((item, sender)).unwrap();
         self.as_mut().task = Some(receiver);
         return Ok(());
+    }
+}
+
+pub fn show_devices() {
+    // show available devices
+    let host = cpal::default_host();
+    let devices = host.devices().unwrap();
+    println!("Available devices:");
+    for device in devices {
+        println!("  {:?}", device.name().unwrap());
     }
 }
 

@@ -23,9 +23,13 @@ pub struct Modulator {
 impl Modulator {
     pub fn new(carrier_freq: Vec<f32>, sample_rate: u32, enable_ofdm: bool) -> Self {
         let host = cpal::host_from_id(HostId::Asio).expect("failed to initialise ASIO host");
-        let device = host
-            .default_input_device()
-            .expect("failed to find input device");
+        let device = host.output_devices().expect("failed to find output device");
+        let device = device
+            .into_iter()
+            .next()
+            .expect("no output device available");
+        println!("Output device: {:?}", device.name().unwrap());
+
         let default_config = device.default_input_config().unwrap();
         let config = SupportedStreamConfig::new(
             1,                       // mono
