@@ -11,11 +11,15 @@ use crate::asio_stream::{self, AudioTrack};
 
 // Objective 1 (1.5 points): NODE1 should record the TA’s voice for 10 seconds and accurately replay the recorded sound.
 async fn obj_1(host: &Host) {
-    let device = host
+    let input_device = host
         .default_input_device()
         .expect("failed to get default input device");
 
-    let default_config = device.default_input_config().unwrap();
+    let output_device = host
+        .default_output_device()
+        .expect("failed to get default output device");
+
+    let default_config = input_device.default_input_config().unwrap();
 
     let config = SupportedStreamConfig::new(
         1,
@@ -26,7 +30,7 @@ async fn obj_1(host: &Host) {
 
     println!("config: {:?}", config);
 
-    let mut input_stream = asio_stream::InputAudioStream::new(&device, config.clone());
+    let mut input_stream = asio_stream::InputAudioStream::new(&input_device, config.clone());
     let mut input = vec![];
     println!("start record");
     let start = Instant::now();
@@ -45,7 +49,7 @@ async fn obj_1(host: &Host) {
 
     println!("start replay");
     let track = AudioTrack::new(input.into_iter(), config.clone());
-    let mut output_stream = asio_stream::OutputAudioStream::new(&device, config);
+    let mut output_stream = asio_stream::OutputAudioStream::new(&output_device, config);
 
     let start = Instant::now();
     output_stream.send(track).await.unwrap();
@@ -60,11 +64,15 @@ async fn obj_1(host: &Host) {
 async fn obj_2(host: &Host) {
     let filename = "audio/hallelujah.wav";
 
-    let device = host
+    let input_device = host
         .default_input_device()
         .expect("failed to get default input device");
 
-    let default_config = device.default_input_config().unwrap();
+    let output_device = host
+        .default_output_device()
+        .expect("failed to get default output device");
+
+    let default_config = input_device.default_input_config().unwrap();
 
     let config = SupportedStreamConfig::new(
         1,
@@ -73,12 +81,11 @@ async fn obj_2(host: &Host) {
         default_config.sample_format(),
     );
 
-    let mut input_stream = asio_stream::InputAudioStream::new(&device, config.clone());
+    let mut input_stream = asio_stream::InputAudioStream::new(&input_device, config.clone());
     let mut input = vec![];
 
     println!("start playing");
     let handle = asio_stream::read_wav_and_play(filename);
-    println!("start record");
 
     println!("start record");
     let start = Instant::now();
@@ -93,7 +100,7 @@ async fn obj_2(host: &Host) {
     println!("Time elapsed in recording is: {:?}", duration);
     
     println!("start replay");
-    let mut output_stream = asio_stream::OutputAudioStream::new(&device, config.clone());
+    let mut output_stream = asio_stream::OutputAudioStream::new(&output_device, config.clone());
     let track = AudioTrack::new(input.into_iter(), config.clone());
     let start = Instant::now();
     output_stream.send(track).await.unwrap();
