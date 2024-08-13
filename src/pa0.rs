@@ -4,7 +4,7 @@ use cpal::{
     traits::{DeviceTrait, HostTrait},
     Device, Host, HostId, SampleRate, SupportedStreamConfig,
 };
-use futures::{executor::block_on, SinkExt, StreamExt};
+use futures::{executor::block_on, future::join, join, SinkExt, StreamExt};
 use tokio::time;
 
 use crate::asio_stream::{self, AudioTrack};
@@ -85,15 +85,17 @@ async fn obj_2(host: &Host) {
     let mut input = vec![];
 
     println!("start playing");
-    let handle = asio_stream::read_wav_and_play(filename);
+    let output_handle = asio_stream::read_wav_and_play(filename);
 
     println!("start record");
     let start = Instant::now();
-    time::timeout(Duration::from_secs(10), async {
+    let input_handle = time::timeout(Duration::from_secs(10), async {
         while let Some(samples) = input_stream.next().await {
             input.extend(samples);
         }
-    }).await.ok();
+    });
+    
+    join!(output_handle, input_handle);
     
     let duration = start.elapsed();
     
@@ -110,7 +112,7 @@ async fn obj_2(host: &Host) {
 }
 
 pub async fn pa0() {
-    let host = cpal::host_from_id(HostId::Asio).expect("failed to initialise ASIO host");
+    let host = cpal::default_host();
     println!("Objective 1 start");
     obj_1(&host).await;
     println!("Objective 1 end");
