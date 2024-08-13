@@ -266,13 +266,7 @@ where
     }
 }
 
-pub async fn read_wav(filename: &str) -> (AudioTrack<std::vec::IntoIter<f32>>, u32) {
-    use cpal::{
-        traits::{DeviceTrait, HostTrait},
-        HostId,
-    };
-    use cpal::{SampleRate, SupportedStreamConfig};
-
+pub async fn read_wav_into_vec(filename: &str) -> (Vec<f32>, u32) {
     let mut reader = hound::WavReader::open(filename).unwrap();
     let spec = reader.spec();
 
@@ -306,22 +300,31 @@ pub async fn read_wav(filename: &str) -> (AudioTrack<std::vec::IntoIter<f32>>, u
         hound::SampleFormat::Float => reader.samples::<f32>().map(|s| s.unwrap()).collect(),
     };
 
+    return (samples, spec.sample_rate);
+}
+
+pub async fn read_wav(filename: &str) -> (AudioTrack<std::vec::IntoIter<f32>>, u32) {
+    use cpal::{
+        traits::{DeviceTrait, HostTrait},
+        HostId,
+    };
+    use cpal::{SampleRate, SupportedStreamConfig};
+
+    let (samples, sample_rate) = read_wav_into_vec(filename).await;
+
     let host = cpal::host_from_id(HostId::Asio).expect("failed to initialise ASIO host");
     let device = host
         .default_input_device()
         .expect("failed to find input device");
     let default_config = device.default_input_config().unwrap();
     let config = SupportedStreamConfig::new(
-        1,                            // mono
-        SampleRate(spec.sample_rate), // sample rate
+        1,                       // mono
+        SampleRate(sample_rate), // sample rate
         default_config.buffer_size().clone(),
         default_config.sample_format(),
     );
 
-    return (
-        AudioTrack::new(samples.clone().into_iter(), config.clone()),
-        spec.sample_rate,
-    );
+    return (AudioTrack::new(samples.into_iter(), config), sample_rate);
 }
 
 pub async fn read_wav_and_play(filename: &str) {
