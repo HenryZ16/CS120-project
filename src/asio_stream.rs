@@ -1,7 +1,7 @@
 use anyhow::{Error, Result};
 use cpal::{
     traits::{DeviceTrait, StreamTrait},
-    Device, FromSample, Sample, SampleFormat, SizedSample,
+    Device, FromSample, Sample, SampleFormat, SizedSample, SampleRate
 };
 use futures::{FutureExt, Sink, SinkExt, Stream};
 use rodio::{OutputStream, Source, SupportedStreamConfig};
@@ -44,6 +44,45 @@ where
 
     pub fn Len(&self) -> usize {
         return self.iter.len();
+    }
+}
+
+impl AudioTrack<std::vec::IntoIter<f32>>{
+    pub fn from_wav(filename: &str, config: SupportedStreamConfig) -> Self{
+        let mut reader = hound::WavReader::open(filename).unwrap();
+        let spec = reader.spec();
+
+        println!(
+            "Read {filename} with sample format: {} and sample rate: {}",
+            match spec.sample_format {
+                hound::SampleFormat::Int => match spec.bits_per_sample {
+                    8 => "i8",
+                    16 => "i16",
+                    _ => panic!("unsupported bits per sample"),
+                },
+                hound::SampleFormat::Float => "f32",
+            },
+            spec.sample_rate
+        );
+        let samples: Vec<f32> = match spec.sample_format {
+            hound::SampleFormat::Int => match spec.bits_per_sample {
+                8 => {
+                    let samples: Vec<i8> = reader.samples::<i8>().map(|s| s.unwrap()).collect();
+                    samples.iter().map(|&s| s as f32 / i8::MAX as f32).collect()
+                }
+                16 => {
+                    let samples: Vec<i16> = reader.samples::<i16>().map(|s| s.unwrap()).collect();
+                    samples
+                        .iter()
+                        .map(|&s| s as f32 / i16::MAX as f32)
+                        .collect()
+                }
+                _ => panic!("unsupported bits per sample"),
+            },
+            hound::SampleFormat::Float => reader.samples::<f32>().map(|s| s.unwrap()).collect(),
+        };
+
+        return Self::new(samples.clone().into_iter(), config.clone());
     }
 }
 
@@ -266,7 +305,7 @@ where
     }
 }
 
-pub async fn read_wav(filename: &str) -> (AudioTrack<std::vec::IntoIter<f32>>, u32) {
+pub fn read_wav(filename: &str) -> (AudioTrack<std::vec::IntoIter<f32>>, u32) {
     use cpal::{
         traits::{DeviceTrait, HostTrait},
         HostId,
@@ -330,7 +369,7 @@ pub async fn read_wav_and_play(filename: &str) {
         HostId,
     };
     use cpal::{SampleRate, SupportedStreamConfig};
-    let (track, sample_rate) = read_wav(filename).await;
+    let (track, sample_rate) = read_wav(filename);
 
     let host = cpal::host_from_id(HostId::Asio).expect("failed to initialise ASIO host");
     let device = host
