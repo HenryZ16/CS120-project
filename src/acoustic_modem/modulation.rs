@@ -74,8 +74,7 @@ impl Modulator {
             .unwrap();
     }
 
-    // [Preamble : 10][Length : 30][Payload : 1024]
     pub fn send_bits(&self, data: Vec<u32>, len: usize) {
-        // TODO
+        // TODO: fit in the PHY frame in pa1 - obj2
     }
 }

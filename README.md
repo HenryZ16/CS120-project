@@ -14,7 +14,7 @@
 
 The length of our PHY Frame is 1064, where each part is:
 
-`[Preamble : 10][Length : 30][Payload : 1023]`
+`[Preamble : 10][Length : 30][Payload : 1024]`
 
 - `Preamble`: when a receiver detects this pattern, it means that we receives a frame. The preamble follows this pattern:
 
@@ -24,7 +24,7 @@ The length of our PHY Frame is 1064, where each part is:
 
     For why we use this pattern, you can assume that the nature generates `0` and `1` randomly at a probability of `0.5`. The probability for nature to generate `0101010101` is lower than `1e-4`, which is acceptable, and you can use Markov chain to prove it.
 
-- `Length`: this part indicates the length of the payload. actually, a payload with maximum length of 1023 only needs `10` bits to store its length. Here we use more 2 redundant bits for each original bits, to keep the accuracy.
+- `Length`: this part indicates the length of the payload. actually, a payload with maximum length of 1024 only needs `10` bits to store its length. Here we use more 2 redundant bits for each original bits, to keep the accuracy.
 
     Since we use Reed-Solomon to encode the payload, `Length` here stores the original (before encoding) length of the data.
 
