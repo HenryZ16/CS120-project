@@ -1,5 +1,15 @@
 # CS120-PROJECT
 
+## Modulation Specification
+
+- Shift keying policy:
+
+    **PSK** (Phase Shift Keying).
+
+- Carrier frequency: **1000Hz**
+
+    This frequency is low enough to come across the obstacles. Also it can avoid the inaccuracy bringing from the non-differential point when we using PSK.
+
 ## PHY Frame Specification
 
 The length of our PHY Frame is 1064, where each part is:
