@@ -26,6 +26,6 @@ The length of our PHY Frame is 1064, where each part is:
 
 - `Length`: this part indicates the length of the payload. actually, a payload with maximum length of 1024 only needs `10` bits to store its length. Here we use more 2 redundant bits for each original bits, to keep the accuracy.
 
-    Since we use Hamming ECC to encode the payload, `Length` here stores the original (before encoding) length of the data.
+    Since we use Reed-Solomon to encode the payload, `Length` here stores the original (before encoding) length of the data.
 
-- `Payload`: as mentioned in `Length`, we use Hamming ECC to encode the data, to ensure the accuracy.
+- `Payload`: as mentioned in `Length`, we use Reed-Solomon to encode the data, to ensure the accuracy.
