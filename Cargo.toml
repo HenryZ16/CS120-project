@@ -4,7 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+reed-solomon-erasure = "4.0"
 num-integer = "*"
+num-traits = "*"
 anyhow = "*"
 futures = "*"
 hound = "*"
