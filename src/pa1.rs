@@ -7,7 +7,7 @@ use cpal::{
 };
 
 pub async fn obj_2(host: &Host) -> Result<u32> {
-    let mut modulator_1 = Modulator::new(vec![1000.0, 10000.0], 48000, false);
+    let mut modulator_1 = Modulator::new(vec![1000, 10000], 48000, false);
     modulator_1.test_carrier_wave().await;
     return Ok(0);
 }

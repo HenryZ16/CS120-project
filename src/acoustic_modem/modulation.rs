@@ -15,7 +15,7 @@ use super::phy_frame;
 const SAMPLE_RATE: u32 = 48000;
 
 pub struct Modulator {
-    carrier_freq: Vec<f32>,
+    carrier_freq: Vec<u32>,
     sample_rate: u32,
     enable_ofdm: bool,
     output_stream: OutputAudioStream<std::vec::IntoIter<f32>>,
@@ -23,7 +23,7 @@ pub struct Modulator {
 }
 
 impl Modulator {
-    pub fn new(carrier_freq: Vec<f32>, sample_rate: u32, enable_ofdm: bool) -> Self {
+    pub fn new(carrier_freq: Vec<u32>, sample_rate: u32, enable_ofdm: bool) -> Self {
         let host = cpal::host_from_id(HostId::Asio).expect("failed to initialise ASIO host");
         let device = host.output_devices().expect("failed to find output device");
         let device = device
@@ -122,5 +122,6 @@ impl Modulator {
 
     pub fn modulate(&self, bits: &Vec<u8>) -> Vec<f32> {
         // TODO: PSK
+        vec![0.3]
     }
 }

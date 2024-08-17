@@ -1,4 +1,4 @@
-#[macro_use(shards)]
+// #[macro_use(shards)]
 extern crate reed_solomon_erasure;
 
 mod acoustic_modem;

@@ -1,9 +1,9 @@
 use anyhow::{Error, Result};
 use cpal::{
     traits::{DeviceTrait, HostTrait},
-    Device, Host, HostId, SampleRate, SupportedStreamConfig,
+     Host, SampleRate, SupportedStreamConfig,
 };
-use futures::{executor::block_on, future::join, join, SinkExt, StreamExt};
+use futures::{join, SinkExt, StreamExt};
 use std::time::{Duration, Instant};
 use tokio::time;
 
@@ -95,7 +95,7 @@ async fn obj_2(host: &Host) {
         }
     });
 
-    join!(output_handle, input_handle);
+    let _ = join!(output_handle, input_handle);
 
     let duration = start.elapsed();
 
