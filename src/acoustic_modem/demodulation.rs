@@ -19,6 +19,21 @@ pub struct Demodulation{
     config: SupportedStreamConfig,
     buffer: VecDeque<Vec<f32>>,
     ref_signal: Vec<Vec<f32>>,
+    ref_signal_len: Vec<u32>,
+}
+
+struct AlignResult{
+    phase: u8,
+    align_index: u32,
+}
+
+impl AlignResult{
+    pub fn new(phase: u8, align_index: u32) -> Self{
+        AlignResult{
+            phase,
+            align_index,
+        }
+    }
 }
 
 impl Demodulation{
@@ -42,9 +57,13 @@ impl Demodulation{
         let input_stream = InputAudioStream::new(&device, config.clone());
 
         let mut ref_signal = Vec::new();
+        let mut ref_signal_len = Vec::new();
 
         for i in 0..carrier_freq.len(){
-            let ref_sin = (0..config.sample_rate().0 / *carrier_freq.get(i).unwrap() as u32).map(|x| (2.0 * std::f32::consts::PI * x as f32 / config.sample_rate().0 as f32).sin()).collect::<Vec<f32>>();
+            let carrier = carrier_freq.get(i).unwrap();
+            let ref_len = sample_rate / *carrier;
+            ref_signal_len.push(ref_len);
+            let ref_sin = (0..ref_len).map(|t| (2.0 * std::f32::consts::PI * *carrier as f32 * (t as f32 / sample_rate as f32)).sin()).collect::<Vec<f32>>();
             ref_signal.push(ref_sin);
         }
 
@@ -55,36 +74,42 @@ impl Demodulation{
             config,
             buffer: VecDeque::new(),
             ref_signal,
+            ref_signal_len,
         }
     }
 
     // input length should be at least the length of the longest reference signal
-    // output length is the number of carrier frequencies, each bit is represented by 1.0 or 0.0
-    pub fn phase_demodulate(&self, input: &[f32]) -> Result<Vec<u8>, Error>{
-        let input_len = input.len();
-
-        if input_len < self.ref_signal.get(0).unwrap().len(){
-            return Err(Error::msg("Input length is too short"));
-        }
+    // output is the dot product of the input signal and the reference signal
+    // output length is the number of carrier frequencies
+    pub fn phase_dot_product(&self, input: &[f32]) -> Result<Vec<f32>, Error>{
+        let input_len = input.len();        
 
         let mut output = Vec::new();
 
         for i in 0..self.carrier_freq.len(){
+            if input_len != self.ref_signal.get(i).unwrap().len(){
+                println!("input len: {:?}", input_len);
+                println!("ref_signal len: {:?}", self.ref_signal.get(i).unwrap().len());
+                return Err(Error::msg("Input length is not equal to reference signal length"));
+            }
+
             let mut dot_product = 0.0;
             let mut ref_signal_iter = self.ref_signal.get(i).unwrap().into_iter();
+            // let ref_signal_vec = self.ref_signal.get(i).unwrap().clone();
             for j in 0..input_len{
                 dot_product += input[j] * ref_signal_iter.next().unwrap();
             }
+            
+            println!("dot_product: {:?}", dot_product);
 
-            output.push(
-                if dot_product > 0.0{
-                    1
-                }else{
-                    0
-                }
-            );
+            output.push(dot_product);
         }
 
         Ok(output)
+    }
+
+    pub fn detect_windowshift(&self, input: Vec<f32>) -> Result<AlignResult, Error>{
+        let input_len = input.len();
+        Err(Error::msg("Not implemented"))
     }
 }
