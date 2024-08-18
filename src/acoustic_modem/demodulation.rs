@@ -3,8 +3,6 @@ use anyhow::Error;
 use cpal::traits::{DeviceTrait, HostTrait};
 use cpal::{HostId, SampleRate, SupportedStreamConfig};
 use std::collections::VecDeque;
-use std::iter::Sum;
-use std::vec;
 // use futures::executor::block_on;
 // use futures::SinkExt;
 
@@ -18,20 +16,27 @@ pub struct Demodulation{
     input_stream: InputAudioStream,
     config: SupportedStreamConfig,
     buffer: VecDeque<Vec<f32>>,
-    ref_signal: Vec<Vec<f32>>,
+    ref_signal: Vec<Vec<f64>>,
     ref_signal_len: Vec<u32>,
 }
 
-struct AlignResult{
+// the return type of window shift detection
+// in order to detect the alignment of the input signal
+#[derive(Debug)]
+pub struct AlignResult{
     phase: u8,
     align_index: u32,
+    max_min_product: f32,
+    confirmed: bool,
 }
 
 impl AlignResult{
-    pub fn new(phase: u8, align_index: u32) -> Self{
+    pub fn new() -> Self{
         AlignResult{
-            phase,
-            align_index,
+            phase: 0,
+            align_index: std::u32::MAX,
+            max_min_product: 0.0,
+            confirmed: false,
         }
     }
 }
@@ -63,7 +68,7 @@ impl Demodulation{
             let carrier = carrier_freq.get(i).unwrap();
             let ref_len = sample_rate / *carrier;
             ref_signal_len.push(ref_len);
-            let ref_sin = (0..ref_len).map(|t| (2.0 * std::f32::consts::PI * *carrier as f32 * (t as f32 / sample_rate as f32)).sin()).collect::<Vec<f32>>();
+            let ref_sin = (0..ref_len).map(|t| (2.0 * std::f64::consts::PI * *carrier as f64 * (t as f64 / sample_rate as f64)).sin()).collect::<Vec<f64>>();
             ref_signal.push(ref_sin);
         }
 
@@ -87,29 +92,75 @@ impl Demodulation{
         let mut output = Vec::new();
 
         for i in 0..self.carrier_freq.len(){
-            if input_len != self.ref_signal.get(i).unwrap().len(){
+            if input_len != *self.ref_signal_len.get(i).unwrap() as usize{
                 println!("input len: {:?}", input_len);
                 println!("ref_signal len: {:?}", self.ref_signal.get(i).unwrap().len());
                 return Err(Error::msg("Input length is not equal to reference signal length"));
             }
 
-            let mut dot_product = 0.0;
+            let mut dot_product: f64 = 0.0;
             let mut ref_signal_iter = self.ref_signal.get(i).unwrap().into_iter();
             // let ref_signal_vec = self.ref_signal.get(i).unwrap().clone();
             for j in 0..input_len{
-                dot_product += input[j] * ref_signal_iter.next().unwrap();
+                dot_product += input[j] as f64 * ref_signal_iter.next().unwrap();
             }
             
             println!("dot_product: {:?}", dot_product);
 
-            output.push(dot_product);
+            output.push(dot_product as f32);
         }
 
         Ok(output)
     }
 
-    pub fn detect_windowshift(&self, input: Vec<f32>) -> Result<AlignResult, Error>{
+    // find the index of the first maximum/minimum value in the input vector
+    // detect frequency is the first carrier frequency
+    // TODO: remove the half wave of input signal
+    pub fn detect_windowshift(&self, input: &Vec<f32>) -> Result<AlignResult, Error>{
+        let power_floor: f32 = 5.0;
+
         let input_len = input.len();
-        Err(Error::msg("Not implemented"))
+
+        let mut result = AlignResult::new();
+        let mut prev_is_max = false;
+        let mut detect_once = false;
+
+        let detect_signal_len = *self.ref_signal_len.get(0).unwrap() as usize;
+
+        // println!("input_len: {:?}", input_len);
+        // println!("detect_freq: {:?}", detect_freq);
+        if input_len < detect_signal_len{
+            return Err(Error::msg("Input length is less than reference signal length"));
+        }
+
+        for i in 0..(input_len - detect_signal_len + 1){
+            let window_input = &input[i..(i + detect_signal_len)];
+            let phase_product = self.phase_dot_product(window_input).unwrap()[0];
+            // println!("phase_product: {:?}", phase_product);
+            if phase_product.abs() > power_floor{
+                if phase_product.abs() > result.max_min_product{
+                    result.max_min_product = phase_product.abs();
+                    result.align_index = i as u32;
+                    result.phase = if phase_product > 0.0 {1} else {0};
+                    prev_is_max = true;
+                }
+                else if prev_is_max{
+                    if !detect_once {
+                        detect_once = true;
+                    }
+                    else{
+                        result.confirmed = true;
+                        println!("result: {:?}", result);
+                        return Ok(result);
+                    }
+                }
+            } 
+        }
+        
+        if result.align_index != std::u32::MAX{
+            return Ok(result);
+        }
+
+        Err(Error::msg("No alignment found"))
     }
 }
