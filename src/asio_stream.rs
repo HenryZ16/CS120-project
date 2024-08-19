@@ -387,8 +387,8 @@ pub async fn read_wav_and_play(filename: &str) {
     let host = cpal::host_from_id(HostId::Asio).expect("failed to initialise ASIO host");
     let device = host
         .default_output_device()
-        .expect("failed to find input device");
-    let default_config = device.default_input_config().unwrap();
+        .expect("failed to find output device");
+    let default_config = device.default_output_config().unwrap();
     let config = SupportedStreamConfig::new(
         1,                       // mono
         SampleRate(sample_rate), // sample rate

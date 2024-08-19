@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+plotters = "0.3.6"
 reed-solomon-erasure = "4.0"
 num-integer = "*"
 num-traits = "*"

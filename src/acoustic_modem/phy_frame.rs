@@ -42,16 +42,21 @@ impl PHYFrame {
         // Preamble
         let preamble = FRAME_PREAMBLE;
         let mut preamble_length = FRAME_PREAMBLE_LENGTH as isize;
+        preamble_length -= 8;
         while preamble_length > 0 {
-            preamble_length -= 8;
             let byte = (preamble >> preamble_length) as u8;
             whole_frame_bits.push(byte);
+            preamble_length -= 8;
         }
+
+        println!("[get_whole_frame_bits] preamble: {:?}", whole_frame_bits);
 
         // Length
         let mut length: u64 = 0;
         let length_length = (frame_length_length() / FRAME_LENGTH_LENGTH_REDUNDANCY) as isize;
-        for i in (length_length - 1)..-1 {
+        println!("[get_whole_frame_bits] self.length: {:?}", self.length);
+        println!("[get_whole_frame_bits] length_length: {:?}", length_length);
+        for i in (0..length_length).rev() {
             for _ in 0..FRAME_LENGTH_LENGTH_REDUNDANCY {
                 length |= (self.length >> i) as u64 & 1;
                 length <<= 1;
@@ -72,18 +77,20 @@ impl PHYFrame {
             whole_frame_bits.push(byte);
         }
 
+        println!("[get_whole_frame_bits] length: {:?}", whole_frame_bits);
+
         // Payload
-        let mut payload_length = FRAME_PAYLOAD_LENGTH as isize;
-        let mut payload = self.payload.clone();
-        while payload_length > 0 {
-            payload_length -= 8;
-            let mut byte = 0;
+        let mut payload_length = (FRAME_PAYLOAD_LENGTH / 32) as isize;
+        let payload = self.payload.clone();
+        let mut loop_cnt = 0;
+        for _ in 0..payload_length {
             for i in 0..4 {
-                byte |= (payload[0][i] as u32) << (3 - i) * 8;
+                whole_frame_bits.push(payload[loop_cnt][i]);
             }
-            whole_frame_bits.push(byte as u8);
-            payload.remove(0);
+            loop_cnt += 1;
         }
+
+        println!("[get_whole_frame_bits] payload: {:?}", whole_frame_bits);
 
         return whole_frame_bits;
     }
@@ -100,22 +107,22 @@ impl PHYFrame {
 
         // extend the length of `data: Vec<u8>` to 1024 bits
         let mut data = data;
-        let mut data_len = data.len() * 8;
-        while data_len < MAX_FRAME_DATA_LENGTH {
+        let mut data_len = data.len();
+        while data_len < FRAME_PAYLOAD_LENGTH / 8 {
             data.push(0);
-            data_len += 8;
+            data_len += 1;
         }
 
         // construct the payload (to fit in the shard macro)
         let mut i = 0;
         let mut payload: Vec<Vec<u8>> = vec![];
-        while i < FRAME_PAYLOAD_LENGTH {
+        while i < FRAME_PAYLOAD_LENGTH / 8 {
             let mut payload_shard = vec![];
             for j in 0..4 {
                 payload_shard.push(data[i + j]);
             }
             payload.push(payload_shard);
-            i += 8;
+            i += 4;
         }
 
         // RS encoding
@@ -125,6 +132,9 @@ impl PHYFrame {
         )
         .unwrap();
         rs.encode(&mut payload).unwrap();
+
+        println!("payload: {:?}", payload);
+        println!("payload length: {:?}", payload.len());
 
         return Ok(payload);
     }

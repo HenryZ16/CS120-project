@@ -4,7 +4,7 @@ Input data
 -> Output Signal
 */
 use crate::asio_stream::{read_wav_into_vec, AudioTrack, OutputAudioStream};
-use crate::symrs::utils::lcm;
+use crate::utils;
 use cpal::traits::{DeviceTrait, HostTrait};
 use cpal::{HostId, SampleRate, SupportedStreamConfig};
 use futures::executor::block_on;
@@ -30,9 +30,9 @@ impl Modulator {
             .into_iter()
             .next()
             .expect("no output device available");
-        println!("Output device: {:?}", device.name().unwrap());
+        println!("[Modulator] Output device: {:?}", device.name().unwrap());
 
-        let default_config = device.default_input_config().unwrap();
+        let default_config = device.default_output_config().unwrap();
         let config = SupportedStreamConfig::new(
             1,                       // mono
             SampleRate(sample_rate), // sample rate
@@ -68,7 +68,7 @@ impl Modulator {
             wave.push(sample as f32);
         }
 
-        println!("wave length: {:?}", wave.len());
+        println!("[test_carrier_wave] wave length: {:?}", wave.len());
 
         self.output_stream
             .send(AudioTrack::new(wave.into_iter(), self.config.clone()))
@@ -83,17 +83,28 @@ impl Modulator {
     //   - modulate the bits
     //   - send the modulated signal
     pub async fn send_bits(&mut self, data: Vec<u8>, len: isize) {
-        // TODO
+        // TODO: impl OFDM
+        println!("[send_bits] send bits: {:?}", len);
         let mut len = len;
+        let mut loop_cnt = 0;
+        len -= phy_frame::MAX_FRAME_DATA_LENGTH as isize;
         while len > 0 {
-            len -= phy_frame::MAX_FRAME_DATA_LENGTH as isize;
             let mut payload = vec![];
-            for i in 0..phy_frame::MAX_FRAME_DATA_LENGTH {
-                payload.push(data[i]);
+            for i in 0..(phy_frame::MAX_FRAME_DATA_LENGTH / 8) {
+                payload.push(data[i + loop_cnt * (phy_frame::MAX_FRAME_DATA_LENGTH / 8)]);
             }
             let frame = phy_frame::PHYFrame::new(phy_frame::MAX_FRAME_DATA_LENGTH, payload);
             let frame_bits = frame.get_whole_frame_bits();
-            let modulated_signal = self.modulate(&frame_bits);
+            let decompressed_data = utils::read_compressed_u8_2_data(frame_bits);
+            println!(
+                "[send_bits] decompressed_data.len(): {}",
+                decompressed_data.len()
+            );
+            let modulated_signal = self.modulate(&decompressed_data, 0);
+            println!(
+                "[send_bits] modulated_signal.len(): {}",
+                modulated_signal.len()
+            );
             self.output_stream
                 .send(AudioTrack::new(
                     modulated_signal.into_iter(),
@@ -101,16 +112,24 @@ impl Modulator {
                 ))
                 .await
                 .unwrap();
+            len -= phy_frame::MAX_FRAME_DATA_LENGTH as isize;
+            loop_cnt += 1;
         }
 
         // send the last frame
+        len += phy_frame::MAX_FRAME_DATA_LENGTH as isize;
+        println!("[send_bits] remaining len: {:?}", len);
         let mut payload = vec![];
-        for i in 0..len {
-            payload.push(data[i as usize]);
+        for i in 0..((len + 7) / 8) {
+            payload.push(data[i as usize + loop_cnt * (phy_frame::MAX_FRAME_DATA_LENGTH / 8)]);
         }
         let frame = phy_frame::PHYFrame::new(len as usize, payload);
         let frame_bits = frame.get_whole_frame_bits();
-        let modulated_signal = self.modulate(&frame_bits);
+        let modulated_signal = self.modulate(&utils::read_compressed_u8_2_data(frame_bits), 0);
+        println!(
+            "[send_bits] modulated_signal.len(): {}",
+            modulated_signal.len()
+        );
         self.output_stream
             .send(AudioTrack::new(
                 modulated_signal.into_iter(),
@@ -118,10 +137,30 @@ impl Modulator {
             ))
             .await
             .unwrap();
+        println!("[send_bits] send {} frames", loop_cnt + 1);
     }
 
-    pub fn modulate(&self, bits: &Vec<u8>) -> Vec<f32> {
+    // translate the bits into modulated signal
+    pub fn modulate(&self, bits: &Vec<u8>, carrrier_freq_id: usize) -> Vec<f32> {
         // TODO: PSK
-        vec![0.3]
+        let mut modulated_signal = vec![];
+        let sample_cnt_each_bit = self.sample_rate / self.carrier_freq[carrrier_freq_id];
+        let mut bit_id = 0;
+        while bit_id < bits.len() {
+            let bit = bits[bit_id];
+            let freq = self.carrier_freq[carrrier_freq_id];
+            for i in 0..sample_cnt_each_bit {
+                let sample = (if bit == 0 { 1.0 } else { -1.0 })
+                    * (2.0
+                        * std::f64::consts::PI
+                        * freq as f64
+                        * (i + bit_id as u32 * sample_cnt_each_bit) as f64
+                        / self.sample_rate as f64)
+                        .sin();
+                modulated_signal.push(sample as f32);
+            }
+            bit_id += 1;
+        }
+        return modulated_signal;
     }
 }
