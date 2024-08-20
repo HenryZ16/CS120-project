@@ -9,6 +9,7 @@ use plotters::prelude::*;
 use rand::thread_rng;
 use rand::Rng;
 use rand_distr::Normal;
+use tokio::task;
 
 fn plot(modulated_signal: Vec<f32>) -> Result<(), Box<dyn std::error::Error>> {
     // get the first 10000 samples
@@ -78,37 +79,64 @@ async fn test_modulation() {
         .await;
 }
 
-// #[test]
-// fn test_demodulation() {
-//     let sample_rate = 48000;
-//     let carrier_freq = 1000;
+#[tokio::test]
+async fn test_demodulation_detect_windowshift() {
+    let sample_rate = 48000;
+    let carrier_freq = 1000;
 
-//     let normal = Normal::new(0.0, 0.2).unwrap();
-//     let mut rng = thread_rng();
+    let normal = Normal::new(0.0, 0.3).unwrap();
+    let mut rng = thread_rng();
 
-//     let mut demodulator = Demodulation::new(vec![carrier_freq], 48000, false);
+    let mut demodulator = Demodulation::new(vec![carrier_freq], 48000, false);
 
-//     let mut padding: Vec<f32> = (0..12).map(|_| rng.sample(&normal)).collect();
-//     let mut back_padding: Vec<f32> = (0..10).map(|_| rng.sample(&normal)).collect();
+    let mut padding: Vec<f32> = (0..0).map(|_| rng.sample(&normal)).collect();
+    let mut back_padding: Vec<f32> = (0..1).map(|_| rng.sample(&normal)).collect();
 
-//     let t = (0..(sample_rate / carrier_freq) * 2).map(|t| t as f32 / sample_rate as f32);
+    let t = (0..(sample_rate / carrier_freq) * 2).map(|t| t as f32 / sample_rate as f32);
 
-//     let mut test_vec = t
-//         .map(|t| (2.0 * std::f32::consts::PI * t * carrier_freq as f32).sin() + rng.sample(&normal))
-//         .collect::<Vec<f32>>();
+    let mut test_vec = t
+        .map(|t| (2.0 * std::f32::consts::PI * t * carrier_freq as f32).sin() + rng.sample(&normal))
+        .collect::<Vec<f32>>();
 
-//     padding.append(&mut test_vec);
-//     padding.append(&mut back_padding);
+    padding.append(&mut test_vec);
+    padding.append(&mut back_padding);
 
-//     let mut buffer = Vec::new();
-//     buffer.push(demodulator.detect_windowshift(&padding));
+    let mut buffer = Vec::new();
+    buffer.push(demodulator.detect_windowshift(&padding, 0.0));
 
-//     println!("buffer: {:?}", buffer);
-// }
+    println!("buffer: {:?}", buffer);
+}
 
-// #[test]
-// fn test_gen_vec(){
-//     use crate::asio_stream;
+#[tokio::test]
+async fn test_demodulation_detect_preamble(){
+    let sample_rate = 48000;
+    let carrier_freq = 1000;
+    let demodulator = Demodulation::new(vec![carrier_freq], 48000, false);
+    
+    // let handle1 = task::spawn(demodulator.detect_preamble(10));
 
-//     let input_stream = asio_stream::InputAudioStream::new(&asio_stream::get_device(0), asio_stream::get_config(0, 48000));
-// }
+    let handle1 = task::spawn(async move {
+        demodulator.detect_preamble(10).await;
+    });
+
+    handle1.await.unwrap();
+
+}
+
+#[test]
+fn test_iter(){
+
+    let index = 0;
+
+    let mut vec = vec![1, 2, 3, 4, 5];
+
+    let mut iter = vec.iter();
+    for _ in 0..index{
+        iter.next();
+    }
+
+    for i in iter{
+        println!("{}", i);
+    }
+
+}
