@@ -1,15 +1,22 @@
 use std::fs::File;
 use std::io::Read;
+use std::os::windows::thread;
+use std::time::Duration;
 use std::vec;
 
 use crate::acoustic_modem::demodulation::{self, Demodulation};
 use crate::acoustic_modem::modulation::Modulator;
 use crate::utils;
+use futures::join;
 use plotters::prelude::*;
 use rand::thread_rng;
 use rand::Rng;
 use rand_distr::Normal;
 use tokio::task;
+use tokio::time::sleep;
+
+use std::thread::spawn;
+
 
 fn plot(modulated_signal: Vec<f32>) -> Result<(), Box<dyn std::error::Error>> {
     // get the first 10000 samples
@@ -113,33 +120,67 @@ async fn test_demodulation_detect_preamble(){
     let carrier_freq = 1000;
     let demodulator = Demodulation::new(vec![carrier_freq], 48000, false);
     
-    let normal = Normal::new(0.0, 0.3).unwrap();
-    let mut rng = thread_rng();
+    let padding_lock = demodulator.buffer.clone();
+    
+    
+    
+    let handle1 = task::spawn(
+        async move{
+            let normal = Normal::new(0.0, 0.4).unwrap();
+            // let mut rng = thread_rng();
+            let mut padding = padding_lock.lock().await;
 
-    let padding = demodulator.buffer.clone();
-    let mut padding = padding.lock().await;
+            padding.push_back((0..10).map(|_| 0.0).collect());
 
-    padding.push_back((0..20).map(|_| rng.sample(&normal)).collect());
+            // let mut padding: Vec<f32> = (0..0).map(|_| rng.sample(&normal)).collect();
+            let mut back_padding: Vec<f32> = (0..0).map(|_| 0.0).collect();
 
-    // let mut padding: Vec<f32> = (0..0).map(|_| rng.sample(&normal)).collect();
-    let mut back_padding: Vec<f32> = (0..10).map(|_| rng.sample(&normal)).collect();
+            let phase_base = (0..(sample_rate / carrier_freq)).map(|t| t as f32 / sample_rate as f32);
+            let phase1 = phase_base.clone().map(|t| (2.0 * std::f32::consts::PI * t * carrier_freq as f32).sin()).collect::<Vec<f32>>();
+            let phase0 = phase_base.clone().map(|t| (2.0 * std::f32::consts::PI * t * carrier_freq as f32 + std::f32::consts::PI).sin()).collect::<Vec<f32>>();
 
-    let phase_base = (0..(sample_rate / carrier_freq)).map(|t| t as f32 / sample_rate as f32);
-    let phase1 = phase_base.clone().map(|t| (2.0 * std::f32::consts::PI * t * carrier_freq as f32).sin() + rng.sample(&normal)).collect::<Vec<f32>>();
-    let phase0 = phase_base.clone().map(|t| (2.0 * std::f32::consts::PI * t * carrier_freq as f32 + std::f32::consts::PI).sin() + rng.sample(&normal)).collect::<Vec<f32>>();
+            padding.push_back(phase1.clone());
+            padding.push_back(phase1.clone());
+            padding.push_back(phase0.clone());
+            padding.push_back(phase0.clone());
+            padding.push_back(phase1.clone());
+            drop(padding);
+            println!("send 1st sequence");
+            tokio::task::yield_now();
+            
+            for i in 1..5{
+                let mut padding = padding_lock.lock().await;
+                padding.push_back(phase0.clone());
+                padding.push_back(phase1.clone());
+                drop(padding);
+                sleep(Duration::from_millis(500));
+                println!("send {}st sequence", i + 1);
+                tokio::task::yield_now();
+            }
 
-    for i in 0..10{
-        padding.push_back(phase0.clone());
-        padding.push_back(phase1.clone());
-    }
-    padding.push_back(back_padding);
-    drop(padding);
+            let mut padding = padding_lock.lock().await;
+            padding.push_back(phase0.clone());
+            padding.push_back(phase1.clone());
+            drop(padding);
+            sleep(Duration::from_millis(500));
+
+            let mut padding = padding_lock.lock().await;
+            padding.push_back(back_padding);
+            drop(padding);
+        }
+    );
 
 
+    // join!(handle1);
+    // let res = demodulator.detect_preamble(3);
 
-    let res = demodulator.detect_preamble(1).await.unwrap();
-
-    println!("res: {:?}", res);
+    let handle2 = task::spawn(
+        async move{demodulator.detect_preamble(4).await;}
+    );
+    
+    handle1.await;
+    handle2.await;
+    // println!("res: {:?}", res.await.expect("error"));
 }
 
 #[test]
