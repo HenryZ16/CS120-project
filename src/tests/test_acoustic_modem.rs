@@ -102,7 +102,7 @@ async fn test_demodulation_detect_windowshift() {
     padding.append(&mut back_padding);
 
     let mut buffer = Vec::new();
-    buffer.push(demodulator.detect_windowshift(&padding, 0.0));
+    buffer.push(demodulator.detect_windowshift(&padding[..], 0.0, 0));
 
     println!("buffer: {:?}", buffer);
 }
@@ -113,14 +113,33 @@ async fn test_demodulation_detect_preamble(){
     let carrier_freq = 1000;
     let demodulator = Demodulation::new(vec![carrier_freq], 48000, false);
     
-    // let handle1 = task::spawn(demodulator.detect_preamble(10));
+    let normal = Normal::new(0.0, 0.3).unwrap();
+    let mut rng = thread_rng();
 
-    let handle1 = task::spawn(async move {
-        demodulator.detect_preamble(10).await;
-    });
+    let padding = demodulator.buffer.clone();
+    let mut padding = padding.lock().await;
 
-    handle1.await.unwrap();
+    padding.push_back((0..20).map(|_| rng.sample(&normal)).collect());
 
+    // let mut padding: Vec<f32> = (0..0).map(|_| rng.sample(&normal)).collect();
+    let mut back_padding: Vec<f32> = (0..10).map(|_| rng.sample(&normal)).collect();
+
+    let phase_base = (0..(sample_rate / carrier_freq)).map(|t| t as f32 / sample_rate as f32);
+    let phase1 = phase_base.clone().map(|t| (2.0 * std::f32::consts::PI * t * carrier_freq as f32).sin() + rng.sample(&normal)).collect::<Vec<f32>>();
+    let phase0 = phase_base.clone().map(|t| (2.0 * std::f32::consts::PI * t * carrier_freq as f32 + std::f32::consts::PI).sin() + rng.sample(&normal)).collect::<Vec<f32>>();
+
+    for i in 0..10{
+        padding.push_back(phase0.clone());
+        padding.push_back(phase1.clone());
+    }
+    padding.push_back(back_padding);
+    drop(padding);
+
+
+
+    let res = demodulator.detect_preamble(1).await.unwrap();
+
+    println!("res: {:?}", res);
 }
 
 #[test]

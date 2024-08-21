@@ -36,7 +36,7 @@ impl DemodulationConfig{
 
 pub struct Demodulation{
     input_stream: InputAudioStream,
-    buffer: Arc<Mutex<VecDeque<Vec<f32>>>>,
+    pub buffer: Arc<Mutex<VecDeque<Vec<f32>>>>,
     // carrier_freq: Vec<u32>,
     // enable_ofdm: bool,
     // ref_signal: Vec<Vec<f64>>,
@@ -51,11 +51,12 @@ pub struct Demodulation{
 // in order to detect the alignment of the input signal
 #[derive(Debug)]
 pub struct AlignResult{
-    align_index: u32,
+    align_index: usize,
     dot_product: f32,
+    received_bit: u8,
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub enum PreambleState{
     Waiting,
     First0,
@@ -116,8 +117,9 @@ impl PreambleState {
 impl AlignResult{
     pub fn new() -> Self{
         AlignResult{
-            align_index: std::u32::MAX,
+            align_index: std::usize::MAX,
             dot_product: 0.0,
+            received_bit: 0,
         }
     }
 }
@@ -204,7 +206,7 @@ impl Demodulation{
     // find the index of the first maximum/minimum value in the input vector
     // detect frequency is the first carrier frequency
     // TODO: remove the half wave of input signal
-    pub fn detect_windowshift(&self, input: &Vec<f32>, power_floor: f32) -> Result<AlignResult, Error>{
+    pub fn detect_windowshift(&self, input: &[f32], power_floor: f32, start_index: usize) -> Result<AlignResult, Error>{
         let demodulation_config = &self.config;
 
         let power_floor: f32 = {
@@ -216,7 +218,7 @@ impl Demodulation{
             }
         };
 
-        let input_len = input.len();
+        let input_len = input.len() - start_index;
 
         let mut result = AlignResult::new();
         let mut prev_is_max = false;
@@ -229,24 +231,31 @@ impl Demodulation{
             return Err(Error::msg("Input length is less than reference signal length"));
         }
 
-        for i in 0..(input_len - detect_signal_len + 1){
+        for i in start_index..(input_len - detect_signal_len + 1 + start_index){
             let window_input = &input[i..(i + detect_signal_len)];
             let phase_product = self.phase_dot_product(window_input).unwrap()[0];
             // println!("phase_product: {:?}", phase_product);
             if phase_product.abs() > power_floor{
                 if phase_product.abs() > result.dot_product.abs(){
-                    result.align_index = i as u32;
-                    result.dot_product = phase_product;
+                    result.align_index = i;
+                    result.received_bit = if phase_product > 0.0{
+                        1
+                    }
+                    else{
+                        0
+                    };
+                    result.dot_product = phase_product.abs();
                     prev_is_max = true;
                 }
                 else if prev_is_max{
-                    println!("result: {:?}", result);
+                    // println!("result: {:?}", result);
                     break;
                 }
             } 
         }
         
-        if result.align_index != std::u32::MAX{
+        if result.align_index != std::usize::MAX{
+            // println!("result: {:?}", result);
             return Ok(result);
         }
 
@@ -254,18 +263,21 @@ impl Demodulation{
     }
 
     pub async fn detect_preamble(&self, time_limit: u64) -> Result<(), Error>{
-        let error = 3.0;
-
-        let duration = Duration::from_secs(time_limit);
+        // let duration = Duration::from_secs(time_limit);
+        let duration = Duration::from_millis(5);
         let demodulation_config = &self.config;
         let ref_signal_len = *demodulation_config.ref_signal_len.get(0).unwrap() as usize;
         match timeout(duration, async move{
+            println!("start detect preamble");
+
             let mut last_align_result = AlignResult::new();
             let mut preamble_state = PreambleState::Waiting;
             let mut concat_buffer: Vec<f32> = Vec::new();
             let mut buffer_read_index = 0;
             let mut is_aligned = false;
             while preamble_state != PreambleState::ToRecv {
+                println!("preamble_state: {:?}", preamble_state);
+
                 let mut buffer = self.buffer.lock().await;
                 if buffer.len() > 0{
                     let mut buffer_iter = buffer.iter();
@@ -280,14 +292,34 @@ impl Demodulation{
                         continue;
                     }
 
+                    // println!("concat_buffer: {:?}", concat_buffer);
+
                     if !is_aligned{
-                        let align_result = self.detect_windowshift(&concat_buffer, 5.0).unwrap();
-                        if align_result.align_index != std::u32::MAX{
-                            if last_align_result.align_index == std::u32::MAX{
-                                last_align_result = align_result;
-                            }
-                            else if last_align_result.align_index != align_result.align_index{
-                                if (last_align_result.dot_product - align_result.dot_product).abs() < last_align_result.dot_product / 3.0{
+                        let start = if last_align_result.align_index == std::usize::MAX{
+                            println!("start from 0");
+                            0
+                        }
+                        else{
+                            // println!("start from last_align_result.align_index + 1");
+                            last_align_result.align_index + *demodulation_config.ref_signal_len.get(0).unwrap() as usize / 2
+                        };
+
+                        // println!("start: {:?}", start);
+
+                        let align_result = self.detect_windowshift(&concat_buffer[..], last_align_result.dot_product / 3.0, start).unwrap();
+
+                        // println!("align_result: {:?}, last_result: {:?}", align_result, last_align_result);
+                        // println!("is_aligned: {:?}", is_aligned);
+
+
+                        if align_result.align_index != std::usize::MAX{
+                            // if last_align_result.align_index == std::usize::MAX{
+                            //     last_align_result = align_result;
+                            //     println!("update last_align_result");
+                            // }
+                            // else 
+                            if last_align_result.align_index != align_result.align_index{
+                                if (last_align_result.dot_product - align_result.dot_product).abs() < (last_align_result.dot_product / 3.0){
                                     is_aligned = true;
                                     preamble_state.state_move(
                                         if last_align_result.dot_product > 0.0{
@@ -304,32 +336,53 @@ impl Demodulation{
                                         else {
                                             0
                                         }
-                                    );
-                                    last_align_result = align_result;
-                                    
-                                    buffer_read_index = 0;
-                                    
-                                    while buffer.get(0).unwrap().len() > last_align_result.align_index{
-                                        let tmp_vec = buffer.pop_front().unwrap();
-                                        last_align_result.align_index -= tmp_vec.len() as u32;
-                                    }
+                                    );                                    
                                 }
                             }
-                            else{
-                                continue;
+                            
+                            
+                            last_align_result = align_result;
+                            buffer_read_index = 0;
+                            concat_buffer.clear();
+                            
+                            while buffer.get(0).unwrap().len() < last_align_result.align_index{
+                                let tmp_vec = buffer.pop_front().unwrap();
+                                last_align_result.align_index -= tmp_vec.len();
                             }
+                            
                         }
-                        else{
+                    }
+                    else{
+                        if concat_buffer.len() < (ref_signal_len + last_align_result.align_index){
                             continue;
+                        }
+    
+                        println!("has aligned");
+                        let dot_product = self.phase_dot_product(&concat_buffer[last_align_result.align_index..(last_align_result.align_index + ref_signal_len)]).unwrap()[0];
+                        if dot_product.abs() > last_align_result.dot_product.abs() * 2.0 / 3.0{
+                            preamble_state.state_move(
+                                if dot_product > 0.0{
+                                    1
+                                }
+                                else{
+                                    0
+                                }
+                            );
+                            buffer_read_index = 0;
+                            concat_buffer.clear();
+                            last_align_result.align_index += ref_signal_len;
+                            last_align_result.dot_product = dot_product;
+    
+                            while buffer.get(0).unwrap().len() < last_align_result.align_index{
+                                let tmp_vec = buffer.pop_front().unwrap();
+                                last_align_result.align_index -= tmp_vec.len();
+                            }    
+    
                         }
                     }
                 }
 
                 // has aligned
-                else{
-                    
-
-                }
             }
             Ok::<(), Error>(())
         }).await{
