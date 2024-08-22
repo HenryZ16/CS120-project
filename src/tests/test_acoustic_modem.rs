@@ -9,9 +9,11 @@ use crate::acoustic_modem::modulation::{self, Modulator};
 use crate::utils;
 use futures::join;
 use plotters::prelude::*;
+use rand::seq::index;
 use rand::thread_rng;
 use rand::Rng;
 use rand_distr::Normal;
+use rodio::buffer;
 use tokio::{signal, task};
 use tokio::time::sleep;
 
@@ -198,14 +200,33 @@ async fn test_listen_directly(){
 
     let signal = modulation.send_bits(data.clone(), data.len() as isize).await;
 
-    let mut buffer = buffer.lock().await;
+    // let mut buffer = buffer.lock().await;
+    let mut buffer = Vec::new();
     for vec in signal{
-        buffer.push_back(vec);
+        // buffer.push_back(vec);
+        buffer.extend(vec);
     }
 
-    drop(buffer);
+    // drop(buffer);
 
-    demodulator.listening(1).await;
+    // demodulator.listening(1).await;
+    
+    let mut recv_data: Vec<u8> = Vec::new();
+    let mut index = 0;
+    while index < buffer.len(){
+        recv_data.push(
+            if demodulator.phase_dot_product(&buffer[index..index+48]).unwrap()[0] > 0.0{
+                1
+            }else{
+                0
+            }
+        );
+        index += 48;
+    }
+
+    let recv_data = utils::read_data_2_compressed_u8(recv_data);
+    println!("len of recv_data: {}", recv_data.len());
+    println!("recv_data: {:?}", recv_data);
 }
 
 #[tokio::test]

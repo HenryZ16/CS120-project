@@ -188,7 +188,7 @@ impl Demodulation{
             let carrier = carrier_freq.get(i).unwrap();
             let ref_len = (sample_rate / *carrier) as usize;
             ref_signal_len.push(ref_len);
-            let ref_sin = (0..ref_len).map(|t| (2.0 * std::f64::consts::PI * *carrier as f64 * (t as f64 / sample_rate as f64)).sin()).collect::<Vec<f64>>();
+            let ref_sin = (0..ref_len).map(|t| - (2.0 * std::f64::consts::PI * *carrier as f64 * (t as f64 / sample_rate as f64)).sin()).collect::<Vec<f64>>();
             ref_signal.push(ref_sin);
         }
 
@@ -458,6 +458,7 @@ impl Demodulation{
             }
         }
 
+        println!("recv_buffer: {:?}", recv_buffer);
         let recv_buffer = utils::read_data_2_compressed_u8(recv_buffer);
         for i in recv_buffer{
             length <<= 4;

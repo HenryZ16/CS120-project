@@ -91,6 +91,7 @@ impl PHYFrame {
         }
 
         println!("[get_whole_frame_bits] payload: {:?}", whole_frame_bits);
+        println!("[get_whole_frame_bits] whole_frame_bits.len(): {:?}", whole_frame_bits.len());
 
         return whole_frame_bits;
     }
