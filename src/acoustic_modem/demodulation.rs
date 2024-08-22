@@ -124,7 +124,7 @@ impl PreambleState {
             *self = self.back_waiting();
         }
         
-        // println!("current state: {:?}", self);
+        println!("current state: {:?}", self);
     }
 }
 
@@ -158,7 +158,7 @@ unsafe impl Sync for Demodulation{}
 
 impl Demodulation{
     pub fn new(carrier_freq: Vec<u32>, sample_rate: u32, enable_ofdm: bool) -> Self{
-        // let host = cpal::host_from_id(HostId::Asio).expect("failed to initialise ASIO host");
+        let host = cpal::host_from_id(HostId::Asio).expect("failed to initialise ASIO host");
         let host = cpal::default_host();
         let device = host.input_devices().expect("failed to find input device");
         let device = device
@@ -238,8 +238,8 @@ impl Demodulation{
         let demodulation_config = &self.demodulate_config;
 
         let power_floor: f32 = {
-            if power_floor < 1.0{
-                1.0
+            if power_floor < 0.1{
+                0.1
             }
             else{
                 power_floor
@@ -476,12 +476,18 @@ impl Demodulation{
 
         last_align_result.align_index += ref_signal_len;
 
+        for i in 0..10{
+            let mut ones = 0;
+            for j in 0..3{
+                if recv_buffer[i * 3 + j + 2] == 1{
+                    ones += 1;
+                }
+            }
+            length = length * 2 + ones;
+        }
+        
         let recv_buffer = utils::read_data_2_compressed_u8(recv_buffer);
         println!("recv_buffer: {:?}", recv_buffer);
-        for i in recv_buffer{
-            length <<= 4;
-            length |= i as usize;
-        }
         println!("length: {:?}", length);
         let mut recv_buffer: Vec<u8> = Vec::new();
 
@@ -559,7 +565,7 @@ impl Demodulation{
                 _ = async{
                     while let Some(data) = input_stream.next().await{
                         let mut buffer = buffer_input.lock().await;
-                        println!("get lock in recorder");
+                        // println!("get lock in recorder");
                         buffer.push_back(data);
                     }
                 } => {},

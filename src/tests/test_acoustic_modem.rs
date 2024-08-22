@@ -235,7 +235,7 @@ async fn test_listening()
     let carrier_freq = 1000;
     let mut demodulator = Demodulation::new(vec![carrier_freq], 48000, false);
 
-    demodulator.listening(1).await;
+    demodulator.listening(5).await;
 }
 
 #[test]
