@@ -1,17 +1,15 @@
+use crate::acoustic_modem::{modulation, phy_frame};
 use crate::asio_stream::InputAudioStream;
+use crate::utils;
 use anyhow::Error;
 use cpal::traits::{DeviceTrait, HostTrait};
-use cpal::{HostId, SampleRate, SupportedStreamConfig};
+use cpal::{HostId, SampleRate, SupportedStreamConfig, Device};
 use futures::StreamExt;
+use tokio::select;
 use core::time;
 use std::collections::VecDeque;
 use std::env::consts;
-// use futures::executor::block_on;
-// use futures::SinkExt;
-
-use super::phy_frame;
-
-use tokio::{sync::Mutex, task, time::{timeout, Duration}};
+use tokio::{sync::{Mutex, oneshot}, task, time::{timeout, Duration}};
 use std::sync::Arc;
 
 struct DemodulationConfig{
@@ -35,6 +33,31 @@ impl DemodulationConfig{
     }
 }
 
+struct InputStreamConfig{
+    config: SupportedStreamConfig,
+    device: Device,
+}
+
+impl InputStreamConfig{
+    fn new(config: SupportedStreamConfig, device: Device) -> Self{
+        InputStreamConfig{
+            config,
+            device,
+        }
+    }
+
+    fn create_input_stream(&self) -> InputAudioStream{
+
+        // println!("create input stream");
+        // println!("config: {:?}", self.config);
+        // println!("device: {:?}", self.device.name());
+
+        InputAudioStream::new(&self.device, self.config.clone())
+    }
+}
+
+unsafe impl Send for InputStreamConfig{}
+unsafe impl Sync for InputStreamConfig{}
 
 // the return type of window shift detection
 // in order to detect the alignment of the input signal
@@ -101,7 +124,7 @@ impl PreambleState {
             *self = self.back_waiting();
         }
         
-        println!("current state: {:?}", self);
+        // println!("current state: {:?}", self);
     }
 }
 
@@ -126,16 +149,17 @@ impl AlignResult{
 unsafe impl Send for AlignResult{}
 unsafe impl Sync for AlignResult{}
 pub struct Demodulation{
-    input_stream: InputAudioStream,
+    input_config: InputStreamConfig,
     pub buffer: Arc<Mutex<VecDeque<Vec<f32>>>>,
-    config: DemodulationConfig,
+    demodulate_config: DemodulationConfig,
 }
 unsafe impl Send for Demodulation{}
 unsafe impl Sync for Demodulation{}
 
 impl Demodulation{
     pub fn new(carrier_freq: Vec<u32>, sample_rate: u32, enable_ofdm: bool) -> Self{
-        let host = cpal::host_from_id(HostId::Asio).expect("failed to initialise ASIO host");
+        // let host = cpal::host_from_id(HostId::Asio).expect("failed to initialise ASIO host");
+        let host = cpal::default_host();
         let device = host.input_devices().expect("failed to find input device");
         let device = device
             .into_iter()
@@ -151,7 +175,7 @@ impl Demodulation{
             default_config.sample_format(),
         );
 
-        let input_stream = InputAudioStream::new(&device, config.clone());
+        let input_stream_config = InputStreamConfig::new(config, device);
 
         // sort carrier_freq in ascending order
         let mut carrier_freq = carrier_freq;
@@ -171,9 +195,9 @@ impl Demodulation{
         let demodulation_config = DemodulationConfig::new(carrier_freq, enable_ofdm, ref_signal, ref_signal_len); 
 
         Demodulation{
-            input_stream,
+            input_config: input_stream_config,
             buffer: Arc::new(Mutex::new(VecDeque::new())),
-            config: demodulation_config,
+            demodulate_config: demodulation_config,
         }
     }
 
@@ -181,7 +205,7 @@ impl Demodulation{
     // output is the dot product of the input signal and the reference signal
     // output length is the number of carrier frequencies
     pub fn phase_dot_product(&self, input: &[f32]) -> Result<Vec<f32>, Error>{
-        let demodulation_config = &self.config;
+        let demodulation_config = &self.demodulate_config;
         let input_len = input.len();        
 
         let mut output = Vec::new();
@@ -211,11 +235,11 @@ impl Demodulation{
     // detect frequency is the first carrier frequency
     // TODO: remove the half wave of input signal
     pub fn detect_windowshift(&self, input: &[f32], power_floor: f32, start_index: usize) -> Result<AlignResult, Error>{
-        let demodulation_config = &self.config;
+        let demodulation_config = &self.demodulate_config;
 
         let power_floor: f32 = {
-            if power_floor < 5.0{
-                5.0
+            if power_floor < 1.0{
+                1.0
             }
             else{
                 power_floor
@@ -252,7 +276,7 @@ impl Demodulation{
                     prev_is_max = true;
                 }
                 else if prev_is_max{
-                    println!("result: {:?}", result);
+                    // println!("result: {:?}", result);
                     break;
                 }
             } 
@@ -266,13 +290,13 @@ impl Demodulation{
         Err(Error::msg("No alignment found"))
     }
 
-    pub async fn detect_preamble(&self, time_limit: u64) -> Result<(), Error>{
+    pub async fn detect_preamble(&self, time_limit: u64) -> Result<AlignResult, Error>{
         let duration = Duration::from_secs(time_limit);
-        // let duration = Duration::from_millis(1);
-        let demodulation_config = &self.config;
+        // let duration = Duration::from_millis(100);
+        let demodulation_config = &self.demodulate_config;
         let ref_signal_len = *demodulation_config.ref_signal_len.get(0).unwrap() as usize;
         match timeout(duration, async move{
-            println!("start detect preamble");
+            // println!("start detect preamble");
 
             let mut last_align_result = AlignResult::new();
             let mut preamble_state = PreambleState::Waiting;
@@ -283,6 +307,7 @@ impl Demodulation{
                 // println!("preamble_state: {:?}", preamble_state);
 
                 let mut buffer = self.buffer.lock().await;
+                // println!("get lock in detection, buffer len: {:?}", buffer.len());
                 if buffer.len() > 0{
                     let mut buffer_iter = buffer.iter();
                     for _ in 0..buffer_read_index{
@@ -304,7 +329,7 @@ impl Demodulation{
                     };
 
                     let align_result = self.detect_windowshift(&concat_buffer[..], last_align_result.dot_product / 3.0 * 2.0, start);
-                    let align_result = match align_result{
+                    let mut align_result = match align_result{
                         Ok(result) => result,
                         Err(_) => {
                             last_align_result.align_index = concat_buffer.len() - ref_signal_len;
@@ -328,17 +353,36 @@ impl Demodulation{
                         last_align_result = align_result;
                     }
                     else{
-                        preamble_state.state_move(align_result.received_bit);
-                        if(preamble_state != PreambleState::Waiting){
-                            last_align_result = align_result;
-                        }
-                        else {
-                            is_aligned = false;
+                        loop{
+                            preamble_state.state_move(align_result.received_bit);
+                            if(preamble_state != PreambleState::Waiting){
+                                last_align_result = align_result;
+                                if(preamble_state != PreambleState::ToRecv && last_align_result.align_index + 2 * ref_signal_len < concat_buffer.len()){
+                                    let tmp_res = self.detect_windowshift(&concat_buffer[..], last_align_result.dot_product * 2.0 / 3.0, last_align_result.align_index + ref_signal_len);
+                                    match tmp_res{
+                                        Ok(res) => {
+                                            align_result = res;
+                                        }
+                                        Err(_) => {
+                                            break;
+                                        }
+                                    }
+                                }
+                                else {
+                                    break;
+                                }
+                            }
+                            else {
+                                is_aligned = false;
+                                break;
+                            }
                         }
                     }
+
                     if is_aligned{
                         last_align_result.align_index += ref_signal_len;
                     }
+
                     buffer_read_index = 0;
                     concat_buffer.clear();
                     while !buffer.is_empty() && (buffer.get(0).unwrap().len() <= last_align_result.align_index){
@@ -350,16 +394,176 @@ impl Demodulation{
 
                 // has aligned
             }
-            println!("have detected preamble, start receiving data");
-            Ok::<AlignResult, Error>(last_align_result)
+            // println!("have detected preamble, start receiving data");
+            last_align_result
         }).await{
-            Ok(_) => Ok(()),
+            Ok(last_align_result) => Ok(last_align_result),
             Err(_) => Err(Error::msg("Timeout")),
         }
     }
 
 
-    // pub async fn recv_frame(&self, align_result: &AlignResult){
+    pub async fn recv_frame(&self, align_result: &AlignResult) -> Result<Vec<u8>, Error>{
+        let start_index = align_result.align_index;
+        let demodulate_config = &self.demodulate_config;
+        let ref_signal_len = *demodulate_config.ref_signal_len.get(0).unwrap() as usize;
+        let power_floor = align_result.dot_product / 3.0 * 2.0;
+        let mut last_align_result = AlignResult::copy(align_result);
+
+        let mut recv_buffer: Vec<u8> = vec![0,0];
         
-    // }
+        let mut concat_buffer: Vec<f32> = Vec::new();
+        let mut buffer_read_index = 0;
+        
+        let mut length: usize = 0;
+        let mut bits_num = 0;
+        while bits_num < 30{
+            let mut buffer = self.buffer.lock().await;
+            if buffer.len() > 0{
+                let mut buffer_iter = buffer.iter();
+                for _ in 0..buffer_read_index{
+                    buffer_iter.next();
+                }
+                for i in buffer_iter{
+                    concat_buffer.extend(i);
+                    buffer_read_index += 1;
+                }
+                if concat_buffer.len() < ref_signal_len as usize{
+                    continue;
+                }
+
+                let mut start = last_align_result.align_index + ref_signal_len;
+                while start + ref_signal_len < concat_buffer.len() && bits_num < 30{
+                    let align_result = self.detect_windowshift(&concat_buffer[start..], power_floor, 0);
+                    let align_result = match align_result{
+                        Ok(result) => result,
+                        Err(_) => {
+                            return Err(Error::msg("No contunuous data found"));
+                        }
+                    };
+
+                    if last_align_result.align_index != align_result.align_index{
+                        last_align_result = align_result;
+                        last_align_result.align_index += ref_signal_len;
+                        recv_buffer.push(last_align_result.received_bit);
+                        bits_num += 1;
+                        
+                        if !buffer.is_empty() && buffer.get(0).unwrap().len() <= last_align_result.align_index{
+                            let tmp_vec = buffer.pop_front().unwrap();
+                            last_align_result.align_index -= tmp_vec.len();
+                        }
+                        start = last_align_result.align_index;
+                    }
+                }
+            }
+        }
+
+        let recv_buffer = utils::read_data_2_compressed_u8(recv_buffer);
+        for i in recv_buffer{
+            length <<= 4;
+            length |= i as usize;
+        }
+        println!("length: {:?}", length);
+        let mut recv_buffer: Vec<u8> = Vec::new();
+
+        let mut bits_num = 0;
+        while bits_num < phy_frame::FRAME_PAYLOAD_LENGTH{
+            let mut buffer = self.buffer.lock().await;
+            if buffer.len() > 0{
+                let mut buffer_iter = buffer.iter();
+                for _ in 0..buffer_read_index{
+                    buffer_iter.next();
+                }
+                for i in buffer_iter{
+                    concat_buffer.extend(i);
+                    buffer_read_index += 1;
+                }
+                if concat_buffer.len() < ref_signal_len as usize{
+                    continue;
+                }
+
+                let mut start = last_align_result.align_index + ref_signal_len;
+                while start + ref_signal_len < concat_buffer.len() && bits_num < phy_frame::FRAME_PAYLOAD_LENGTH{
+                    let align_result = self.detect_windowshift(&concat_buffer[start..], power_floor, 0);
+                    let align_result = match align_result{
+                        Ok(result) => result,
+                        Err(_) => {
+                            return Err(Error::msg("No contunuous data found"));
+                        }
+                    };
+
+                    if last_align_result.align_index != align_result.align_index{
+                        last_align_result = align_result;
+                        last_align_result.align_index += ref_signal_len;
+                        recv_buffer.push(last_align_result.received_bit);
+                        bits_num += 1;
+                        
+                        if !buffer.is_empty() && buffer.get(0).unwrap().len() <= last_align_result.align_index{
+                            let tmp_vec = buffer.pop_front().unwrap();
+                            last_align_result.align_index -= tmp_vec.len();
+                        }
+                        start = last_align_result.align_index;
+                    }
+                }
+            }
+        }
+        
+        let recv_buffer = phy_frame::PHYFrame::data_2_payload(utils::read_data_2_compressed_u8(recv_buffer), length).unwrap();
+        let res = phy_frame::PHYFrame::payload_2_data(recv_buffer).unwrap();
+
+        // println!("recv_buffer: {:?}", recv_buffer);
+
+        Ok(res)
+    }
+
+    pub async fn listening(&mut self, time_limit: u64){
+        println!("start recording");
+
+        let mut buffer_input = self.buffer.clone();
+        let mut input_stream = self.input_config.create_input_stream();
+
+        let (stop_sender, stop_receiver) = oneshot::channel::<()>();
+
+        let handle_recorder = async move{
+            select! {
+                _ = async{
+                    while let Some(data) = input_stream.next().await{
+                        let mut buffer = buffer_input.lock().await;
+                        println!("get lock in recorder");
+                        buffer.push_back(data);
+                    }
+                } => {},
+                _ = stop_receiver => {
+                    println!("stop recording");
+                },
+            }
+        };
+
+        let handle_detect_preamble =self.detect_preamble(time_limit);
+
+        select! {
+            _ = handle_recorder => {},
+            result_detect = handle_detect_preamble => {
+                match  result_detect {
+                    Ok(align_result) => {
+                        println!("detect preamble success, start receiving data");
+                        let handle_recv_frame = self.recv_frame(&align_result).await;
+                        match handle_recv_frame{
+                            Ok(_) => {
+                                println!("receive frame success");
+                            }
+                            Err(_) => {
+                                println!("receive frame failed");
+                            }
+                        }
+                        stop_sender.send(());
+                        
+                    }
+                    Err(_) => {
+                        println!("detect preamble failed");
+                    }
+                }
+            }
+        }
+    }
 }

@@ -5,14 +5,14 @@ use std::time::Duration;
 use std::vec;
 
 use crate::acoustic_modem::demodulation::{self, Demodulation};
-use crate::acoustic_modem::modulation::Modulator;
+use crate::acoustic_modem::modulation::{self, Modulator};
 use crate::utils;
 use futures::join;
 use plotters::prelude::*;
 use rand::thread_rng;
 use rand::Rng;
 use rand_distr::Normal;
-use tokio::task;
+use tokio::{signal, task};
 use tokio::time::sleep;
 
 use std::thread::spawn;
@@ -130,7 +130,7 @@ async fn test_demodulation_detect_preamble(){
             // let mut rng = thread_rng();
             let mut padding = padding_lock.lock().await;
 
-            padding.push_back((0..10).map(|_| 0.0).collect());
+            padding.push_back((0..20).map(|_| 0.0).collect());
 
             // let mut padding: Vec<f32> = (0..0).map(|_| rng.sample(&normal)).collect();
             let mut back_padding: Vec<f32> = (0..0).map(|_| 0.0).collect();
@@ -139,11 +139,11 @@ async fn test_demodulation_detect_preamble(){
             let phase1 = phase_base.clone().map(|t| (2.0 * std::f32::consts::PI * t * carrier_freq as f32).sin()).collect::<Vec<f32>>();
             let phase0 = phase_base.clone().map(|t| (2.0 * std::f32::consts::PI * t * carrier_freq as f32 + std::f32::consts::PI).sin()).collect::<Vec<f32>>();
 
-            padding.push_back(phase1.clone());
-            padding.push_back(phase1.clone());
-            padding.push_back(phase0.clone());
-            padding.push_back(phase0.clone());
-            padding.push_back(phase1.clone());
+            // padding.push_back(phase1.clone());
+            // padding.push_back(phase1.clone());
+            // padding.push_back(phase0.clone());
+            // padding.push_back(phase0.clone());
+            // padding.push_back(phase1.clone());
             drop(padding);
             println!("send 1st sequence");
             tokio::task::yield_now();
@@ -181,6 +181,41 @@ async fn test_demodulation_detect_preamble(){
     handle1.await;
     handle2.await;
     // println!("res: {:?}", res.await.expect("error"));
+}
+
+
+#[tokio::test]
+async fn test_listen_directly(){
+    let sample_rate = 48000;
+    let carrier_freq = 1000;
+    let mut demodulator = Demodulation::new(vec![carrier_freq], 48000, false);
+    let mut modulation = Modulator::new(vec![carrier_freq], sample_rate, false);
+
+    let data = vec![1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 1, 1];
+    // let data = [1; 2048].to_vec();
+    let data = utils::read_data_2_compressed_u8(data);
+    let buffer = demodulator.buffer.clone();
+
+    let signal = modulation.send_bits(data.clone(), data.len() as isize).await;
+
+    let mut buffer = buffer.lock().await;
+    for vec in signal{
+        buffer.push_back(vec);
+    }
+
+    drop(buffer);
+
+    demodulator.listening(1).await;
+}
+
+#[tokio::test]
+async fn test_listening()
+{
+    let sample_rate = 48000;
+    let carrier_freq = 1000;
+    let mut demodulator = Demodulation::new(vec![carrier_freq], 48000, false);
+
+    demodulator.listening(1).await;
 }
 
 #[test]

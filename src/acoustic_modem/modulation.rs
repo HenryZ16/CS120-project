@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 /*
 Input data
 -> Modulation
@@ -82,12 +84,16 @@ impl Modulator {
     //   - get the whole frame bits
     //   - modulate the bits
     //   - send the modulated signal
-    pub async fn send_bits(&mut self, data: Vec<u8>, len: isize) {
+    pub async fn send_bits(&mut self, data: Vec<u8>, len: isize) -> VecDeque<Vec<f32>>{
         // TODO: impl OFDM
         println!("[send_bits] send bits: {:?}", len);
         let mut len = len;
         let mut loop_cnt = 0;
         len -= phy_frame::MAX_FRAME_DATA_LENGTH as isize;
+
+        // for debug
+        let mut output = VecDeque::new();
+
         while len > 0 {
             let mut payload = vec![];
             for i in 0..(phy_frame::MAX_FRAME_DATA_LENGTH / 8) {
@@ -105,6 +111,11 @@ impl Modulator {
                 "[send_bits] modulated_signal.len(): {}",
                 modulated_signal.len()
             );
+
+            // for debug
+            output.push_back(modulated_signal.clone());
+
+
             self.output_stream
                 .send(AudioTrack::new(
                     modulated_signal.into_iter(),
@@ -130,6 +141,11 @@ impl Modulator {
             "[send_bits] modulated_signal.len(): {}",
             modulated_signal.len()
         );
+
+        // for debug
+        output.push_back(modulated_signal.clone());
+
+
         self.output_stream
             .send(AudioTrack::new(
                 modulated_signal.into_iter(),
@@ -138,6 +154,9 @@ impl Modulator {
             .await
             .unwrap();
         println!("[send_bits] send {} frames", loop_cnt + 1);
+
+        // for debug
+        return output;
     }
 
     // translate the bits into modulated signal
