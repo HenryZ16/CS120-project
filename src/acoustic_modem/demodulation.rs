@@ -65,7 +65,7 @@ unsafe impl Sync for InputStreamConfig{}
 pub struct AlignResult{
     align_index: usize,
     dot_product: f32,
-    received_bit: u8,
+    pub received_bit: u8,
 }
 
 #[derive(PartialEq, Debug)]
@@ -395,6 +395,7 @@ impl Demodulation{
                 // has aligned
             }
             // println!("have detected preamble, start receiving data");
+            println!("last_align_result: {:?}", last_align_result);
             last_align_result
         }).await{
             Ok(last_align_result) => Ok(last_align_result),
@@ -417,6 +418,10 @@ impl Demodulation{
         
         let mut length: usize = 0;
         let mut bits_num = 0;
+
+        // let mut buffer = self.buffer.lock().await;
+        // println!("buffer sample: {:?}", buffer.get(0).unwrap()[start_index..start_index + 48].to_vec());
+
         while bits_num < 30{
             let mut buffer = self.buffer.lock().await;
             if buffer.len() > 0{
@@ -432,34 +437,47 @@ impl Demodulation{
                     continue;
                 }
 
-                let mut start = last_align_result.align_index + ref_signal_len;
-                while start + ref_signal_len < concat_buffer.len() && bits_num < 30{
-                    let align_result = self.detect_windowshift(&concat_buffer[start..], power_floor, 0);
-                    let align_result = match align_result{
-                        Ok(result) => result,
-                        Err(_) => {
-                            return Err(Error::msg("No contunuous data found"));
-                        }
-                    };
+                let align_result = self.detect_windowshift(&concat_buffer[..], power_floor, last_align_result.align_index);
+                let mut align_result = match align_result{
+                    Ok(result) => result,
+                    Err(_) => {
+                        return Err(Error::msg("No contunuous data found"));
+                    }
+                };
 
-                    if last_align_result.align_index != align_result.align_index{
-                        last_align_result = align_result;
-                        last_align_result.align_index += ref_signal_len;
-                        recv_buffer.push(last_align_result.received_bit);
-                        bits_num += 1;
-                        
-                        if !buffer.is_empty() && buffer.get(0).unwrap().len() <= last_align_result.align_index{
-                            let tmp_vec = buffer.pop_front().unwrap();
-                            last_align_result.align_index -= tmp_vec.len();
+                loop{
+                    last_align_result = align_result;
+                    recv_buffer.push(last_align_result.received_bit);
+                    bits_num += 1;
+                    if bits_num < 30 && last_align_result.align_index + 2 * ref_signal_len < concat_buffer.len(){
+                        let tmp_res = self.detect_windowshift(&concat_buffer[..], power_floor, last_align_result.align_index + ref_signal_len);
+                        match tmp_res{
+                            Ok(res) => {
+                                align_result = res;
+                            }
+                            Err(_) => {
+                                break;
+                            }
                         }
-                        start = last_align_result.align_index;
+                    }
+                    else {
+                        break;
                     }
                 }
+
+                buffer_read_index = 0;
+                concat_buffer.clear();
+                while !buffer.is_empty() && (buffer.get(0).unwrap().len() <= last_align_result.align_index){
+                    let tmp_vec = buffer.pop_front().unwrap();
+                    last_align_result.align_index -= tmp_vec.len();
+                }   
             }
         }
 
-        println!("recv_buffer: {:?}", recv_buffer);
+        last_align_result.align_index += ref_signal_len;
+
         let recv_buffer = utils::read_data_2_compressed_u8(recv_buffer);
+        println!("recv_buffer: {:?}", recv_buffer);
         for i in recv_buffer{
             length <<= 4;
             length |= i as usize;
@@ -483,38 +501,49 @@ impl Demodulation{
                     continue;
                 }
 
-                let mut start = last_align_result.align_index + ref_signal_len;
-                while start + ref_signal_len < concat_buffer.len() && bits_num < phy_frame::FRAME_PAYLOAD_LENGTH{
-                    let align_result = self.detect_windowshift(&concat_buffer[start..], power_floor, 0);
-                    let align_result = match align_result{
-                        Ok(result) => result,
-                        Err(_) => {
-                            return Err(Error::msg("No contunuous data found"));
-                        }
-                    };
-
-                    if last_align_result.align_index != align_result.align_index{
-                        last_align_result = align_result;
-                        last_align_result.align_index += ref_signal_len;
-                        recv_buffer.push(last_align_result.received_bit);
-                        bits_num += 1;
-                        
-                        if !buffer.is_empty() && buffer.get(0).unwrap().len() <= last_align_result.align_index{
-                            let tmp_vec = buffer.pop_front().unwrap();
-                            last_align_result.align_index -= tmp_vec.len();
-                        }
-                        start = last_align_result.align_index;
+                let align_result = self.detect_windowshift(&concat_buffer[..], power_floor, last_align_result.align_index);
+                let mut align_result = match align_result{
+                    Ok(result) => result,
+                    Err(_) => {
+                        return Err(Error::msg("No contunuous data found"));
                     }
+                };
+
+                loop{
+                    last_align_result = align_result;
+                    recv_buffer.push(last_align_result.received_bit);
+                    bits_num += 1;
+                    if bits_num < phy_frame::FRAME_PAYLOAD_LENGTH && last_align_result.align_index + 2 * ref_signal_len < concat_buffer.len(){
+                        let tmp_res = self.detect_windowshift(&concat_buffer[..], power_floor, last_align_result.align_index + ref_signal_len);
+                        match tmp_res{
+                            Ok(res) => {
+                                align_result = res;
+                            }
+                            Err(_) => {
+                                break;
+                            }
+                        }
+                    }
+                    else {
+                        break;
+                    }
+                }
+
+                buffer_read_index = 0;
+                concat_buffer.clear();
+                while !buffer.is_empty() && (buffer.get(0).unwrap().len() <= last_align_result.align_index){
+                    let tmp_vec = buffer.pop_front().unwrap();
+                    last_align_result.align_index -= tmp_vec.len();
                 }
             }
         }
+        println!("recv_buffer: {:?}", utils::read_data_2_compressed_u8(recv_buffer.clone()));
         
-        let recv_buffer = phy_frame::PHYFrame::data_2_payload(utils::read_data_2_compressed_u8(recv_buffer), length).unwrap();
-        let res = phy_frame::PHYFrame::payload_2_data(recv_buffer).unwrap();
+        // let recv_buffer = phy_frame::PHYFrame::data_2_payload(utils::read_data_2_compressed_u8(recv_buffer), length).unwrap();
+        // let res = phy_frame::PHYFrame::payload_2_data(recv_buffer).unwrap();
 
-        // println!("recv_buffer: {:?}", recv_buffer);
 
-        Ok(res)
+        Ok(recv_buffer)
     }
 
     pub async fn listening(&mut self, time_limit: u64){

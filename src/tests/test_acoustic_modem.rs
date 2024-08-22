@@ -4,7 +4,7 @@ use std::os::windows::thread;
 use std::time::Duration;
 use std::vec;
 
-use crate::acoustic_modem::demodulation::{self, Demodulation};
+use crate::acoustic_modem::demodulation::{self, Demodulation, AlignResult};
 use crate::acoustic_modem::modulation::{self, Modulator};
 use crate::utils;
 use futures::join;
@@ -200,33 +200,32 @@ async fn test_listen_directly(){
 
     let signal = modulation.send_bits(data.clone(), data.len() as isize).await;
 
-    // let mut buffer = buffer.lock().await;
-    let mut buffer = Vec::new();
+    let mut buffer = buffer.lock().await;
     for vec in signal{
-        // buffer.push_back(vec);
-        buffer.extend(vec);
+        buffer.push_back(vec);
     }
 
-    // drop(buffer);
+    drop(buffer);
 
-    // demodulator.listening(1).await;
+    demodulator.listening(1).await;
+
+    // let mut buffer = Vec::new();
+    // for vec in signal{
+    //     // buffer.push_back(vec);
+    //     buffer.extend(vec);
+    // }
     
-    let mut recv_data: Vec<u8> = Vec::new();
-    let mut index = 0;
-    while index < buffer.len(){
-        recv_data.push(
-            if demodulator.phase_dot_product(&buffer[index..index+48]).unwrap()[0] > 0.0{
-                1
-            }else{
-                0
-            }
-        );
-        index += 48;
-    }
+    // let mut recv_data: Vec<u8> = Vec::new();
+    // let mut index = 384;
+    // println!("sample buffer: {:?}", buffer[index..index + 48].to_vec());
+    // while index < buffer.len(){
+    //     recv_data.push(demodulator.detect_windowshift(&buffer, 12.0, index).unwrap().received_bit);
+    //     index += 48;
+    // }
 
-    let recv_data = utils::read_data_2_compressed_u8(recv_data);
-    println!("len of recv_data: {}", recv_data.len());
-    println!("recv_data: {:?}", recv_data);
+    // let recv_data = utils::read_data_2_compressed_u8(recv_data);
+    // println!("len of recv_data: {}", recv_data.len());
+    // println!("recv_data: {:?}", recv_data);
 }
 
 #[tokio::test]
