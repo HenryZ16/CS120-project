@@ -4,8 +4,16 @@ use cpal::{
     Device, FromSample, Sample, SampleFormat, SizedSample,
 };
 use futures::{FutureExt, Sink, SinkExt, Stream};
+use hound::{WavSpec, WavWriter};
 use rodio::{OutputStream, Source, SupportedStreamConfig};
-use std::{iter::ExactSizeIterator, time::Duration};
+use std::{
+    fs::File,
+    io::BufWriter,
+    iter::ExactSizeIterator,
+    sync::{Arc, Mutex},
+    thread,
+    time::Duration,
+};
 use tokio::{
     sync::{
         mpsc::{self, UnboundedReceiver, UnboundedSender},

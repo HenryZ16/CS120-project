@@ -48,6 +48,40 @@ pub async fn obj_3_send() -> Result<u32> {
     return Ok(0);
 }
 
+pub async fn obj_3_send_file() -> Result<u32> {
+    let t_start = std::time::Instant::now();
+
+    // read data from testset/data.txt
+    let mut file = File::open("testset/data.txt")?;
+    let mut data = String::new();
+    file.read_to_string(&mut data)?;
+    let data = data
+        .chars()
+        .map(|c| c.to_digit(10).unwrap() as u8)
+        .collect::<Vec<u8>>();
+
+    // modulator
+    let sample_rate = 48000;
+    let carrier_freq = 1500;
+    let mut modulator = Modulator::new(vec![carrier_freq], sample_rate, false);
+
+    // send
+    modulator
+        .send_bits_2_file(
+            utils::read_data_2_compressed_u8(data.clone()),
+            data.len() as isize,
+            "testset/send.wav",
+        )
+        .await;
+
+    println!(
+        "[pa1-obj3-send] Total elapsed time: {:?}",
+        t_start.elapsed()
+    );
+
+    return Ok(0);
+}
+
 pub async fn pa1(sel: i32, additional_type: &str) -> Result<u32> {
     let available_sel = vec![0, 1, 2, 3];
     if !available_sel.contains(&sel) {
@@ -81,6 +115,16 @@ pub async fn pa1(sel: i32, additional_type: &str) -> Result<u32> {
             "send" => {
                 println!("Objective 3 start");
                 match obj_3_send().await {
+                    Ok(_) => {}
+                    Err(e) => {
+                        println!("Error: {}", e);
+                    }
+                }
+                println!("Objective 3 end");
+            }
+            "send_file" => {
+                println!("Objective 3 start");
+                match obj_3_send_file().await {
                     Ok(_) => {}
                     Err(e) => {
                         println!("Error: {}", e);
