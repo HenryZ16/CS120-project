@@ -8,18 +8,9 @@ Input data
 use crate::asio_stream::{AudioTrack, OutputAudioStream};
 use crate::utils;
 use cpal::traits::{DeviceTrait, HostTrait};
-use cpal::{HostId, SampleFormat, SampleRate, SupportedStreamConfig};
-use futures::executor::block_on;
+use cpal::{HostId, SampleRate, SupportedStreamConfig};
 use futures::SinkExt;
 use hound::{WavSpec, WavWriter};
-use std::{
-    fs::File,
-    io::BufWriter,
-    sync::{Arc, Mutex},
-    thread,
-    time::Duration,
-};
-
 use super::phy_frame;
 
 const SAMPLE_RATE: u32 = 48000;

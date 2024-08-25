@@ -2,10 +2,10 @@ use crate::acoustic_modem::modulation::Modulator;
 use crate::pa0;
 use crate::utils;
 use anyhow::{Error, Result};
-use cpal::{
-    traits::{DeviceTrait, HostTrait},
-    Device, Host, HostId, SampleRate, SupportedStreamConfig,
-};
+// use cpal::{
+//     traits::{DeviceTrait, HostTrait},
+//     Device, Host, HostId, SampleRate, SupportedStreamConfig,
+// };
 use std::fs::File;
 use std::io::Read;
 

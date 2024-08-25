@@ -1,23 +1,18 @@
 use std::fs::File;
 use std::io::Read;
-use std::os::windows::thread;
 use std::time::Duration;
 use std::vec;
 
-use crate::acoustic_modem::demodulation::{self, Demodulation, AlignResult};
-use crate::acoustic_modem::modulation::{self, Modulator};
+use crate::acoustic_modem;
+use crate::acoustic_modem::demodulation::{Demodulation, Demodulation2};
+use crate::acoustic_modem::modulation::Modulator;
 use crate::utils;
-use futures::join;
-use plotters::prelude::*;
-use rand::seq::index;
+use plotters::{data, prelude::*};
 use rand::thread_rng;
 use rand::Rng;
 use rand_distr::Normal;
-use rodio::buffer;
-use tokio::{signal, task};
+use tokio::task;
 use tokio::time::sleep;
-
-use std::thread::spawn;
 
 
 fn plot(modulated_signal: Vec<f32>) -> Result<(), Box<dyn std::error::Error>> {
@@ -96,7 +91,7 @@ async fn test_demodulation_detect_windowshift() {
     let normal = Normal::new(0.0, 0.3).unwrap();
     let mut rng = thread_rng();
 
-    let mut demodulator = Demodulation::new(vec![carrier_freq], 48000, false);
+    let demodulator = Demodulation::new(vec![carrier_freq], 48000, false);
 
     let mut padding: Vec<f32> = (0..0).map(|_| rng.sample(&normal)).collect();
     let mut back_padding: Vec<f32> = (0..1).map(|_| rng.sample(&normal)).collect();
@@ -128,14 +123,14 @@ async fn test_demodulation_detect_preamble(){
     
     let handle1 = task::spawn(
         async move{
-            let normal = Normal::new(0.0, 0.4).unwrap();
+            // let _normal = Normal::new(0.0, 0.4).unwrap();
             // let mut rng = thread_rng();
             let mut padding = padding_lock.lock().await;
 
             padding.push_back((0..20).map(|_| 0.0).collect());
 
             // let mut padding: Vec<f32> = (0..0).map(|_| rng.sample(&normal)).collect();
-            let mut back_padding: Vec<f32> = (0..0).map(|_| 0.0).collect();
+            let back_padding: Vec<f32> = (0..0).map(|_| 0.0).collect();
 
             let phase_base = (0..(sample_rate / carrier_freq)).map(|t| t as f32 / sample_rate as f32);
             let phase1 = phase_base.clone().map(|t| (2.0 * std::f32::consts::PI * t * carrier_freq as f32).sin()).collect::<Vec<f32>>();
@@ -148,23 +143,21 @@ async fn test_demodulation_detect_preamble(){
             // padding.push_back(phase1.clone());
             drop(padding);
             println!("send 1st sequence");
-            tokio::task::yield_now();
             
             for i in 1..5{
                 let mut padding = padding_lock.lock().await;
                 padding.push_back(phase0.clone());
                 padding.push_back(phase1.clone());
                 drop(padding);
-                sleep(Duration::from_millis(500));
+                let _ = sleep(Duration::from_millis(500));
                 println!("send {}st sequence", i + 1);
-                tokio::task::yield_now();
             }
 
             let mut padding = padding_lock.lock().await;
             padding.push_back(phase0.clone());
             padding.push_back(phase1.clone());
             drop(padding);
-            sleep(Duration::from_millis(500));
+            let _ = sleep(Duration::from_millis(500));
 
             let mut padding = padding_lock.lock().await;
             padding.push_back(back_padding);
@@ -177,11 +170,11 @@ async fn test_demodulation_detect_preamble(){
     // let res = demodulator.detect_preamble(3);
 
     let handle2 = task::spawn(
-        async move{demodulator.detect_preamble(4).await;}
+        async move{demodulator.detect_preamble(4).await.unwrap();}
     );
     
-    handle1.await;
-    handle2.await;
+    handle1.await.unwrap();
+    handle2.await.unwrap();
     // println!("res: {:?}", res.await.expect("error"));
 }
 
@@ -233,25 +226,77 @@ async fn test_listening()
 {
     let sample_rate = 48000;
     let carrier_freq = 1000;
-    let mut demodulator = Demodulation::new(vec![carrier_freq], 48000, false);
+    let mut demodulator = Demodulation::new(vec![carrier_freq], sample_rate, false);
 
     demodulator.listening(5).await;
+}
+
+#[tokio::test]
+async fn test_2_listening(){
+    use std::collections::VecDeque;
+
+    let sample_rate = 48000;
+    let carrier_freq = 1500;
+    let mut demodulator = Demodulation2::new(vec![carrier_freq], sample_rate, false, "test.txt");
+
+    // let mut test_data = VecDeque::new();
+    // let mut padding: Vec<f32> = (0..10).map(|_| 0.0).collect();
+    // let mut back_padding: Vec<f32> = (0..10).map(|_| 0.0).collect();
+
+    // let t = (0..(sample_rate / carrier_freq)).map(|t| t as f32 / sample_rate as f32);
+    
+    // let mut test_vec = t
+    //     .map(|t| (2.0 * std::f32::consts::PI * t * carrier_freq as f32).sin());
+
+    // test_data.push_back(padding);
+    // for i in 0..6{
+    //     test_data.push_back(test_vec.clone().map(|x| -x).collect());
+    //     test_data.push_back(test_vec.clone().collect());
+    // }
+    // test_data.push_back(back_padding);
+
+    // read wav from file
+    let file_path = "testset/send.wav";
+    let mut reader = hound::WavReader::open(file_path).unwrap();
+    let data: Vec<f32> = reader.samples::<f32>()
+        .map(|s| s.unwrap())
+        .collect();
+    
+    let mut test_data = VecDeque::new();
+    let mut count = 0;
+    for i in 0..data.len(){
+        if count == 0{
+            test_data.push_back(Vec::new());
+        }
+        test_data.back_mut().unwrap().push(data[i]);
+        count += 1;
+        if count == 640{
+            count = 0;
+        }
+    }
+
+    demodulator.listening(false, test_data).await;
 }
 
 #[test]
 fn test_iter(){
 
-    let index = 0;
+    let len = 48;
 
-    let mut vec = vec![1, 2, 3, 4, 5];
+    let mut test = Vec::new();
 
-    let mut iter = vec.iter();
-    for _ in 0..index{
-        iter.next();
+    let sin = (0..len).map(|n| (2.0 * std::f64::consts::PI * 1000.0 * n as f64 / 48000.0).sin());
+
+    for _ in 0..5{
+        test.extend(sin.clone());
+        test.extend(sin.clone().map(|x| -x));
     }
 
-    for i in iter{
-        println!("{}", i);
+    let mut power = 0.0;
+    let factor = 1.0 / 32.0;
+    for i in test{
+        power = power * (1.0 - factor) + i * factor;
     }
 
+    println!("power: {:?}", power);
 }

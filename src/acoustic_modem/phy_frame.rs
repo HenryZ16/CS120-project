@@ -1,5 +1,4 @@
 use anyhow::{Error, Result};
-use num_traits::Float;
 use reed_solomon_erasure::galois_8::ReedSolomon;
 
 pub const MAX_FRAME_DATA_LENGTH: usize = 960;
@@ -54,7 +53,6 @@ impl PHYFrame {
         // Length
         let mut length: u64 = 0;
         let length_length = (frame_length_length() / FRAME_LENGTH_LENGTH_REDUNDANCY) as isize;
-        println!("[get_whole_frame_bits] self.length: {:?}", self.length);
         println!("[get_whole_frame_bits] length_length: {:?}", length_length);
         for i in (0..length_length).rev() {
             for _ in 0..FRAME_LENGTH_LENGTH_REDUNDANCY {
@@ -62,7 +60,8 @@ impl PHYFrame {
                 length <<= 1;
             }
         }
-
+        println!("[get_whole_frame_bits] self.length: {:?}", self.length);
+        
         let mut length_length = frame_length_length() as isize;
         if preamble_length < 0 {
             length_length += preamble_length;
@@ -80,7 +79,7 @@ impl PHYFrame {
         println!("[get_whole_frame_bits] length: {:?}", whole_frame_bits);
 
         // Payload
-        let mut payload_length = (FRAME_PAYLOAD_LENGTH / 32) as isize;
+        let payload_length = (FRAME_PAYLOAD_LENGTH / 32) as isize;
         let payload = self.payload.clone();
         let mut loop_cnt = 0;
         for _ in 0..payload_length {
