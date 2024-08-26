@@ -811,7 +811,7 @@ impl Demodulation2{
                     continue;
                 }
 
-                while tmp_buffer_len - start_index > demodulate_config.ref_signal_len[0] && tmp_bits_data.len() < phy_frame::frame_length_length()+phy_frame::FRAME_PAYLOAD_LENGTH + phy_frame::FRAME_PREAMBLE_LENGTH{
+                while tmp_buffer_len - start_index >= demodulate_config.ref_signal_len[0] && tmp_bits_data.len() < phy_frame::frame_length_length()+phy_frame::FRAME_PAYLOAD_LENGTH + phy_frame::FRAME_PREAMBLE_LENGTH{
                     // let dot_product = dot_product_smooth(tmp_buffer.range(start_index..start_index+demodulate_config.ref_signal_len[0]).map(|x| *x).collect::<Vec<f32>>().as_slice(), 
                     //                                           demodulate_config.ref_signal[0].iter().map(|x| *x).collect::<Vec<f64>>().as_slice(), 
                     //                                           window_size);
@@ -821,8 +821,8 @@ impl Demodulation2{
 
                     tmp_bits_data.push(if dot_product > 0.0 {0} else {1});
 
-                    start_index += demodulate_config.ref_signal_len[0];
                     debug_vec.extend(tmp_buffer.range(start_index..start_index+demodulate_config.ref_signal_len[0]));
+                    start_index += demodulate_config.ref_signal_len[0];
                 }
 
                 if tmp_bits_data.len() == phy_frame::frame_length_length()+phy_frame::FRAME_PAYLOAD_LENGTH + phy_frame::FRAME_PREAMBLE_LENGTH{
@@ -864,10 +864,6 @@ impl Demodulation2{
                         demodulate_state = demodulate_state.next();
                         println!("stop receiving data");
                     }
-                }
-                else
-                {
-                    println!("length not enough");
                 }
             }
 
