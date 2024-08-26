@@ -60,6 +60,7 @@ impl PHYFrame {
                 length <<= 1;
             }
         }
+        length >>= 1;
         println!("[get_whole_frame_bits] self.length: {:?}", self.length);
         
         let mut length_length = frame_length_length() as isize;
@@ -160,5 +161,20 @@ impl PHYFrame {
         }
 
         return Ok(data);
+    }
+
+    pub fn construct_payload_format(input: Vec<u8>) -> Vec<Vec<u8>>{
+        let mut payload = Vec::new();
+        let mut i = 0;
+        while i < input.len(){
+            let mut payload_shard = Vec::new();
+            for j in 0..4{
+                payload_shard.push(input[i + j]);
+            }
+            payload.push(payload_shard);
+            i += 4;
+        }
+        
+        payload
     }
 }

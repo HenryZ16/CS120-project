@@ -182,7 +182,7 @@ async fn test_demodulation_detect_preamble(){
 #[tokio::test]
 async fn test_listen_directly(){
     let sample_rate = 48000;
-    let carrier_freq = 1000;
+    let carrier_freq = 1500;
     let mut demodulator = Demodulation::new(vec![carrier_freq], 48000, false);
     let mut modulation = Modulator::new(vec![carrier_freq], sample_rate, false);
 
@@ -191,7 +191,7 @@ async fn test_listen_directly(){
     let data = utils::read_data_2_compressed_u8(data);
     let buffer = demodulator.buffer.clone();
 
-    let signal = modulation.send_bits(data.clone(), data.len() as isize).await;
+    let signal = modulation.send_bits_2_file(data.clone(), data.len() as isize, "test.wav").await;
 
     let mut buffer = buffer.lock().await;
     for vec in signal{
@@ -238,25 +238,10 @@ async fn test_2_listening(){
     let sample_rate = 48000;
     let carrier_freq = 1500;
     let mut demodulator = Demodulation2::new(vec![carrier_freq], sample_rate, false, "test.txt");
-
-    // let mut test_data = VecDeque::new();
-    // let mut padding: Vec<f32> = (0..10).map(|_| 0.0).collect();
-    // let mut back_padding: Vec<f32> = (0..10).map(|_| 0.0).collect();
-
-    // let t = (0..(sample_rate / carrier_freq)).map(|t| t as f32 / sample_rate as f32);
     
-    // let mut test_vec = t
-    //     .map(|t| (2.0 * std::f32::consts::PI * t * carrier_freq as f32).sin());
-
-    // test_data.push_back(padding);
-    // for i in 0..6{
-    //     test_data.push_back(test_vec.clone().map(|x| -x).collect());
-    //     test_data.push_back(test_vec.clone().collect());
-    // }
-    // test_data.push_back(back_padding);
-
     // read wav from file
     let file_path = "testset/send.wav";
+    // let file_path = "test.wav";
     let mut reader = hound::WavReader::open(file_path).unwrap();
     let data: Vec<f32> = reader.samples::<f32>()
         .map(|s| s.unwrap())
@@ -274,8 +259,11 @@ async fn test_2_listening(){
             count = 0;
         }
     }
+    let mut debug_vec = vec![];
 
-    demodulator.listening(false, test_data).await;
+    let result = demodulator.listening(true, test_data, &mut debug_vec).await;
+
+    plot(debug_vec).unwrap();
 }
 
 #[test]
