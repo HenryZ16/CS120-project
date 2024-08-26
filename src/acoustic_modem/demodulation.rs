@@ -854,7 +854,7 @@ impl Demodulation2{
                     let mut i = 0;
                     let mut payload = phy_frame::PHYFrame::construct_payload_format(recv_data);
 
-                    result.extend(utils::read_compressed_u8_2_data(phy_frame::PHYFrame::payload_2_data(payload).unwrap()));
+                    result.extend(&utils::read_compressed_u8_2_data(phy_frame::PHYFrame::payload_2_data(payload).unwrap())[..data_len]);
                     
                     if data_len == phy_frame::MAX_FRAME_DATA_LENGTH{
                         demodulate_state = demodulate_state.return_detect_preamble();
