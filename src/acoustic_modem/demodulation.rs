@@ -758,8 +758,8 @@ impl Demodulation2{
         let mut result = Vec::new();
         let mut tmp_bits_data: Vec<u8> = Vec::new();
 
-        // while let Some(data) = input_stream.next().await{
-        for data in data{
+        while let Some(data) = input_stream.next().await{
+        // for data in data{
             if demodulate_state == DemodulationState::Stop {
                 break;
             }
@@ -784,15 +784,15 @@ impl Demodulation2{
                     let dot_product = dot_product(window.clone().map(|x| *x).collect::<Vec<f32>>().as_slice(), 
                                                   demodulate_config.preamble.iter().map(|x| *x).collect::<Vec<f64>>().as_slice());
 
-                    // println!("dot_product: {:?}, local_max: {:?}", dot_product, local_max);
-
-                    if dot_product > avg_power * 2.0 && dot_product > local_max && dot_product > 0.1{
+                    
+                    println!("dot_product: {:?}, local_max: {:?}", dot_product, local_max);
+                    if dot_product > avg_power * 2.0 && dot_product > local_max && dot_product > 0.0{
                         local_max = dot_product;
                         start_index = i+1;
                         debug_vec.clear();
                         debug_vec.extend(window.clone());
                     }
-                    else if start_index != usize::MAX && i - start_index > demodulate_config.preamble_len/2 && local_max > 0.3{
+                    else if start_index != usize::MAX && i - start_index > demodulate_config.preamble_len/2 && local_max > 0.2{
                         println!("have detected preamble !!");
                         println!("local_max: {:?}", local_max);
                         demodulate_state = demodulate_state.next();
@@ -812,12 +812,12 @@ impl Demodulation2{
                 }
 
                 while tmp_buffer_len - start_index >= demodulate_config.ref_signal_len[0] && tmp_bits_data.len() < phy_frame::frame_length_length()+phy_frame::FRAME_PAYLOAD_LENGTH + phy_frame::FRAME_PREAMBLE_LENGTH{
-                    // let dot_product = dot_product_smooth(tmp_buffer.range(start_index..start_index+demodulate_config.ref_signal_len[0]).map(|x| *x).collect::<Vec<f32>>().as_slice(), 
-                    //                                           demodulate_config.ref_signal[0].iter().map(|x| *x).collect::<Vec<f64>>().as_slice(), 
-                    //                                           window_size);
+                    let dot_product = dot_product_smooth(tmp_buffer.range(start_index..start_index+demodulate_config.ref_signal_len[0]).map(|x| *x).collect::<Vec<f32>>().as_slice(), 
+                                                              demodulate_config.ref_signal[0].iter().map(|x| *x).collect::<Vec<f64>>().as_slice(), 
+                                                              window_size);
 
-                    let dot_product = dot_product(tmp_buffer.range(start_index..start_index+demodulate_config.ref_signal_len[0]).map(|x| *x).collect::<Vec<f32>>().as_slice(), 
-                                                  demodulate_config.ref_signal[0].iter().map(|x| *x).collect::<Vec<f64>>().as_slice());
+                    // let dot_product = dot_product(tmp_buffer.range(start_index..start_index+demodulate_config.ref_signal_len[0]).map(|x| *x).collect::<Vec<f32>>().as_slice(), 
+                    //                               demodulate_config.ref_signal[0].iter().map(|x| *x).collect::<Vec<f64>>().as_slice());
 
                     tmp_bits_data.push(if dot_product > 0.0 {0} else {1});
 
@@ -864,6 +864,7 @@ impl Demodulation2{
                         demodulate_state = demodulate_state.next();
                         println!("stop receiving data");
                     }
+                    // demodulate_state = DemodulationState::Stop;
                 }
             }
 
