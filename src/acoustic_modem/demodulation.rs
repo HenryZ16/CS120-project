@@ -638,6 +638,28 @@ pub fn dot_product(input: &[f32], ref_signal: &[f64]) -> f64{
     dot_product_iter(input.iter().map(|x| *x as f64), ref_signal.iter().map(|x| *x)) 
 }
 
+pub fn smooth(input: &[f32], window_size: i32) -> Vec<f32>{
+    let mut smoothed_input = Vec::new();
+
+    for i in 0..input.len(){
+        let mut sum = 0.0;
+        for j in i as i32 - window_size/2..i as i32 + window_size/2{
+            if j < 0{
+                sum += input[(j + input.len() as i32) as usize];
+            }
+            else if j >= input.len() as i32{
+                sum += input[j as usize - input.len()];
+            }
+            else{
+                sum += input[j as usize];
+            }
+        }
+        smoothed_input.push(sum / window_size as f32);
+    }
+
+    smoothed_input
+} 
+
 pub fn dot_product_smooth(input: &[f32], ref_signal: &[f64], window_size: i32) -> f64{
     if input.len() != ref_signal.len(){
         panic!("Input length is not equal to reference signal length");
@@ -790,7 +812,8 @@ impl Demodulation2{
                         local_max = dot_product;
                         start_index = i+1;
                         debug_vec.clear();
-                        debug_vec.extend(window.clone());
+                        debug_vec.extend(smooth(window.clone().map(|x| *x).collect::<Vec<f32>>().as_slice(), window_size))
+                        // debug_vec.extend(window.clone());
                     }
                     else if start_index != usize::MAX && i - start_index > demodulate_config.preamble_len/2 && local_max > 0.2{
                         println!("have detected preamble !!");
@@ -821,7 +844,8 @@ impl Demodulation2{
 
                     tmp_bits_data.push(if dot_product > 0.0 {0} else {1});
 
-                    debug_vec.extend(tmp_buffer.range(start_index..start_index+demodulate_config.ref_signal_len[0]));
+                    // debug_vec.extend(tmp_buffer.range(start_index..start_index+demodulate_config.ref_signal_len[0]));
+                    debug_vec.extend(smooth(&tmp_buffer.range(start_index..start_index+demodulate_config.ref_signal_len[0]).map(|x| *x).collect::<Vec<f32>>()[..], window_size));
                     start_index += demodulate_config.ref_signal_len[0];
                 }
 
