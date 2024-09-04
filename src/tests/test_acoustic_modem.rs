@@ -254,8 +254,8 @@ async fn test_2_listening(){
     
     // read wav from file
     let file_path = "testset/output1.wav";
-    let file_path = "testset/send.wav";
-    let file_path = "test.wav";
+    // let file_path = "testset/send.wav";
+    // let file_path = "test.wav";
     let mut reader = hound::WavReader::open(file_path).unwrap();
     let data: Vec<f32> = reader.samples::<f32>()
         .map(|s| s.unwrap())
