@@ -54,6 +54,19 @@ fn plot(modulated_signal: Vec<f32>) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+#[test]
+fn test_plot(){
+    // read wav from file
+    let file_path = "testset/output1.wav";
+    // let file_path = "test.wav";
+    let mut reader = hound::WavReader::open(file_path).unwrap();
+    let data: Vec<f32> = reader.samples::<f32>()
+        .map(|s| s.unwrap())
+        .collect();
+
+    plot(data);
+}
+
 #[tokio::test]
 async fn test_modulation() {
     // read data from testset/data.txt
@@ -240,8 +253,9 @@ async fn test_2_listening(){
     let mut demodulator = Demodulation2::new(vec![carrier_freq], sample_rate, false, "test.txt");
     
     // read wav from file
+    let file_path = "testset/output1.wav";
     let file_path = "testset/send.wav";
-    // let file_path = "test.wav";
+    let file_path = "test.wav";
     let mut reader = hound::WavReader::open(file_path).unwrap();
     let data: Vec<f32> = reader.samples::<f32>()
         .map(|s| s.unwrap())
