@@ -11,6 +11,7 @@ use cpal::traits::{DeviceTrait, HostTrait};
 use cpal::{HostId, SampleRate, SupportedStreamConfig};
 use futures::SinkExt;
 use hound::{WavSpec, WavWriter};
+use rand_distr::Standard;
 use super::phy_frame;
 
 const SAMPLE_RATE: u32 = 48000;
@@ -207,7 +208,12 @@ impl Modulator {
                 "[send_bits] decompressed_data.len(): {}",
                 decompressed_data.len()
             );
-            let modulated_signal = self.modulate(&decompressed_data, 0);
+            let modulated_psk_signal = self.modulate(&decompressed_data, 0);
+
+            // add FSK preamble
+            let preamble = Modulator::modulate_fsk_preamble();
+            let mut modulated_signal = preamble.clone();
+            modulated_signal.extend(modulated_psk_signal.clone());
             println!(
                 "[send_bits] modulated_signal.len(): {}",
                 modulated_signal.len()
@@ -234,7 +240,13 @@ impl Modulator {
         }
         let frame = phy_frame::PHYFrame::new(len as usize, payload);
         let frame_bits = frame.get_whole_frame_bits();
-        let modulated_signal = self.modulate(&utils::read_compressed_u8_2_data(frame_bits), 0);
+        let modulated_psk_signal = self.modulate(&utils::read_compressed_u8_2_data(frame_bits), 0);
+
+        // add FSK preamble
+        let preamble = Modulator::modulate_fsk_preamble();
+        let mut modulated_signal = preamble.clone();
+        modulated_signal.extend(modulated_psk_signal.clone());
+
         println!(
             "[send_bits] modulated_signal.len(): {}",
             modulated_signal.len()
@@ -281,20 +293,42 @@ impl Modulator {
 
     pub fn modulate_fsk_preamble() -> Vec<f32> {
         // freq series: 523, 659, 784, 1046, 784, 659, 523, 659, 784, 1046, 784, 659, 523
-        let freq = vec![
-            523, 659, 784, 1046, 784, 659, 523, 659, 784, 1046, 784, 659, 523,
-        ];
+        // let freq = vec![
+        //     523, 659, 784, 1046, 784, 659, 523, 659, 784, 1046, 784, 659, 523,
+        // ];
 
-        let mut modulated_signal = vec![];
-        for f in freq {
-            let sample_cnt_each_bit = SAMPLE_RATE * 2 / f;
-            for i in 0..sample_cnt_each_bit {
-                let sample =
-                    (2.0 * std::f64::consts::PI * f as f64 * i as f64 / SAMPLE_RATE as f64).sin();
-                modulated_signal.push(sample as f32);
-            }
+        // let mut modulated_signal = vec![];
+        // for f in freq {
+        //     let sample_cnt_each_bit = SAMPLE_RATE * 2 / f;
+        //     for i in 0..sample_cnt_each_bit {
+        //         let sample =
+        //             (2.0 * std::f64::consts::PI * f as f64 * i as f64 / SAMPLE_RATE as f64).sin();
+        //         modulated_signal.push(sample as f32);
+        //     }
+        // }
+
+        // return modulated_signal;
+
+
+
+        let start = 2e3;
+        let end = 1e4;
+        let dx: f64 = 1.0 / 48000.0;
+        let step = 8e3 / 220.0;
+        let mut fp: Vec<f64> = (0..220).map(|i| start + i as f64 * step).collect();
+        fp.extend(fp.clone().iter().rev());
+
+        let mut res = vec![];
+
+        res.push(0.0);
+        for i in 1..fp.len(){
+            let trap_area = (fp[i] + fp[i-1]) * dx / 2.0;
+            res.push(res[i-1] + trap_area);
         }
 
-        return modulated_signal;
+        println!("create preamble len: {}", fp.len());
+
+        res.into_iter().map(|x| (2.0 * std::f64::consts::PI * x ).sin() as f32).collect()
+        
     }
 }

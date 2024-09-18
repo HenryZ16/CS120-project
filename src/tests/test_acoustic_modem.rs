@@ -1,17 +1,17 @@
 use std::fs::File;
 use std::io::Read;
 use std::time::Duration;
-use std::vec;
+use std::{result, vec};
 
-use crate::acoustic_modem;
-use crate::acoustic_modem::demodulation::{Demodulation, Demodulation2};
+use crate::acoustic_modem::{self, demodulation, modulation};
+use crate::acoustic_modem::demodulation::{dot_product_iter, Demodulation, Demodulation2};
 use crate::acoustic_modem::modulation::Modulator;
 use crate::utils;
 use plotters::{data, prelude::*};
 use rand::thread_rng;
 use rand::Rng;
 use rand_distr::Normal;
-use tokio::task;
+use tokio::{signal, task};
 use tokio::time::sleep;
 
 
@@ -26,7 +26,7 @@ fn plot(modulated_signal: Vec<f32>) -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let drawing_area =
-        SVGBackend::new("testset/modulated_data_wave.svg", (30000, 200)).into_drawing_area();
+        SVGBackend::new("testset/modulated_data_wave.svg", (3000, 200)).into_drawing_area();
     drawing_area.fill(&WHITE).unwrap();
     let mut chart_builder = ChartBuilder::on(&drawing_area);
     chart_builder
@@ -206,14 +206,20 @@ async fn test_listen_directly(){
 
     let signal = modulation.send_bits_2_file(data.clone(), data.len() as isize, "test.wav").await;
 
-    let mut buffer = buffer.lock().await;
-    for vec in signal{
-        buffer.push_back(vec);
-    }
+    plot(signal[0].clone());
 
-    drop(buffer);
+    let ref_signal = Modulator::modulate_fsk_preamble();
 
-    demodulator.listening(1).await;
+    println!("dot product: {:?}", demodulation::dot_product_iter(signal[0].iter(), ref_signal.iter()));
+
+    // let mut buffer = buffer.lock().await;
+    // for vec in signal{
+    //     buffer.push_back(vec);
+    // }
+
+    // drop(buffer);
+
+    // demodulator.listening(1).await;
 
     // let mut buffer = Vec::new();
     // for vec in signal{
@@ -253,13 +259,15 @@ async fn test_2_listening(){
     let mut demodulator = Demodulation2::new(vec![carrier_freq], sample_rate, false, "test.txt");
     
     // read wav from file
-    let file_path = "testset/output1.wav";
+    let file_path = "testset/output.wav";
     // let file_path = "testset/send.wav";
     // let file_path = "test.wav";
     let mut reader = hound::WavReader::open(file_path).unwrap();
     let data: Vec<f32> = reader.samples::<f32>()
         .map(|s| s.unwrap())
         .collect();
+
+    // plot(data.clone()).unwrap();
     
     let mut test_data = VecDeque::new();
     let mut count = 0;
@@ -275,7 +283,9 @@ async fn test_2_listening(){
     }
     let mut debug_vec = vec![];
 
+    println!("start listening");
     let result = demodulator.listening(true, test_data, &mut debug_vec).await;
+    // let result = demodulator.listening(true, VecDeque::new().push_back(data.clone()), &mut debug_vec).await;
 
     plot(debug_vec).unwrap();
 }
@@ -283,22 +293,38 @@ async fn test_2_listening(){
 #[test]
 fn test_iter(){
 
-    let len = 48;
+    let signal = modulation::Modulator::modulate_fsk_preamble();
+    let mut zero: Vec<f32> = vec![0.0; 2];
+    zero.extend(signal.clone().iter());
 
-    let mut test = Vec::new();
+    println!("product res: {:?}", dot_product_iter(zero.clone().iter(), signal.clone().iter()));
+}
 
-    let sin = (0..len).map(|n| (2.0 * std::f64::consts::PI * 1000.0 * n as f64 / 48000.0).sin());
+#[test]
+fn test_plot_wav(){
+    let mut reader = hound::WavReader::open("test.wav").unwrap();
+    let samples: Vec<f32> = reader.samples::<f32>().map(|s| s.unwrap()).collect();
 
-    for _ in 0..5{
-        test.extend(sin.clone());
-        test.extend(sin.clone().map(|x| -x));
-    }
+    // 创建绘图区域
+    let root =
+        SVGBackend::new("testset/ref_wave.svg", (30000, 200)).into_drawing_area();
+    root.fill(&WHITE).unwrap();
 
-    let mut power = 0.0;
-    let factor = 1.0 / 32.0;
-    for i in test{
-        power = power * (1.0 - factor) + i * factor;
-    }
+    let mut chart = ChartBuilder::on(&root)
+        .caption("Audio Waveform", ("sans-serif", 50).into_font())
+        .margin(10)
+        .x_label_area_size(30)
+        .y_label_area_size(30)
+        .build_cartesian_2d(0..samples.len(), -1.0..1.0).unwrap();
 
-    println!("power: {:?}", power);
+    chart.configure_mesh().draw().unwrap();
+
+    // 绘制波形图
+    chart.draw_series(LineSeries::new(
+        samples.iter().enumerate().map(|(x, y)| (x, *y as f64)),
+        &BLUE,
+    )).unwrap();
+
+    // 保存图像
+    root.present().unwrap();
 }
