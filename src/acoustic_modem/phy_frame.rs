@@ -52,6 +52,7 @@ impl PHYFrame {
         println!("[get_whole_frame_bits] preamble: {:?}", whole_frame_bits);
 
         // Length
+        // compute the length of length bits
         let mut length: u64 = 0;
         let length_length = (frame_length_length() / FRAME_LENGTH_LENGTH_REDUNDANCY) as isize;
         println!("[get_whole_frame_bits] self.length: {:?}", self.length);
@@ -91,7 +92,10 @@ impl PHYFrame {
         }
 
         println!("[get_whole_frame_bits] payload: {:?}", whole_frame_bits);
-        println!("[get_whole_frame_bits] whole_frame_bits.len(): {:?}", whole_frame_bits.len());
+        println!(
+            "[get_whole_frame_bits] whole_frame_bits.len(): {:?}",
+            whole_frame_bits.len()
+        );
 
         return whole_frame_bits;
     }
