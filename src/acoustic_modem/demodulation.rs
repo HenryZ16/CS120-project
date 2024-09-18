@@ -1,34 +1,39 @@
-use crate::acoustic_modem::{modulation, phy_frame};
+use crate::acoustic_modem::phy_frame::{self, PHYFrame};
 use crate::asio_stream::InputAudioStream;
 use crate::utils;
 use anyhow::Error;
 use cpal::traits::{DeviceTrait, HostTrait};
-use cpal::{HostId, SampleRate, SupportedStreamConfig, Device};
+use cpal::{SampleRate, SupportedStreamConfig, Device};
 use futures::StreamExt;
 use tokio::select;
-use core::time;
 use std::collections::VecDeque;
-use std::env::consts;
-use tokio::{sync::{Mutex, oneshot}, task, time::{timeout, Duration}};
+use std::io::Write;
+use tokio::{sync::{Mutex, oneshot}, time::{timeout, Duration}};
 use std::sync::Arc;
+use std::fs::File;
+use std::ops::{Add, Mul};
 
 struct DemodulationConfig{
     carrier_freq: Vec<u32>,
     enable_ofdm: bool,
     ref_signal: Vec<Vec<f64>>,
     ref_signal_len: Vec<usize>,
+    preamble_len: usize,
+    preamble: Vec<f64>,
 }
 
 unsafe impl Send for DemodulationConfig{}
 unsafe impl Sync for DemodulationConfig{}
 
 impl DemodulationConfig{
-    fn new(carrier_freq: Vec<u32>, enable_ofdm: bool, ref_signal: Vec<Vec<f64>>, ref_signal_len: Vec<usize>) -> Self{
+    fn new(carrier_freq: Vec<u32>, enable_ofdm: bool, ref_signal: Vec<Vec<f64>>, ref_signal_len: Vec<usize>, preamble: Vec<f64>) -> Self{
         DemodulationConfig{
             carrier_freq,
             enable_ofdm,
             ref_signal,
             ref_signal_len,
+            preamble_len: preamble.len(),
+            preamble,
         }
     }
 }
@@ -158,7 +163,6 @@ unsafe impl Sync for Demodulation{}
 
 impl Demodulation{
     pub fn new(carrier_freq: Vec<u32>, sample_rate: u32, enable_ofdm: bool) -> Self{
-        let host = cpal::host_from_id(HostId::Asio).expect("failed to initialise ASIO host");
         let host = cpal::default_host();
         let device = host.input_devices().expect("failed to find input device");
         let device = device
@@ -183,6 +187,7 @@ impl Demodulation{
 
         let mut ref_signal = Vec::new();
         let mut ref_signal_len = Vec::new();
+        let preamble = Vec::new();
 
         for i in 0..carrier_freq.len(){
             let carrier = carrier_freq.get(i).unwrap();
@@ -190,9 +195,10 @@ impl Demodulation{
             ref_signal_len.push(ref_len);
             let ref_sin = (0..ref_len).map(|t| - (2.0 * std::f64::consts::PI * *carrier as f64 * (t as f64 / sample_rate as f64)).sin()).collect::<Vec<f64>>();
             ref_signal.push(ref_sin);
+
         }
 
-        let demodulation_config = DemodulationConfig::new(carrier_freq, enable_ofdm, ref_signal, ref_signal_len); 
+        let demodulation_config = DemodulationConfig::new(carrier_freq, enable_ofdm, ref_signal, ref_signal_len, preamble); 
 
         Demodulation{
             input_config: input_stream_config,
@@ -355,9 +361,9 @@ impl Demodulation{
                     else{
                         loop{
                             preamble_state.state_move(align_result.received_bit);
-                            if(preamble_state != PreambleState::Waiting){
+                            if preamble_state != PreambleState::Waiting{
                                 last_align_result = align_result;
-                                if(preamble_state != PreambleState::ToRecv && last_align_result.align_index + 2 * ref_signal_len < concat_buffer.len()){
+                                if preamble_state != PreambleState::ToRecv && last_align_result.align_index + 2 * ref_signal_len < concat_buffer.len(){
                                     let tmp_res = self.detect_windowshift(&concat_buffer[..], last_align_result.dot_product * 2.0 / 3.0, last_align_result.align_index + ref_signal_len);
                                     match tmp_res{
                                         Ok(res) => {
@@ -405,7 +411,6 @@ impl Demodulation{
 
 
     pub async fn recv_frame(&self, align_result: &AlignResult) -> Result<Vec<u8>, Error>{
-        let start_index = align_result.align_index;
         let demodulate_config = &self.demodulate_config;
         let ref_signal_len = *demodulate_config.ref_signal_len.get(0).unwrap() as usize;
         let power_floor = align_result.dot_product / 3.0 * 2.0;
@@ -592,7 +597,7 @@ impl Demodulation{
                                 println!("receive frame failed");
                             }
                         }
-                        stop_sender.send(());
+                        stop_sender.send(()).unwrap();
                         
                     }
                     Err(_) => {
@@ -601,5 +606,344 @@ impl Demodulation{
                 }
             }
         }
+    }
+}
+
+#[derive(PartialEq, Debug)]
+enum DemodulationState{
+    DetectPreamble,
+    RecvFrame,
+    Stop,
+}
+
+impl DemodulationState{
+    pub fn next(&self) -> Self{
+        match self{
+            DemodulationState::DetectPreamble => DemodulationState::RecvFrame,
+            DemodulationState::RecvFrame => DemodulationState::Stop,
+            DemodulationState::Stop => DemodulationState::Stop,
+        }
+    }
+
+    pub fn return_detect_preamble(&self) -> Self{
+        DemodulationState::DetectPreamble
+    }
+}
+
+pub fn dot_product(input: &[f32], ref_signal: &[f64]) -> f64{
+    if input.len() != ref_signal.len(){
+        panic!("Input length is not equal to reference signal length");
+    }
+
+    dot_product_iter(input.iter().map(|x| *x as f64), ref_signal.iter().map(|x| *x)) 
+}
+
+pub fn smooth(input: &[f32], window_size: i32) -> Vec<f32>{
+    let mut smoothed_input = Vec::new();
+
+    for i in 0..input.len(){
+        let mut sum = 0.0;
+        for j in i as i32 - window_size/2..i as i32 + window_size/2{
+            if j < 0{
+                sum += input[(j + input.len() as i32) as usize];
+            }
+            else if j >= input.len() as i32{
+                sum += input[j as usize - input.len()];
+            }
+            else{
+                sum += input[j as usize];
+            }
+        }
+        smoothed_input.push(sum / window_size as f32);
+    }
+
+    smoothed_input
+} 
+
+pub fn exponential_smooth(input: &[f32], prev_signal: &mut f32, alpha: f32) -> Vec<f32>{
+    let mut smoothed_input = Vec::new();
+
+    for i in 0..input.len(){
+        let smoothed = alpha * input[i] + (1.0 - alpha) * *prev_signal;
+        smoothed_input.push(smoothed);
+        *prev_signal = smoothed;
+    }
+    smoothed_input
+}
+
+pub fn dot_product_smooth(input: &[f32], ref_signal: &[f64], window_size: i32) -> f64{
+    if input.len() != ref_signal.len(){
+        panic!("Input length is not equal to reference signal length");
+    }
+
+    let mut smoothed_input = Vec::new();
+
+    for i in 0..input.len(){
+        let mut sum = 0.0;
+        for j in i as i32 - window_size/2..i as i32 + window_size/2{
+            if j < 0{
+                sum += input[(j + input.len() as i32) as usize] as f64;
+            }
+            else if j >= input.len() as i32{
+                sum += input[j as usize - input.len()] as f64;
+            }
+            else{
+                sum += input[j as usize] as f64;
+            }
+        }
+        smoothed_input.push(sum / window_size as f64);
+    }
+
+    dot_product_iter(smoothed_input.iter(), ref_signal.iter().map(|x| *x))
+}
+
+pub fn dot_product_exponential_smooth(input: &[f32], ref_signal: &[f64], prev_signal: &mut f32, alpha: f32) -> f64{
+    if input.len() != ref_signal.len(){
+        panic!("Input length is not equal to reference signal length");
+    }
+
+    let mut smoothed_input = exponential_smooth(input, prev_signal, alpha);
+
+    dot_product_iter(smoothed_input.iter().map(|x| *x as f64), ref_signal.iter().map(|x| *x))
+}
+
+pub fn dot_product_iter<I, J, T, U, V>(iter1: I, iter2: J) -> V
+where
+    I: Iterator<Item = T>,
+    J: Iterator<Item = U>,
+    T: Mul<U, Output = V>,
+    V: Add<Output = V> + Default,
+{
+    iter1.zip(iter2)
+        .map(|(a, b)| a * b)
+        .fold(V::default(), |acc, x| acc + x)
+}
+
+pub struct Demodulation2{
+    input_config: InputStreamConfig,
+    pub buffer: VecDeque<Vec<f32>>,
+    demodulate_config: DemodulationConfig,
+    writer: File,
+}
+
+impl Demodulation2{
+    pub fn new(carrier_freq: Vec<u32>, sample_rate: u32, enable_ofdm: bool, output_file: &str) -> Self{
+        // let host = cpal::host_from_id(HostId::Asio).expect("failed to initialise ASIO host");
+        let host = cpal::default_host();
+        let device = host.input_devices().expect("failed to find input device");
+        let device = device
+            .into_iter()
+            .next()
+            .expect("no input device available");
+        println!("Input device: {:?}", device.name().unwrap());
+
+        let default_config = device.default_input_config().unwrap();
+        let config = SupportedStreamConfig::new(
+            1,                       // mono
+            SampleRate(sample_rate), // sample rate
+            default_config.buffer_size().clone(),
+            default_config.sample_format(),
+        );
+
+        let input_stream_config = InputStreamConfig::new(config, device);
+
+        // sort carrier_freq in ascending order
+        let mut carrier_freq = carrier_freq;
+        carrier_freq.sort();
+
+        let mut ref_signal = Vec::new();
+        let mut ref_signal_len = Vec::new();
+        let mut preamble = Vec::new();
+
+        for i in 0..carrier_freq.len(){
+            let carrier = carrier_freq.get(i).unwrap();
+            let ref_len = (sample_rate / *carrier) as usize;
+            ref_signal_len.push(ref_len);
+            let ref_sin = (0..ref_len).map(|t| (2.0 * std::f64::consts::PI * *carrier as f64 * (t as f64 / sample_rate as f64)).sin()).collect::<Vec<f64>>();
+            for _ in 0..phy_frame::FRAME_PREAMBLE_LENGTH/2{
+                preamble.extend(ref_sin.iter());
+                preamble.extend(ref_sin.iter().map(|x| -*x));
+            }
+            ref_signal.push(ref_sin);
+
+        }
+
+        let demodulation_config = DemodulationConfig::new(carrier_freq, enable_ofdm, ref_signal, ref_signal_len, preamble); 
+
+        let writer = File::create(output_file).unwrap();
+
+        Demodulation2{
+            input_config: input_stream_config,
+            buffer: VecDeque::new(),
+            demodulate_config: demodulation_config,
+            writer,
+        }
+    }
+
+    pub async fn listening(&mut self, write_to_file: bool, data: VecDeque<Vec<f32>>, debug_vec: &mut Vec<f32>) -> Vec<u8>{
+        let mut input_stream = self.input_config.create_input_stream();
+        let demodulate_config = &self.demodulate_config;
+        let window_size = 10;
+        let alpha = 0.3;
+        let mut prev = 0.0;
+
+        // let mut debug_vec = Vec::new();
+
+        let mut demodulate_state = DemodulationState::DetectPreamble;
+
+        let mut avg_power = 0.0;
+        let power_lim = 0.4;
+        let factor = 1.0 / 64.0;
+
+        let mut tmp_buffer: VecDeque<f32> = VecDeque::new();
+        let mut tmp_buffer_len = tmp_buffer.len();
+
+        let mut local_max = 0.0;
+        let mut start_index = usize::MAX;
+
+        let mut result = Vec::new();
+        let mut tmp_bits_data: Vec<u8> = Vec::new();
+
+        // while let Some(data) = input_stream.next().await{
+        for data in data{
+            if demodulate_state == DemodulationState::Stop {
+                break;
+            }
+
+            tmp_buffer_len += data.len();
+            for i in data{
+                avg_power = avg_power * (1.0 - factor) + i as f64 * factor;
+                tmp_buffer.push_back(i);
+            }
+            
+            if demodulate_state == DemodulationState::DetectPreamble{
+                if tmp_buffer_len <= demodulate_config.preamble_len{
+                    continue;
+                }
+
+                for i in 0..tmp_buffer_len-demodulate_config.preamble_len{
+                    let window = tmp_buffer.range(i..i+demodulate_config.preamble_len);
+                    // let dot_product = dot_product_smooth(window.clone().map(|x| *x).collect::<Vec<f32>>().as_slice(), 
+                    //                                           demodulate_config.preamble.iter().map(|x| *x).collect::<Vec<f64>>().as_slice(), 
+                    //                                           window_size);
+
+                    let dot_product = dot_product_exponential_smooth(window.clone().map(|x| *x).collect::<Vec<f32>>().as_slice(), 
+                                                                  demodulate_config.preamble.iter().map(|x| *x).collect::<Vec<f64>>().as_slice(), 
+                                                                  &mut prev, 0.7);
+
+                    // let dot_product = dot_product(window.clone().map(|x| *x).collect::<Vec<f32>>().as_slice(), 
+                    //                               demodulate_config.preamble.iter().map(|x| *x).collect::<Vec<f64>>().as_slice());
+
+                    
+                    // println!("dot_product: {:?}", dot_product);
+                    if dot_product > avg_power * 2.0 && dot_product > local_max && dot_product > power_lim{
+                        local_max = dot_product;
+                        start_index = i+1;
+                        debug_vec.clear();
+                        println!("start index: {:?}", start_index);
+                        // debug_vec.extend(smooth(window.clone().map(|x| *x).collect::<Vec<f32>>().as_slice(), window_size))
+                        debug_vec.extend(window.clone());
+                    }
+                    else if start_index != usize::MAX && i - start_index > demodulate_config.preamble_len/3 && local_max > power_lim{
+                        println!("have detected preamble !!");
+                        // println!("local_max: {:?}", local_max);
+                        demodulate_state = demodulate_state.next();
+
+                        local_max = 0.0;
+                        start_index += demodulate_config.preamble_len - 1;
+                        tmp_bits_data.clear();
+                        tmp_bits_data.extend(vec![0, 1, 0, 1, 0, 1, 0, 1, 0, 1]);
+                        break;
+                    }
+                }
+            }
+            else if demodulate_state == DemodulationState::RecvFrame{
+                if tmp_buffer_len <= demodulate_config.ref_signal_len[0]{
+                    continue;
+                }
+
+                while tmp_buffer_len - start_index >= demodulate_config.ref_signal_len[0] && tmp_bits_data.len() < phy_frame::frame_length_length()+phy_frame::FRAME_PAYLOAD_LENGTH + phy_frame::FRAME_PREAMBLE_LENGTH{
+                    // let dot_product = dot_product_smooth(tmp_buffer.range(start_index..start_index+demodulate_config.ref_signal_len[0]).map(|x| *x).collect::<Vec<f32>>().as_slice(), 
+                    //                                           demodulate_config.ref_signal[0].iter().map(|x| *x).collect::<Vec<f64>>().as_slice(), 
+                    //                                           window_size);
+
+                    let dot_product = dot_product_exponential_smooth(tmp_buffer.range(start_index..start_index+demodulate_config.ref_signal_len[0]).map(|x| *x).collect::<Vec<f32>>().as_slice(), 
+                                                                  demodulate_config.ref_signal[0].iter().map(|x| *x).collect::<Vec<f64>>().as_slice(), 
+                                                                  &mut prev, alpha);
+
+                    // let dot_product = dot_product(tmp_buffer.range(start_index..start_index+demodulate_config.ref_signal_len[0]).map(|x| *x).collect::<Vec<f32>>().as_slice(), 
+                    //                               demodulate_config.ref_signal[0].iter().map(|x| *x).collect::<Vec<f64>>().as_slice());
+
+                    // println!("dot_product: {:?}", dot_product);
+                    tmp_bits_data.push(if dot_product > 0.0 {0} else {1});
+
+                    debug_vec.extend(tmp_buffer.range(start_index..start_index+demodulate_config.ref_signal_len[0]));
+                    // debug_vec.extend(smooth(&tmp_buffer.range(start_index..start_index+demodulate_config.ref_signal_len[0]).map(|x| *x).collect::<Vec<f32>>()[..], window_size));
+                    start_index += demodulate_config.ref_signal_len[0];
+                }
+
+                if tmp_bits_data.len() == phy_frame::frame_length_length()+phy_frame::FRAME_PAYLOAD_LENGTH + phy_frame::FRAME_PREAMBLE_LENGTH{
+                    let mut loop_count = 0;
+                    let mut ones_count = 0;
+                    let mut data_len = 0;
+                    for i in phy_frame::FRAME_PREAMBLE_LENGTH..phy_frame::frame_length_length()+phy_frame::FRAME_PREAMBLE_LENGTH{
+                        ones_count += tmp_bits_data[i];
+                        loop_count += 1;
+                        if loop_count == 3{
+                            data_len <<= 1;
+                            if ones_count > 1{
+                                data_len += 1;
+                            }
+
+                            ones_count = 0;
+                            loop_count = 0;
+                        }
+                    }
+
+                    let length = utils::read_data_2_compressed_u8(tmp_bits_data.iter().take(phy_frame::frame_length_length()+phy_frame::FRAME_PREAMBLE_LENGTH).cloned().collect());
+                    println!("length: {:?}", length);
+                    println!("actual len: {:?}", data_len);
+
+                    let mut recv_data= utils::read_data_2_compressed_u8(tmp_bits_data.iter().skip(phy_frame::frame_length_length()+phy_frame::FRAME_PREAMBLE_LENGTH).cloned().collect());
+                    println!("recv_data: {:?}", recv_data);
+
+                    // construct the payload (to fit in the shard macro)
+                    let mut i = 0;
+                    let mut payload = phy_frame::PHYFrame::construct_payload_format(recv_data);
+
+                    result.extend(&utils::read_compressed_u8_2_data(phy_frame::PHYFrame::payload_2_data(payload).unwrap())[..data_len]);
+                    
+                    if data_len == phy_frame::MAX_FRAME_DATA_LENGTH{
+                        demodulate_state = demodulate_state.return_detect_preamble();
+                        println!("return to detect preamble");
+                    }
+                    else{
+                        demodulate_state = demodulate_state.next();
+                        println!("stop receiving data");
+                    }
+                    // demodulate_state = DemodulationState::Stop;
+                }
+            }
+
+            if start_index == usize::MAX{
+                for i in 0..tmp_buffer_len - demodulate_config.preamble_len+1{
+                    tmp_buffer.pop_front();
+                }
+            }
+            else{
+                for i in 0..start_index{
+                    tmp_buffer.pop_front();
+                }
+                start_index = 0;
+            }
+            tmp_buffer_len = tmp_buffer.len();
+        }
+
+        if write_to_file{
+            self.writer.write_all(result.clone().iter().map(|x| x + b'0').collect::<Vec<u8>>().as_slice()).unwrap();
+        }
+
+        result
+        // debug_vec
     }
 }

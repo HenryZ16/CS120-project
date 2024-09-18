@@ -8,18 +8,9 @@ Input data
 use crate::asio_stream::{AudioTrack, OutputAudioStream};
 use crate::utils;
 use cpal::traits::{DeviceTrait, HostTrait};
-use cpal::{HostId, SampleFormat, SampleRate, SupportedStreamConfig};
-use futures::executor::block_on;
+use cpal::{HostId, SampleRate, SupportedStreamConfig};
 use futures::SinkExt;
 use hound::{WavSpec, WavWriter};
-use std::{
-    fs::File,
-    io::BufWriter,
-    sync::{Arc, Mutex},
-    thread,
-    time::Duration,
-};
-
 use super::phy_frame;
 
 const SAMPLE_RATE: u32 = 48000;
@@ -35,8 +26,8 @@ pub struct Modulator {
 
 impl Modulator {
     pub fn new(carrier_freq: Vec<u32>, sample_rate: u32, enable_ofdm: bool) -> Self {
-        let host = cpal::host_from_id(HostId::Asio).expect("failed to initialise ASIO host");
-        // let host = cpal::default_host();
+        // let host = cpal::host_from_id(HostId::Asio).expect("failed to initialise ASIO host");
+        let host = cpal::default_host();
         let device = host.output_devices().expect("failed to find output device");
         let device = device
             .into_iter()
