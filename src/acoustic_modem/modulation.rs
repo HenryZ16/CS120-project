@@ -311,12 +311,15 @@ impl Modulator {
 
 
 
-        let start = 2e3;
+        let start = 1e3;
         let end = 1e4;
+        let half_length = 400;
         let dx: f64 = 1.0 / 48000.0;
-        let step = 8e3 / 220.0;
-        let mut fp: Vec<f64> = (0..220).map(|i| start + i as f64 * step).collect();
-        fp.extend(fp.clone().iter().rev());
+        let step = (end - start) as f64 / half_length as f64;
+        let mut fp: Vec<f64> = (0..half_length).map(|i| start + i as f64 * step).collect();
+        let fp_rev = fp.clone().into_iter().rev();
+        fp.pop();
+        fp.extend(fp_rev);
 
         let mut res = vec![];
 

@@ -1,4 +1,5 @@
 use anyhow::{Error, Result};
+use plotters::data;
 use reed_solomon_erasure::galois_8::ReedSolomon;
 
 pub const MAX_FRAME_DATA_LENGTH: usize = 960;
@@ -181,4 +182,52 @@ impl PHYFrame {
         
         payload
     }
+}
+
+pub struct SimpleFrame{
+    data: Vec<u8>,
+    sample_rate: u32,
+    ref_signal: Vec<f32>,
+}
+
+impl SimpleFrame{
+    pub fn new(carrier_freq: u32) -> Self{
+        let ref_signal: Vec<f32> = (0..48000 / carrier_freq).map(|x| (2.0 * std::f32::consts::PI * x / 48000.0 * carrier_freq).sin()).collect();
+        SimpleFrame{
+            data: vec![0,1,0,1],
+            sample_rate: 48000,
+            ref_signal,
+        }
+    }
+
+    pub fn into_audio(&self) -> Vec<f32>{
+        let mut res = gen_preamble(sample_rate);
+        for bit in self.data{
+            break;
+        }
+    }
+}
+
+pub fn gen_preamble(sample_rate: u32) -> Vec<f32>{
+        let start = 1e3;
+        let end = 1e4;
+        let half_length = 400;
+        let dx = 1.0 / sample_rate as f32;
+        let step = (end - start) as f32 / half_length as f32;
+        let mut fp: Vec<f32> = (0..half_length).map(|i| start + i as f32 * step).collect();
+        let fp_rev = fp.clone().into_iter().rev();
+        fp.pop();
+        fp.extend(fp_rev);
+
+        let mut res = vec![];
+
+        res.push(0.0);
+        for i in 1..fp.len(){
+            let trap_area = (fp[i] + fp[i-1]) * dx / 2.0;
+            res.push(res[i-1] + trap_area);
+        }
+
+        println!("create preamble len: {}", fp.len());
+
+        res.into_iter().map(|x| (2.0 * std::f32::consts::PI * x ).sin()).collect()
 }

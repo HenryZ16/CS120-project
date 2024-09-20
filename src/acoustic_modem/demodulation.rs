@@ -22,8 +22,8 @@ struct DemodulationConfig{
     ref_signal_len: Vec<usize>,
     check_len: usize,
     check: Vec<f64>,
+    preamble: Vec<f32>,
     preamble_len: usize,
-    preamble: Vec<f32>
 }
 
 unsafe impl Send for DemodulationConfig{}
