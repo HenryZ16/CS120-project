@@ -34,6 +34,7 @@ impl Modulator {
             .into_iter()
             .next()
             .expect("no output device available");
+        let device = host.default_output_device().unwrap();
         println!("[Modulator] Output device: {:?}", device.name().unwrap());
 
         let default_config = device.default_output_config().unwrap();

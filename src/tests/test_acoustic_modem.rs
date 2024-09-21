@@ -321,8 +321,8 @@ fn test_plot_wav(){
     root.present().unwrap();
 }
 
-const CARRIER: u32 = 2000;
-const LEN: usize = 50;
+const CARRIER: u32 = 6000;
+const LEN: usize = 30;
 
 #[test]
 fn test_simple_gen(){
@@ -353,28 +353,31 @@ async fn test_simple_listen(){
 
     let mut debug_vec = vec![];
 
-    let res = demodulator.simple_listen(true, &mut debug_vec, LEN).await;
-
+    
     use std::fs::File;
     use std::io::BufReader;
-
+    
     let reader = File::open("ref_signal.txt").unwrap();
     let mut reader = BufReader::new(reader);
     let mut ref_data = vec![];
     for data in reader.bytes(){
         ref_data.push(data.unwrap() - b'0');
     }
-
+    
     // println!("ref: {:?}", ref_data);
+    loop{
 
-    let mut diff_num = 0;
-    for i in 0..ref_data.len(){
-        if ref_data[i] != res[i]
-        {
-            diff_num += 1;
+        
+        let res = demodulator.simple_listen(true, &mut debug_vec, LEN).await;
+        let mut diff_num = 0;
+        for i in 0..ref_data.len(){
+            if ref_data[i] != res[i]
+            {
+                diff_num += 1;
+            }
         }
+    
+        plot(debug_vec.clone()).unwrap();
+        println!("error percent: {}", diff_num as f32 / ref_data.len() as f32);
     }
-
-    plot(debug_vec.clone()).unwrap();
-    println!("error percent: {}", diff_num as f32 / ref_data.len() as f32);
 }

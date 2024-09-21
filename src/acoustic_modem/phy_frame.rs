@@ -235,7 +235,7 @@ impl SimpleFrame{
 }
 
 pub fn gen_preamble(sample_rate: u32) -> Vec<f32> {
-    let start = 1e3;
+    let start = 1e2;
     let end = 1e4;
     let half_length = 400;
     let dx: f64 = 1.0 / sample_rate as f64;

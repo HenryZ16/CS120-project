@@ -75,7 +75,7 @@ enum DemodulationState{
 
 impl DemodulationState{
     pub fn next(&self) -> Self{
-        println!("switched");
+        // println!("switched");
 
         match self{
             DemodulationState::DetectPreamble => DemodulationState::RecvFrame,
@@ -427,7 +427,7 @@ impl Demodulation2{
         let demodulate_config = &self.demodulate_config;
         let window_size = 10;
         let alpha_data = 0.3;
-        let alpha_check = 1.0;
+        let alpha_check = 0.31;
         let mut prev = 0.0;
 
         let mut demodulate_state = DemodulationState::DetectPreamble;
@@ -469,7 +469,7 @@ impl Demodulation2{
                     let dot_product = range_dot_product_vec(window.clone(), &demodulate_config.preamble);
 
                     if dot_product > avg_power * 2.0 && dot_product > local_max && dot_product > power_lim_preamble{
-                        println!("detected");
+                        // println!("detected");
                         local_max = dot_product;
                         start_index = i + 1;
                         debug_vec.clear();
