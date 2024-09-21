@@ -1,10 +1,10 @@
 use std::fs::File;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::time::Duration;
 use std::{result, vec};
 
-use crate::acoustic_modem::{self, demodulation, modulation};
-use crate::acoustic_modem::demodulation::{dot_product_iter, Demodulation, Demodulation2};
+use crate::acoustic_modem::{self, demodulation, modulation, phy_frame};
+use crate::acoustic_modem::demodulation::{dot_product_iter, Demodulation2};
 use crate::acoustic_modem::modulation::Modulator;
 use crate::utils;
 use plotters::{data, prelude::*};
@@ -13,6 +13,8 @@ use rand::Rng;
 use rand_distr::Normal;
 use tokio::{signal, task};
 use tokio::time::sleep;
+
+use hound::{WavSpec, WavWriter};
 
 
 fn plot(modulated_signal: Vec<f32>) -> Result<(), Box<dyn std::error::Error>> {
@@ -64,250 +66,240 @@ fn test_plot(){
         .map(|s| s.unwrap())
         .collect();
 
-    plot(data);
+    plot(data).unwrap();
 }
 
-#[tokio::test]
-async fn test_modulation() {
-    // read data from testset/data.txt
-    let mut file = File::open("testset/data.txt").unwrap();
-    let mut data = String::new();
-    file.read_to_string(&mut data).unwrap();
-    let data = data
-        .chars()
-        .map(|c| c.to_digit(10).unwrap() as u8)
-        .collect::<Vec<u8>>();
+// #[tokio::test]
+// async fn test_modulation() {
+//     // read data from testset/data.txt
+//     let mut file = File::open("testset/data.txt").unwrap();
+//     let mut data = String::new();
+//     file.read_to_string(&mut data).unwrap();
+//     let data = data
+//         .chars()
+//         .map(|c| c.to_digit(10).unwrap() as u8)
+//         .collect::<Vec<u8>>();
 
-    // modulation
-    let sample_rate = 48000;
-    let carrier_freq = 1000;
-    let mut modulator = Modulator::new(vec![carrier_freq], sample_rate, false);
-    let modulated_signal = modulator.modulate(&data, 0);
+//     // modulation
+//     let sample_rate = 48000;
+//     let carrier_freq = 1000;
+//     let mut modulator = Modulator::new(vec![carrier_freq], sample_rate, false);
+//     let modulated_signal = modulator.modulate(&data, 0);
 
-    // show figure of the modulated_signal: Vec<f32>
-    plot(modulated_signal.clone()).unwrap();
+//     // show figure of the modulated_signal: Vec<f32>
+//     plot(modulated_signal.clone()).unwrap();
 
-    // send
-    modulator
-        .send_bits(
-            utils::read_data_2_compressed_u8(data.clone()),
-            data.len() as isize,
-        )
-        .await;
-}
+//     // send
+//     modulator
+//         .send_bits(
+//             utils::read_data_2_compressed_u8(data.clone()),
+//             data.len() as isize,
+//         )
+//         .await;
+// }
 
-#[tokio::test]
-async fn test_demodulation_detect_windowshift() {
-    let sample_rate = 48000;
-    let carrier_freq = 1000;
+// #[tokio::test]
+// async fn test_demodulation_detect_windowshift() {
+//     let sample_rate = 48000;
+//     let carrier_freq = 1000;
 
-    let normal = Normal::new(0.0, 0.3).unwrap();
-    let mut rng = thread_rng();
+//     let normal = Normal::new(0.0, 0.3).unwrap();
+//     let mut rng = thread_rng();
 
-    let demodulator = Demodulation::new(vec![carrier_freq], 48000, false);
+//     let demodulator = Demodulation::new(vec![carrier_freq], 48000, false);
 
-    let mut padding: Vec<f32> = (0..0).map(|_| rng.sample(&normal)).collect();
-    let mut back_padding: Vec<f32> = (0..1).map(|_| rng.sample(&normal)).collect();
+//     let mut padding: Vec<f32> = (0..0).map(|_| rng.sample(&normal)).collect();
+//     let mut back_padding: Vec<f32> = (0..1).map(|_| rng.sample(&normal)).collect();
 
-    let t = (0..(sample_rate / carrier_freq) * 2).map(|t| t as f32 / sample_rate as f32);
+//     let t = (0..(sample_rate / carrier_freq) * 2).map(|t| t as f32 / sample_rate as f32);
 
-    let mut test_vec = t
-        .map(|t| (2.0 * std::f32::consts::PI * t * carrier_freq as f32).sin() + rng.sample(&normal))
-        .collect::<Vec<f32>>();
+//     let mut test_vec = t
+//         .map(|t| (2.0 * std::f32::consts::PI * t * carrier_freq as f32).sin() + rng.sample(&normal))
+//         .collect::<Vec<f32>>();
 
-    padding.append(&mut test_vec);
-    padding.append(&mut back_padding);
+//     padding.append(&mut test_vec);
+//     padding.append(&mut back_padding);
 
-    let mut buffer = Vec::new();
-    buffer.push(demodulator.detect_windowshift(&padding[..], 0.0, 0));
+//     let mut buffer = Vec::new();
+//     buffer.push(demodulator.detect_windowshift(&padding[..], 0.0, 0));
 
-    println!("buffer: {:?}", buffer);
-}
+//     println!("buffer: {:?}", buffer);
+// }
 
-#[tokio::test]
-async fn test_demodulation_detect_preamble(){
-    let sample_rate = 48000;
-    let carrier_freq = 1000;
-    let demodulator = Demodulation::new(vec![carrier_freq], 48000, false);
+// #[tokio::test]
+// async fn test_demodulation_detect_preamble(){
+//     let sample_rate = 48000;
+//     let carrier_freq = 1000;
+//     let demodulator = Demodulation::new(vec![carrier_freq], 48000, false);
     
-    let padding_lock = demodulator.buffer.clone();
+//     let padding_lock = demodulator.buffer.clone();
     
     
     
-    let handle1 = task::spawn(
-        async move{
-            // let _normal = Normal::new(0.0, 0.4).unwrap();
-            // let mut rng = thread_rng();
-            let mut padding = padding_lock.lock().await;
+//     let handle1 = task::spawn(
+//         async move{
+//             // let _normal = Normal::new(0.0, 0.4).unwrap();
+//             // let mut rng = thread_rng();
+//             let mut padding = padding_lock.lock().await;
 
-            padding.push_back((0..20).map(|_| 0.0).collect());
+//             padding.push_back((0..20).map(|_| 0.0).collect());
 
-            // let mut padding: Vec<f32> = (0..0).map(|_| rng.sample(&normal)).collect();
-            let back_padding: Vec<f32> = (0..0).map(|_| 0.0).collect();
+//             // let mut padding: Vec<f32> = (0..0).map(|_| rng.sample(&normal)).collect();
+//             let back_padding: Vec<f32> = (0..0).map(|_| 0.0).collect();
 
-            let phase_base = (0..(sample_rate / carrier_freq)).map(|t| t as f32 / sample_rate as f32);
-            let phase1 = phase_base.clone().map(|t| (2.0 * std::f32::consts::PI * t * carrier_freq as f32).sin()).collect::<Vec<f32>>();
-            let phase0 = phase_base.clone().map(|t| (2.0 * std::f32::consts::PI * t * carrier_freq as f32 + std::f32::consts::PI).sin()).collect::<Vec<f32>>();
+//             let phase_base = (0..(sample_rate / carrier_freq)).map(|t| t as f32 / sample_rate as f32);
+//             let phase1 = phase_base.clone().map(|t| (2.0 * std::f32::consts::PI * t * carrier_freq as f32).sin()).collect::<Vec<f32>>();
+//             let phase0 = phase_base.clone().map(|t| (2.0 * std::f32::consts::PI * t * carrier_freq as f32 + std::f32::consts::PI).sin()).collect::<Vec<f32>>();
 
-            // padding.push_back(phase1.clone());
-            // padding.push_back(phase1.clone());
-            // padding.push_back(phase0.clone());
-            // padding.push_back(phase0.clone());
-            // padding.push_back(phase1.clone());
-            drop(padding);
-            println!("send 1st sequence");
+//             // padding.push_back(phase1.clone());
+//             // padding.push_back(phase1.clone());
+//             // padding.push_back(phase0.clone());
+//             // padding.push_back(phase0.clone());
+//             // padding.push_back(phase1.clone());
+//             drop(padding);
+//             println!("send 1st sequence");
             
-            for i in 1..5{
-                let mut padding = padding_lock.lock().await;
-                padding.push_back(phase0.clone());
-                padding.push_back(phase1.clone());
-                drop(padding);
-                let _ = sleep(Duration::from_millis(500));
-                println!("send {}st sequence", i + 1);
-            }
+//             for i in 1..5{
+//                 let mut padding = padding_lock.lock().await;
+//                 padding.push_back(phase0.clone());
+//                 padding.push_back(phase1.clone());
+//                 drop(padding);
+//                 let _ = sleep(Duration::from_millis(500));
+//                 println!("send {}st sequence", i + 1);
+//             }
 
-            let mut padding = padding_lock.lock().await;
-            padding.push_back(phase0.clone());
-            padding.push_back(phase1.clone());
-            drop(padding);
-            let _ = sleep(Duration::from_millis(500));
+//             let mut padding = padding_lock.lock().await;
+//             padding.push_back(phase0.clone());
+//             padding.push_back(phase1.clone());
+//             drop(padding);
+//             let _ = sleep(Duration::from_millis(500));
 
-            let mut padding = padding_lock.lock().await;
-            padding.push_back(back_padding);
-            drop(padding);
-        }
-    );
+//             let mut padding = padding_lock.lock().await;
+//             padding.push_back(back_padding);
+//             drop(padding);
+//         }
+//     );
 
 
-    // join!(handle1);
-    // let res = demodulator.detect_preamble(3);
+//     // join!(handle1);
+//     // let res = demodulator.detect_preamble(3);
 
-    let handle2 = task::spawn(
-        async move{demodulator.detect_preamble(4).await.unwrap();}
-    );
+//     let handle2 = task::spawn(
+//         async move{demodulator.detect_preamble(4).await.unwrap();}
+//     );
     
-    handle1.await.unwrap();
-    handle2.await.unwrap();
-    // println!("res: {:?}", res.await.expect("error"));
-}
+//     handle1.await.unwrap();
+//     handle2.await.unwrap();
+//     // println!("res: {:?}", res.await.expect("error"));
+// }
 
 
-#[tokio::test]
-async fn test_listen_directly(){
-    let sample_rate = 48000;
-    let carrier_freq = 1500;
-    let mut demodulator = Demodulation::new(vec![carrier_freq], 48000, false);
-    let mut modulation = Modulator::new(vec![carrier_freq], sample_rate, false);
+// #[tokio::test]
+// async fn test_listen_directly(){
+//     let sample_rate = 48000;
+//     let carrier_freq = 1500;
+//     let mut demodulator = Demodulation::new(vec![carrier_freq], 48000, false);
+//     let mut modulation = Modulator::new(vec![carrier_freq], sample_rate, false);
 
-    let data = vec![1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 1, 1];
-    // let data = [1; 2048].to_vec();
-    let data = utils::read_data_2_compressed_u8(data);
-    let buffer = demodulator.buffer.clone();
+//     let data = vec![1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 1, 1];
+//     // let data = [1; 2048].to_vec();
+//     let data = utils::read_data_2_compressed_u8(data);
+//     let buffer = demodulator.buffer.clone();
 
-    let signal = modulation.send_bits_2_file(data.clone(), data.len() as isize, "test.wav").await;
+//     let signal = modulation.send_bits_2_file(data.clone(), data.len() as isize, "test.wav").await;
 
-    plot(signal[0].clone());
+//     plot(signal[0].clone());
 
-    let ref_signal = Modulator::modulate_fsk_preamble();
+//     let ref_signal = Modulator::modulate_fsk_preamble();
 
-    println!("dot product: {:?}", demodulation::dot_product_iter(signal[0].iter(), ref_signal.iter()));
+//     println!("dot product: {:?}", demodulation::dot_product_iter(signal[0].iter(), ref_signal.iter()));
 
-    // let mut buffer = buffer.lock().await;
-    // for vec in signal{
-    //     buffer.push_back(vec);
-    // }
+//     // let mut buffer = buffer.lock().await;
+//     // for vec in signal{
+//     //     buffer.push_back(vec);
+//     // }
 
-    // drop(buffer);
+//     // drop(buffer);
 
-    // demodulator.listening(1).await;
+//     // demodulator.listening(1).await;
 
-    // let mut buffer = Vec::new();
-    // for vec in signal{
-    //     // buffer.push_back(vec);
-    //     buffer.extend(vec);
-    // }
+//     // let mut buffer = Vec::new();
+//     // for vec in signal{
+//     //     // buffer.push_back(vec);
+//     //     buffer.extend(vec);
+//     // }
     
-    // let mut recv_data: Vec<u8> = Vec::new();
-    // let mut index = 384;
-    // println!("sample buffer: {:?}", buffer[index..index + 48].to_vec());
-    // while index < buffer.len(){
-    //     recv_data.push(demodulator.detect_windowshift(&buffer, 12.0, index).unwrap().received_bit);
-    //     index += 48;
-    // }
+//     // let mut recv_data: Vec<u8> = Vec::new();
+//     // let mut index = 384;
+//     // println!("sample buffer: {:?}", buffer[index..index + 48].to_vec());
+//     // while index < buffer.len(){
+//     //     recv_data.push(demodulator.detect_windowshift(&buffer, 12.0, index).unwrap().received_bit);
+//     //     index += 48;
+//     // }
 
-    // let recv_data = utils::read_data_2_compressed_u8(recv_data);
-    // println!("len of recv_data: {}", recv_data.len());
-    // println!("recv_data: {:?}", recv_data);
-}
+//     // let recv_data = utils::read_data_2_compressed_u8(recv_data);
+//     // println!("len of recv_data: {}", recv_data.len());
+//     // println!("recv_data: {:?}", recv_data);
+// }
 
-#[tokio::test]
-async fn test_listening()
-{
-    let sample_rate = 48000;
-    let carrier_freq = 1000;
-    let mut demodulator = Demodulation::new(vec![carrier_freq], sample_rate, false);
+// #[tokio::test]
+// async fn test_listening()
+// {
+//     let sample_rate = 48000;
+//     let carrier_freq = 1000;
+//     let mut demodulator = Demodulation::new(vec![carrier_freq], sample_rate, false);
 
-    demodulator.listening(5).await;
-}
+//     demodulator.listening(5).await;
+// }
 
-#[tokio::test]
-async fn test_2_listening(){
-    use std::collections::VecDeque;
+// #[tokio::test]
+// async fn test_2_listening(){
+//     use std::collections::VecDeque;
 
-    let sample_rate = 48000;
-    let carrier_freq = 1500;
-    let mut demodulator = Demodulation2::new(vec![carrier_freq], sample_rate, false, "test.txt");
+//     let sample_rate = 48000;
+//     let carrier_freq = 1500;
+//     let mut demodulator = Demodulation2::new(vec![carrier_freq], sample_rate, false, "test.txt");
     
-    // read wav from file
-    let file_path = "testset/output.wav";
-    // let file_path = "testset/send.wav";
-    // let file_path = "test.wav";
-    let mut reader = hound::WavReader::open(file_path).unwrap();
-    let data: Vec<f32> = reader.samples::<f32>()
-        .map(|s| s.unwrap())
-        .collect();
+//     // read wav from file
+//     let file_path = "testset/output.wav";
+//     // let file_path = "testset/send.wav";
+//     // let file_path = "test.wav";
+//     let mut reader = hound::WavReader::open(file_path).unwrap();
+//     let data: Vec<f32> = reader.samples::<f32>()
+//         .map(|s| s.unwrap())
+//         .collect();
 
-    // plot(data.clone()).unwrap();
+//     // plot(data.clone()).unwrap();
     
-    let mut test_data = VecDeque::new();
-    let mut count = 0;
-    for i in 0..data.len(){
-        if count == 0{
-            test_data.push_back(Vec::new());
-        }
-        test_data.back_mut().unwrap().push(data[i]);
-        count += 1;
-        if count == 640{
-            count = 0;
-        }
-    }
-    let mut debug_vec = vec![];
+//     let mut test_data = VecDeque::new();
+//     let mut count = 0;
+//     for i in 0..data.len(){
+//         if count == 0{
+//             test_data.push_back(Vec::new());
+//         }
+//         test_data.back_mut().unwrap().push(data[i]);
+//         count += 1;
+//         if count == 640{
+//             count = 0;
+//         }
+//     }
+//     let mut debug_vec = vec![];
 
-    println!("start listening");
-    let result = demodulator.listening(true, test_data, &mut debug_vec).await;
-    // let result = demodulator.listening(true, VecDeque::new().push_back(data.clone()), &mut debug_vec).await;
+//     println!("start listening");
+//     let result = demodulator.listening(true, test_data, &mut debug_vec).await;
+//     // let result = demodulator.listening(true, VecDeque::new().push_back(data.clone()), &mut debug_vec).await;
 
-    plot(debug_vec).unwrap();
-}
-
-#[test]
-fn test_iter(){
-
-    let signal = modulation::Modulator::modulate_fsk_preamble();
-    let mut zero: Vec<f32> = vec![0.0; 2];
-    zero.extend(signal.clone().iter());
-
-    println!("product res: {:?}", dot_product_iter(zero.clone().iter(), signal.clone().iter()));
-}
+//     plot(debug_vec).unwrap();
+// }
 
 #[test]
 fn test_plot_wav(){
-    let mut reader = hound::WavReader::open("test.wav").unwrap();
+    let mut reader = hound::WavReader::open("test_simple.wav").unwrap();
     let samples: Vec<f32> = reader.samples::<f32>().map(|s| s.unwrap()).collect();
 
     // 创建绘图区域
     let root =
-        SVGBackend::new("testset/ref_wave.svg", (30000, 200)).into_drawing_area();
+        SVGBackend::new("testset/ref_wave.svg", (3000, 200)).into_drawing_area();
     root.fill(&WHITE).unwrap();
 
     let mut chart = ChartBuilder::on(&root)
@@ -327,4 +319,62 @@ fn test_plot_wav(){
 
     // 保存图像
     root.present().unwrap();
+}
+
+const CARRIER: u32 = 2000;
+const LEN: usize = 50;
+
+#[test]
+fn test_simple_gen(){
+    let carrier = CARRIER;
+    let sample_rate = 48000;
+    let simple_frame = phy_frame::SimpleFrame::new(carrier, LEN);
+
+    let output_wav = simple_frame.into_audio();
+
+    // plot(output_wav).unwrap();
+
+    // file write use
+    let spec = WavSpec {
+        channels: 1,
+        sample_rate,
+        bits_per_sample: 32,
+        sample_format: hound::SampleFormat::Float,
+    };
+    let mut writer = WavWriter::create("test_simple.wav", spec).unwrap();
+    for sample in output_wav{
+        writer.write_sample(sample).unwrap();
+    }
+}
+
+#[tokio::test]
+async fn test_simple_listen(){
+    let mut demodulator = Demodulation2::new(vec![CARRIER], 48000, "text.txt");
+
+    let mut debug_vec = vec![];
+
+    let res = demodulator.simple_listen(true, &mut debug_vec, LEN).await;
+
+    use std::fs::File;
+    use std::io::BufReader;
+
+    let reader = File::open("ref_signal.txt").unwrap();
+    let mut reader = BufReader::new(reader);
+    let mut ref_data = vec![];
+    for data in reader.bytes(){
+        ref_data.push(data.unwrap() - b'0');
+    }
+
+    // println!("ref: {:?}", ref_data);
+
+    let mut diff_num = 0;
+    for i in 0..ref_data.len(){
+        if ref_data[i] != res[i]
+        {
+            diff_num += 1;
+        }
+    }
+
+    plot(debug_vec.clone()).unwrap();
+    println!("error percent: {}", diff_num as f32 / ref_data.len() as f32);
 }

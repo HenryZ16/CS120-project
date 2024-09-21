@@ -292,25 +292,6 @@ impl Modulator {
     }
 
     pub fn modulate_fsk_preamble() -> Vec<f32> {
-        // freq series: 523, 659, 784, 1046, 784, 659, 523, 659, 784, 1046, 784, 659, 523
-        // let freq = vec![
-        //     523, 659, 784, 1046, 784, 659, 523, 659, 784, 1046, 784, 659, 523,
-        // ];
-
-        // let mut modulated_signal = vec![];
-        // for f in freq {
-        //     let sample_cnt_each_bit = SAMPLE_RATE * 2 / f;
-        //     for i in 0..sample_cnt_each_bit {
-        //         let sample =
-        //             (2.0 * std::f64::consts::PI * f as f64 * i as f64 / SAMPLE_RATE as f64).sin();
-        //         modulated_signal.push(sample as f32);
-        //     }
-        // }
-
-        // return modulated_signal;
-
-
-
         let start = 1e3;
         let end = 1e4;
         let half_length = 400;

@@ -190,44 +190,68 @@ pub struct SimpleFrame{
     ref_signal: Vec<f32>,
 }
 
+use rand::Rng;
+
 impl SimpleFrame{
-    pub fn new(carrier_freq: u32) -> Self{
-        let ref_signal: Vec<f32> = (0..48000 / carrier_freq).map(|x| (2.0 * std::f32::consts::PI * x / 48000.0 * carrier_freq).sin()).collect();
+    pub fn new(carrier_freq: u32, data_len: usize) -> Self{
+        let ref_signal: Vec<f32> = (0..48000 / carrier_freq).map(|x| (2.0 * std::f32::consts::PI * x as f32 / 48000.0 * carrier_freq as f32).sin()).collect();
+        let mut data = vec![];
+        let mut rng = rand::thread_rng();
+        for _ in 0..data_len{
+            data.push(rng.gen_bool(0.5) as u8);
+        }
+
+        use std::fs::File;
+        use std::io::Write;
+        println!("org data: {:?}", data);
+        let mut writer = File::create("ref_signal.txt").unwrap();
+        
+        for &num in &data{
+            let ch = (num as u8 + b'0');
+            writer.write_all(&[ch]).unwrap();
+        }
+
         SimpleFrame{
-            data: vec![0,1,0,1],
+            data,
             sample_rate: 48000,
             ref_signal,
         }
     }
 
     pub fn into_audio(&self) -> Vec<f32>{
-        let mut res = gen_preamble(sample_rate);
-        for bit in self.data{
-            break;
+        let mut res = gen_preamble(self.sample_rate);
+
+        for &bit in &self.data{
+            if bit == 0{
+                    res.extend(self.ref_signal.clone().into_iter());
+            }
+            else {
+                    res.extend(self.ref_signal.clone().into_iter().map(|x| -x));
+            }
         }
+
+        res
     }
 }
 
-pub fn gen_preamble(sample_rate: u32) -> Vec<f32>{
-        let start = 1e3;
-        let end = 1e4;
-        let half_length = 400;
-        let dx = 1.0 / sample_rate as f32;
-        let step = (end - start) as f32 / half_length as f32;
-        let mut fp: Vec<f32> = (0..half_length).map(|i| start + i as f32 * step).collect();
-        let fp_rev = fp.clone().into_iter().rev();
-        fp.pop();
-        fp.extend(fp_rev);
+pub fn gen_preamble(sample_rate: u32) -> Vec<f32> {
+    let start = 1e3;
+    let end = 1e4;
+    let half_length = 400;
+    let dx: f64 = 1.0 / sample_rate as f64;
+    let step = (end - start) as f64 / half_length as f64;
+    let mut fp: Vec<f64> = (0..half_length).map(|i| start + i as f64 * step).collect();
+    let fp_rev = fp.clone().into_iter().rev();
+    fp.pop();
+    fp.extend(fp_rev);
 
-        let mut res = vec![];
+    let mut res = vec![];
 
-        res.push(0.0);
-        for i in 1..fp.len(){
-            let trap_area = (fp[i] + fp[i-1]) * dx / 2.0;
-            res.push(res[i-1] + trap_area);
-        }
+    res.push(0.0);
+    for i in 1..fp.len(){
+        let trap_area = (fp[i] + fp[i-1]) * dx / 2.0;
+        res.push(res[i-1] + trap_area);
+    }
 
-        println!("create preamble len: {}", fp.len());
-
-        res.into_iter().map(|x| (2.0 * std::f32::consts::PI * x ).sin()).collect()
+    res.into_iter().map(|x| (2.0 * std::f64::consts::PI * x ).sin() as f32).collect()
 }
