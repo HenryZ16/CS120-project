@@ -322,7 +322,7 @@ fn test_plot_wav(){
 }
 
 const CARRIER: u32 = 6000;
-const LEN: usize = 30;
+const LEN: usize = 500;
 
 #[test]
 fn test_simple_gen(){

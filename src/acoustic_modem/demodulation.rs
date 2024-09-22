@@ -425,7 +425,6 @@ impl Demodulation2{
 
         let mut input_stream = self.input_config.create_input_stream();
         let demodulate_config = &self.demodulate_config;
-        let window_size = 10;
         let alpha_data = 0.3;
         let alpha_check = 0.31;
         let mut prev = 0.0;
@@ -442,7 +441,7 @@ impl Demodulation2{
         let mut local_max = 0.0;
         let mut start_index = usize::MAX;
 
-        let mut tmp_bits_data: Vec<u8> = Vec::new();
+        let mut tmp_bits_data = Vec::new();
         let mut res = vec![];
 
         while let Some(data) = input_stream.next().await{
@@ -498,11 +497,8 @@ impl Demodulation2{
                     debug_vec.extend(tmp_buffer.range(start_index..start_index + demodulate_config.ref_signal_len[0]));
 
                     start_index += demodulate_config.ref_signal_len[0];
-
-                    tmp_bits_data.push(
-                        if dot_product > 0.0 {0}
-                        else {1}
-                    );
+                    
+                    tmp_bits_data.push(if dot_product >= 0.0 {0} else {1});
                 }
             }
 
@@ -522,22 +518,12 @@ impl Demodulation2{
 
         let mut count = 0;
         let mut numbers = 0;
-        for &data in &tmp_bits_data{
-            if data == 1{
-                numbers += 1;
-            }
-            count += 1;
-            if count == 1{
-                count = 0;
-                res.push((numbers >= 1) as u8);
-                numbers = 0;
-            }
-        }
+        res.append(&mut tmp_bits_data);
 
         if write_to_file{
             self.writer.write_all(&res.clone().iter().map(|x| x + b'0').collect::<Vec<u8>>()).unwrap()
         }
-        println!("recv data: {:?}", tmp_bits_data);
+        // println!("recv data: {:?}", tmp_bits_data);
         println!("data: {:?}", res);
 
         res
