@@ -2,8 +2,8 @@ use anyhow::{Error, Result};
 use plotters::data;
 use reed_solomon_erasure::galois_8::ReedSolomon;
 
-pub const MAX_FRAME_DATA_LENGTH: usize = 960;
-pub const FRAME_PAYLOAD_LENGTH: usize = 1024;
+pub const MAX_FRAME_DATA_LENGTH: usize = 480;
+pub const FRAME_PAYLOAD_LENGTH: usize = 512;
 pub const FRAME_LENGTH_LENGTH_REDUNDANCY: usize = 3;
 pub const FRAME_PREAMBLE: u32 = 0b0101010101;
 pub const FRAME_PREAMBLE_LENGTH: usize = 10;
@@ -11,7 +11,7 @@ pub const FRAME_PREAMBLE_LENGTH: usize = 10;
 const U8_MASK: u8 = 0b11111111;
 
 pub fn frame_length_length() -> usize {
-    FRAME_LENGTH_LENGTH_REDUNDANCY * (MAX_FRAME_DATA_LENGTH as f64).log2().ceil() as usize
+    FRAME_LENGTH_LENGTH_REDUNDANCY * 10
 }
 
 pub struct PHYFrame {
@@ -64,7 +64,7 @@ impl PHYFrame {
         }
         length >>= 1;
         println!("[get_whole_frame_bits] self.length: {:?}", self.length);
-        
+
         let mut length_length = frame_length_length() as isize;
         if preamble_length < 0 {
             length_length += preamble_length;
@@ -168,23 +168,23 @@ impl PHYFrame {
         return Ok(data);
     }
 
-    pub fn construct_payload_format(input: Vec<u8>) -> Vec<Vec<u8>>{
+    pub fn construct_payload_format(input: Vec<u8>) -> Vec<Vec<u8>> {
         let mut payload = Vec::new();
         let mut i = 0;
-        while i < input.len(){
+        while i < input.len() {
             let mut payload_shard = Vec::new();
-            for j in 0..4{
+            for j in 0..4 {
                 payload_shard.push(input[i + j]);
             }
             payload.push(payload_shard);
             i += 4;
         }
-        
+
         payload
     }
 }
 
-pub struct SimpleFrame{
+pub struct SimpleFrame {
     data: Vec<u8>,
     sample_rate: u32,
     ref_signal: Vec<f32>,
@@ -192,12 +192,14 @@ pub struct SimpleFrame{
 
 use rand::Rng;
 
-impl SimpleFrame{
-    pub fn new(carrier_freq: u32, data_len: usize) -> Self{
-        let ref_signal: Vec<f32> = (0..48000 / carrier_freq).map(|x| (2.0 * std::f32::consts::PI * x as f32 / 48000.0 * carrier_freq as f32).sin()).collect();
+impl SimpleFrame {
+    pub fn new(carrier_freq: u32, data_len: usize) -> Self {
+        let ref_signal: Vec<f32> = (0..48000 / carrier_freq)
+            .map(|x| (2.0 * std::f32::consts::PI * x as f32 / 48000.0 * carrier_freq as f32).sin())
+            .collect();
         let mut data = vec![];
         let mut rng = rand::thread_rng();
-        for _ in 0..data_len{
+        for _ in 0..data_len {
             data.push(rng.gen_bool(0.5) as u8);
         }
 
@@ -205,35 +207,34 @@ impl SimpleFrame{
         use std::io::Write;
         println!("org data: {:?}", data);
         let mut writer = File::create("ref_signal.txt").unwrap();
-        
-        for &num in &data{
+
+        for &num in &data {
             let ch = (num as u8 + b'0');
             writer.write_all(&[ch]).unwrap();
         }
 
-        SimpleFrame{
+        SimpleFrame {
             data,
             sample_rate: 48000,
             ref_signal,
         }
     }
 
-    pub fn into_audio(&self, redundent_times: usize) -> Vec<f32>{
+    pub fn into_audio(&self, redundent_times: usize) -> Vec<f32> {
         let mut redundent = 1;
-        if redundent_times > 1{
+        if redundent_times > 1 {
             redundent = redundent_times;
         }
         let mut res = gen_preamble(self.sample_rate);
 
-        for &bit in &self.data{
-            if bit == 0{
+        for &bit in &self.data {
+            if bit == 0 {
                 // res.extend(self.ref_signal.clone().into_iter());
-                for _ in 0..redundent{
+                for _ in 0..redundent {
                     res.extend(self.ref_signal.clone().into_iter());
                 }
-            }
-            else {
-                for _ in 0..redundent{
+            } else {
+                for _ in 0..redundent {
                     res.extend(self.ref_signal.clone().into_iter().map(|x| -x));
                 }
             }
@@ -242,7 +243,6 @@ impl SimpleFrame{
         res
     }
 }
-
 
 pub fn gen_preamble(sample_rate: u32) -> Vec<f32> {
     let start = 1e2;
@@ -258,10 +258,12 @@ pub fn gen_preamble(sample_rate: u32) -> Vec<f32> {
     let mut res = vec![];
 
     res.push(0.0);
-    for i in 1..fp.len(){
-        let trap_area = (fp[i] + fp[i-1]) * dx / 2.0;
-        res.push(res[i-1] + trap_area);
+    for i in 1..fp.len() {
+        let trap_area = (fp[i] + fp[i - 1]) * dx / 2.0;
+        res.push(res[i - 1] + trap_area);
     }
 
-    res.into_iter().map(|x| (2.0 * std::f64::consts::PI * x ).sin() as f32).collect()
+    res.into_iter()
+        .map(|x| (2.0 * std::f64::consts::PI * x).sin() as f32)
+        .collect()
 }
