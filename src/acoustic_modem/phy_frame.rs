@@ -218,15 +218,24 @@ impl SimpleFrame{
         }
     }
 
-    pub fn into_audio(&self) -> Vec<f32>{
+    pub fn into_audio(&self, redundent_times: usize) -> Vec<f32>{
+        let mut redundent = 1;
+        if redundent_times > 1{
+            redundent = redundent_times;
+        }
         let mut res = gen_preamble(self.sample_rate);
 
         for &bit in &self.data{
             if bit == 0{
+                // res.extend(self.ref_signal.clone().into_iter());
+                for _ in 0..redundent{
                     res.extend(self.ref_signal.clone().into_iter());
+                }
             }
             else {
+                for _ in 0..redundent{
                     res.extend(self.ref_signal.clone().into_iter().map(|x| -x));
+                }
             }
         }
 

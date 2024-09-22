@@ -322,7 +322,8 @@ fn test_plot_wav(){
 }
 
 const CARRIER: u32 = 6000;
-const LEN: usize = 500;
+const LEN: usize = 100;
+const REDUNDENT: usize = 5;
 
 #[test]
 fn test_simple_gen(){
@@ -330,7 +331,7 @@ fn test_simple_gen(){
     let sample_rate = 48000;
     let simple_frame = phy_frame::SimpleFrame::new(carrier, LEN);
 
-    let output_wav = simple_frame.into_audio();
+    let output_wav = simple_frame.into_audio(REDUNDENT);
 
     // plot(output_wav).unwrap();
 
@@ -366,9 +367,7 @@ async fn test_simple_listen(){
     
     // println!("ref: {:?}", ref_data);
     loop{
-
-        
-        let res = demodulator.simple_listen(true, &mut debug_vec, LEN).await;
+        let res = demodulator.simple_listen(true, &mut debug_vec, LEN, REDUNDENT).await;
         let mut diff_num = 0;
         for i in 0..ref_data.len(){
             if ref_data[i] != res[i]

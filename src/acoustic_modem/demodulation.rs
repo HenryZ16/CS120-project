@@ -420,8 +420,13 @@ impl Demodulation2{
     //     result
     // }
 
-    pub async fn simple_listen(&mut self, write_to_file: bool, debug_vec: &mut Vec<f32>, data_len: usize) -> Vec<u8>{
-        let data_len = data_len;
+    pub async fn simple_listen(&mut self, write_to_file: bool, debug_vec: &mut Vec<f32>, data_len: usize, redundent_times: usize) -> Vec<u8>{
+        let mut redundent = 1;
+        if redundent_times > 1{
+            redundent = redundent_times;
+        }
+
+        let data_len = data_len * redundent;
 
         let mut input_stream = self.input_config.create_input_stream();
         let demodulate_config = &self.demodulate_config;
@@ -517,8 +522,21 @@ impl Demodulation2{
         }
 
         let mut count = 0;
-        let mut numbers = 0;
-        res.append(&mut tmp_bits_data);
+        let mut one_number = 0;
+        
+        for i in 0..data_len{
+            if tmp_bits_data[i] == 1{
+                one_number += 1;
+            }
+            count += 1;
+
+            if count == redundent{
+                res.push(if one_number > redundent / 2 {1} else {0});
+
+                one_number = 0;
+                count = 0
+            }
+        }
 
         if write_to_file{
             self.writer.write_all(&res.clone().iter().map(|x| x + b'0').collect::<Vec<u8>>()).unwrap()
