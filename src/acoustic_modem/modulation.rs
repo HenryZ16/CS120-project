@@ -5,6 +5,7 @@ Input data
 -> Modulation
 -> Output Signal
 */
+use super::phy_frame;
 use crate::asio_stream::{AudioTrack, OutputAudioStream};
 use crate::utils;
 use cpal::traits::{DeviceTrait, HostTrait};
@@ -12,13 +13,14 @@ use cpal::{HostId, SampleRate, SupportedStreamConfig};
 use futures::SinkExt;
 use hound::{WavSpec, WavWriter};
 use rand_distr::Standard;
-use super::phy_frame;
 
 const SAMPLE_RATE: u32 = 48000;
+const REDUNDANT_PERIODS: u32 = 4;
 
 pub struct Modulator {
     carrier_freq: Vec<u32>,
     sample_rate: u32,
+    redundant_periods: u32,
     enable_ofdm: bool,
     output_stream: OutputAudioStream<std::vec::IntoIter<f32>>,
     config: SupportedStreamConfig,
@@ -50,6 +52,7 @@ impl Modulator {
         Modulator {
             carrier_freq,
             sample_rate,
+            redundant_periods: REDUNDANT_PERIODS,
             enable_ofdm,
             output_stream,
             config,
@@ -272,7 +275,9 @@ impl Modulator {
     pub fn modulate(&self, bits: &Vec<u8>, carrrier_freq_id: usize) -> Vec<f32> {
         // TODO: PSK
         let mut modulated_signal = vec![];
-        let sample_cnt_each_bit = self.sample_rate / self.carrier_freq[carrrier_freq_id];
+        // redundant periods for each bit
+        let sample_cnt_each_bit =
+            self.sample_rate * self.redundant_periods / self.carrier_freq[carrrier_freq_id];
         let mut bit_id = 0;
         while bit_id < bits.len() {
             let bit = bits[bit_id];
@@ -306,14 +311,15 @@ impl Modulator {
         let mut res = vec![];
 
         res.push(0.0);
-        for i in 1..fp.len(){
-            let trap_area = (fp[i] + fp[i-1]) * dx / 2.0;
-            res.push(res[i-1] + trap_area);
+        for i in 1..fp.len() {
+            let trap_area = (fp[i] + fp[i - 1]) * dx / 2.0;
+            res.push(res[i - 1] + trap_area);
         }
 
         println!("create preamble len: {}", fp.len());
 
-        res.into_iter().map(|x| (2.0 * std::f64::consts::PI * x ).sin() as f32).collect()
-        
+        res.into_iter()
+            .map(|x| (2.0 * std::f64::consts::PI * x).sin() as f32)
+            .collect()
     }
 }
