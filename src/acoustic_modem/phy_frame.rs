@@ -6,12 +6,12 @@ pub const MAX_FRAME_DATA_LENGTH: usize = 480;
 pub const FRAME_PAYLOAD_LENGTH: usize = 512;
 pub const FRAME_LENGTH_LENGTH_REDUNDANCY: usize = 3;
 pub const FRAME_PREAMBLE: u32 = 0b0101010101;
-pub const FRAME_PREAMBLE_LENGTH: usize = 0;
+pub const FRAME_PREAMBLE_LENGTH: usize = 10;
 
 const U8_MASK: u8 = 0b11111111;
 
 pub fn frame_length_length() -> usize {
-    FRAME_LENGTH_LENGTH_REDUNDANCY * 8
+    FRAME_LENGTH_LENGTH_REDUNDANCY * 10
 }
 
 pub struct PHYFrame {
