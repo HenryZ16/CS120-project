@@ -113,7 +113,7 @@ impl Modulator {
             let modulated_psk_signal = self.modulate(&decompressed_data, 0);
 
             // add FSK preamble
-            let preamble = Modulator::modulate_fsk_preamble();
+            let preamble = phy_frame::gen_preamble(self.sample_rate);
             let mut modulated_signal = preamble.clone();
             modulated_signal.extend(modulated_psk_signal.clone());
 
@@ -148,7 +148,7 @@ impl Modulator {
         let modulated_psk_signal = self.modulate(&utils::read_compressed_u8_2_data(frame_bits), 0);
 
         // add FSK preamble
-        let preamble = Modulator::modulate_fsk_preamble();
+        let preamble = phy_frame::gen_preamble(self.sample_rate);
         let mut modulated_signal = preamble.clone();
         modulated_signal.extend(modulated_psk_signal.clone());
 
