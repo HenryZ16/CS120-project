@@ -6,7 +6,7 @@ use std::{result, vec};
 use crate::acoustic_modem::{self, demodulation, modulation, phy_frame};
 use crate::acoustic_modem::demodulation::{dot_product_iter, Demodulation2};
 use crate::acoustic_modem::modulation::Modulator;
-use crate::utils;
+use crate::utils::{self, read_data_2_compressed_u8};
 use plotters::{data, prelude::*};
 use rand::thread_rng;
 use rand::Rng;
@@ -378,5 +378,32 @@ async fn test_simple_listen(){
     
         plot(debug_vec.clone()).unwrap();
         println!("error percent: {}", diff_num as f32 / ref_data.len() as f32);
+    }
+}
+
+#[tokio::test]
+async fn test_frame_gen(){
+    let sample_rate = 48000;
+    let carrier = CARRIER;
+    let mut modulation = Modulator::new(vec![carrier], sample_rate, false);
+
+    let data = vec![0,1,1,0,1,0,0,1,0,1];
+
+    let data = read_data_2_compressed_u8(data);
+    let data_len = data.len() as isize;
+
+    let signal = modulation.send_bits_2_file(data, data_len, "test.wav").await;
+}
+
+#[tokio::test]
+
+async fn test_listen(){
+    let mut demodulator = Demodulation2::new(vec![CARRIER], 48000, "test.txt");
+    let mut debug_vec: Vec<f32> = vec![];
+
+    loop{
+        let res = demodulator.listen_frame(true, &mut debug_vec, phy_frame::FRAME_PREAMBLE_LENGTH + 30 + phy_frame::FRAME_PAYLOAD_LENGTH, phy_frame::FRAME_LENGTH_LENGTH_REDUNDANCY).await;
+
+        println!("res: {:?}", res);       
     }
 }
