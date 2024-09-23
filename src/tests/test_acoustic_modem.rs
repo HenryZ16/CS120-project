@@ -323,7 +323,7 @@ fn test_plot_wav(){
 
 const CARRIER: u32 = 6000;
 const LEN: usize = 100;
-const REDUNDENT: usize = 5;
+const REDUNDENT: usize = 4;
 
 #[test]
 fn test_simple_gen(){
@@ -350,7 +350,7 @@ fn test_simple_gen(){
 
 #[tokio::test]
 async fn test_simple_listen(){
-    let mut demodulator = Demodulation2::new(vec![CARRIER], 48000, "text.txt");
+    let mut demodulator = Demodulation2::new(vec![CARRIER], 48000, "text.txt", REDUNDENT);
 
     let mut debug_vec = vec![];
 
@@ -398,7 +398,7 @@ async fn test_frame_gen(){
 #[tokio::test]
 
 async fn test_listen(){
-    let mut demodulator = Demodulation2::new(vec![CARRIER], 48000, "test.txt");
+    let mut demodulator = Demodulation2::new(vec![CARRIER], 48000, "test.txt", REDUNDENT);
     let mut debug_vec: Vec<f32> = vec![];
 
     loop{
