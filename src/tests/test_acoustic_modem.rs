@@ -367,7 +367,7 @@ async fn test_simple_listen(){
     
     // println!("ref: {:?}", ref_data);
     loop{
-        let res = demodulator.simple_listen(true, &mut debug_vec, LEN, REDUNDENT).await;
+        let res = demodulator.simple_listen(true, &mut debug_vec, LEN).await;
         let mut diff_num = 0;
         for i in 0..ref_data.len(){
             if ref_data[i] != res[i]
@@ -397,11 +397,11 @@ async fn test_frame_gen(){
 
 #[tokio::test]
 async fn test_listen(){
-    let mut demodulator = Demodulation2::new(vec![CARRIER], 48000, "test.txt", REDUNDENT);
+    let mut demodulator = Demodulation2::new(vec![CARRIER], 48000, "test.txt", modulation::REDUNDANT_PERIODS);
     let mut debug_vec: Vec<f32> = vec![];
 
     loop{
-        let res = demodulator.listen_frame(true, &mut debug_vec, phy_frame::FRAME_PREAMBLE_LENGTH + 30 + phy_frame::FRAME_PAYLOAD_LENGTH, phy_frame::FRAME_LENGTH_LENGTH_REDUNDANCY).await;
+        let res = demodulator.listen_frame(false, phy_frame::frame_length_length() + phy_frame::FRAME_PAYLOAD_LENGTH + phy_frame::FRAME_PREAMBLE_LENGTH, phy_frame::FRAME_LENGTH_LENGTH_REDUNDANCY).await;
 
         println!("res: {:?}", res);       
     }

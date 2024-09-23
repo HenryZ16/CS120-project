@@ -15,12 +15,12 @@ use hound::{WavSpec, WavWriter};
 use rand_distr::Standard;
 
 const SAMPLE_RATE: u32 = 48000;
-const REDUNDANT_PERIODS: u32 = 4;
+pub const REDUNDANT_PERIODS: usize = 4;
 
 pub struct Modulator {
     carrier_freq: Vec<u32>,
     sample_rate: u32,
-    redundant_periods: u32,
+    redundant_periods: usize,
     enable_ofdm: bool,
     output_stream: OutputAudioStream<std::vec::IntoIter<f32>>,
     config: SupportedStreamConfig,
@@ -277,7 +277,7 @@ impl Modulator {
         let mut modulated_signal = vec![];
         // redundant periods for each bit
         let sample_cnt_each_bit =
-            self.sample_rate * self.redundant_periods / self.carrier_freq[carrrier_freq_id];
+            self.sample_rate * self.redundant_periods as u32 / self.carrier_freq[carrrier_freq_id];
         let mut bit_id = 0;
         while bit_id < bits.len() {
             let bit = bits[bit_id];

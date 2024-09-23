@@ -242,12 +242,7 @@ impl Demodulation2{
     }
 
 
-    pub async fn simple_listen(&mut self, write_to_file: bool, debug_vec: &mut Vec<f32>, data_len: usize, redundent_times: usize) -> Vec<u8>{
-        let mut redundent = 1;
-        if redundent_times > 1{
-            redundent = redundent_times;
-        }
-
+    pub async fn simple_listen(&mut self, write_to_file: bool, debug_vec: &mut Vec<f32>, data_len: usize) -> Vec<u8>{
         let data_len = data_len;
 
         let mut input_stream = self.input_config.create_input_stream();
@@ -355,7 +350,7 @@ impl Demodulation2{
         tmp_bits_data
     }
 
-    pub async fn listen_frame(&mut self, write_to_file: bool, debug_vec: &mut Vec<f32>, data_len: usize, redundent_times: usize) -> Vec<u8>{
+    pub async fn listen_frame(&mut self, write_to_file: bool, data_len: usize, redundent_times: usize) -> Vec<u8>{
         let mut redundent = 1;
         if redundent_times > 1{
             redundent = redundent_times;
@@ -385,9 +380,7 @@ impl Demodulation2{
         while let Some(data) = input_stream.next().await{
             if demodulate_state == DemodulationState::Stop{
                 break;
-            }
-
-            // debug_vec.extend(data.clone().iter());
+            } 
             tmp_buffer_len += data.len();
             for i in data{
                 avg_power = avg_power * (1.0 - factor) + i.abs() as f32 * factor;
@@ -411,8 +404,6 @@ impl Demodulation2{
                         println!("detected");
                         local_max = dot_product;
                         start_index = i + 1;
-                        // debug_vec.clear();
-                        // debug_vec.extend(window);
                     }
                     else if start_index != usize::MAX && i - start_index > demodulate_config.preamble_len && local_max > power_lim_preamble{
                         local_max = 0.0;
@@ -433,9 +424,7 @@ impl Demodulation2{
                 tmp_buffer.make_contiguous();
 
                 while tmp_buffer_len - start_index >= demodulate_config.ref_signal_len[0] && tmp_bits_data.len() < data_len {
-                    // let dot_product = range_dot_product_vec(tmp_buffer.range(start_index..start_index+demodulate_config.ref_signal_len[0]), &self.demodulate_config.ref_signal[0]);
                     let dot_product = dot_product(&tmp_buffer.as_slices().0[start_index..start_index+demodulate_config.ref_signal_len[0]], &self.demodulate_config.ref_signal[0]);
-                    // debug_vec.extend(tmp_buffer.range(start_index..start_index + demodulate_config.ref_signal_len[0]));
 
                     start_index += demodulate_config.ref_signal_len[0];
                     
@@ -463,17 +452,31 @@ impl Demodulation2{
         }
         // println!("recv data: {:?}", tmp_bits_data);
         // println!("data: {:?}", tmp_bits_data);
+        let mut actual_data_len = 0;
+        let mut one_number = 0;
+        let mut count = 0;
+        for i in phy_frame::FRAME_PREAMBLE_LENGTH..phy_frame::FRAME_PREAMBLE_LENGTH+phy_frame::frame_length_length(){
+            count += 1;
 
-        tmp_bits_data
+            if tmp_bits_data[i] == 1{
+                one_number += 1;
+            }
+
+            if count == redundent{
+                println!("one_number: {}", one_number);
+                actual_data_len <<= 1;
+                if one_number > redundent / 2{
+                    actual_data_len += 1
+                }
+
+                one_number = 0;
+                count = 0;
+            }
+        }
+
+        println!("data len: {}", actual_data_len);
+        read_data_2_compressed_u8(tmp_bits_data)
     }
-    // fn has_detect_preamble(&self, detect_buffer: &VecDeque<f32>, local_max: &){
-    //     for i in 0..detect_buffer.len() - self.demodulate_config.preamble_len{
-    //         let window: std::collections::vec_deque::Iter<'_, f32> = detect_buffer.range(i..i+self.demodulate_config.preamble_len);
-    //         let dot_product = range_dot_product_vec(window, &self.demodulate_config.preamble);
-
-
-    //     }
-    // }
 }
 
 fn range_dot_product_vec(range: std::collections::vec_deque::Iter<'_, f32>, ref_vec: &Vec<f32>) -> f32{
