@@ -215,7 +215,7 @@ impl Modulator {
             let modulated_psk_signal = self.modulate(&decompressed_data, 0);
 
             // add FSK preamble
-            let preamble = Modulator::modulate_fsk_preamble();
+            let preamble = phy_frame::gen_preamble(self.sample_rate);
             let mut modulated_signal = preamble.clone();
             modulated_signal.extend(modulated_psk_signal.clone());
             println!(
@@ -247,7 +247,7 @@ impl Modulator {
         let modulated_psk_signal = self.modulate(&utils::read_compressed_u8_2_data(frame_bits), 0);
 
         // add FSK preamble
-        let preamble = Modulator::modulate_fsk_preamble();
+        let preamble = phy_frame::gen_preamble(self.sample_rate);
         let mut modulated_signal = preamble.clone();
         modulated_signal.extend(modulated_psk_signal.clone());
 
@@ -295,31 +295,5 @@ impl Modulator {
             bit_id += 1;
         }
         return modulated_signal;
-    }
-
-    pub fn modulate_fsk_preamble() -> Vec<f32> {
-        let start = 1e3;
-        let end = 1e4;
-        let half_length = 400;
-        let dx: f64 = 1.0 / 48000.0;
-        let step = (end - start) as f64 / half_length as f64;
-        let mut fp: Vec<f64> = (0..half_length).map(|i| start + i as f64 * step).collect();
-        let fp_rev = fp.clone().into_iter().rev();
-        fp.pop();
-        fp.extend(fp_rev);
-
-        let mut res = vec![];
-
-        res.push(0.0);
-        for i in 1..fp.len() {
-            let trap_area = (fp[i] + fp[i - 1]) * dx / 2.0;
-            res.push(res[i - 1] + trap_area);
-        }
-
-        println!("create preamble len: {}", fp.len());
-
-        res.into_iter()
-            .map(|x| (2.0 * std::f64::consts::PI * x).sin() as f32)
-            .collect()
     }
 }
