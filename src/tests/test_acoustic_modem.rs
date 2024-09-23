@@ -69,34 +69,34 @@ fn test_plot(){
     plot(data).unwrap();
 }
 
-// #[tokio::test]
-// async fn test_modulation() {
-//     // read data from testset/data.txt
-//     let mut file = File::open("testset/data.txt").unwrap();
-//     let mut data = String::new();
-//     file.read_to_string(&mut data).unwrap();
-//     let data = data
-//         .chars()
-//         .map(|c| c.to_digit(10).unwrap() as u8)
-//         .collect::<Vec<u8>>();
+#[tokio::test]
+async fn test_modulation() {
+    // read data from testset/data.txt
+    let mut file = File::open("testset/data.txt").unwrap();
+    let mut data = String::new();
+    file.read_to_string(&mut data).unwrap();
+    let data = data
+        .chars()
+        .map(|c| c.to_digit(10).unwrap() as u8)
+        .collect::<Vec<u8>>();
 
-//     // modulation
-//     let sample_rate = 48000;
-//     let carrier_freq = 1000;
-//     let mut modulator = Modulator::new(vec![carrier_freq], sample_rate, false);
-//     let modulated_signal = modulator.modulate(&data, 0);
+    // modulation
+    let sample_rate = 48000;
+    let carrier_freq = 1000;
+    let mut modulator = Modulator::new(vec![carrier_freq], sample_rate, false);
+    let modulated_signal = modulator.modulate(&data, 0);
 
-//     // show figure of the modulated_signal: Vec<f32>
-//     plot(modulated_signal.clone()).unwrap();
+    // show figure of the modulated_signal: Vec<f32>
+    plot(modulated_signal.clone()).unwrap();
 
-//     // send
-//     modulator
-//         .send_bits(
-//             utils::read_data_2_compressed_u8(data.clone()),
-//             data.len() as isize,
-//         )
-//         .await;
-// }
+    // send
+    modulator
+        .send_bits(
+            utils::read_data_2_compressed_u8(data.clone()),
+            data.len() as isize,
+        )
+        .await;
+}
 
 // #[tokio::test]
 // async fn test_demodulation_detect_windowshift() {
@@ -321,8 +321,8 @@ fn test_plot_wav(){
     root.present().unwrap();
 }
 
-const CARRIER: u32 = 6000;
-const LEN: usize = 100;
+const CARRIER: u32 = 1500;
+const LEN: usize = 500;
 const REDUNDENT: usize = 4;
 
 #[test]
@@ -396,7 +396,6 @@ async fn test_frame_gen(){
 }
 
 #[tokio::test]
-
 async fn test_listen(){
     let mut demodulator = Demodulation2::new(vec![CARRIER], 48000, "test.txt", REDUNDENT);
     let mut debug_vec: Vec<f32> = vec![];
