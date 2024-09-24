@@ -1,7 +1,7 @@
 use std::fs::File;
 use std::io::{Read, Write};
 use std::time::Duration;
-use std::{result, vec};
+use std::{error, result, vec};
 
 use crate::acoustic_modem::{self, demodulation, modulation, phy_frame};
 use crate::acoustic_modem::demodulation::{dot_product_iter, Demodulation2};
@@ -11,7 +11,7 @@ use plotters::{data, prelude::*};
 use rand::thread_rng;
 use rand::Rng;
 use rand_distr::Normal;
-use tokio::{signal, task};
+use tokio::{signal, task, time};
 use tokio::time::sleep;
 
 use hound::{WavSpec, WavWriter};
@@ -321,7 +321,7 @@ fn test_plot_wav(){
     root.present().unwrap();
 }
 
-const CARRIER: u32 = 1500;
+const CARRIER: u32 = 2000;
 const LEN: usize = 500;
 const REDUNDENT: usize = 4;
 
@@ -387,10 +387,18 @@ async fn test_frame_gen(){
     let carrier = CARRIER;
     let mut modulation = Modulator::new(vec![carrier], sample_rate, false);
 
-    let data = vec![0,1,1,0,1,0,0,1,0,1];
+    // let data = vec![0,1,1,0,1,0,0,1,0,1];
+    let mut file = File::open("testset/data.txt").unwrap();
+    let mut data = String::new();
+    file.read_to_string(&mut data).unwrap();
+    let data = data
+        .chars()
+        .map(|c| c.to_digit(10).unwrap() as u8)
+        .collect::<Vec<u8>>();
 
-    let data = read_data_2_compressed_u8(data);
+    println!("readed data: {:?}", data);
     let data_len = data.len() as isize;
+    let data = read_data_2_compressed_u8(data);
 
     let signal = modulation.send_bits_2_file(data, data_len, "test.wav").await;
 }
@@ -400,9 +408,105 @@ async fn test_listen(){
     let mut demodulator = Demodulation2::new(vec![CARRIER], 48000, "test.txt", modulation::REDUNDANT_PERIODS);
     let mut debug_vec: Vec<f32> = vec![];
 
-    loop{
-        let res = demodulator.listen_frame(false, phy_frame::frame_length_length() + phy_frame::FRAME_PAYLOAD_LENGTH + phy_frame::FRAME_PREAMBLE_LENGTH, phy_frame::FRAME_LENGTH_LENGTH_REDUNDANCY).await;
+    let mut file = File::open("testset/data.txt").unwrap();
+    let mut data = String::new();
+    file.read_to_string(&mut data).unwrap();
+    let data = data
+        .chars()
+        .map(|c| c.to_digit(10).unwrap() as u8)
+        .collect::<Vec<u8>>();
 
-        println!("res: {:?}", res);       
+    // println!("readed data: {:?}", data);
+    let data_len = data.len();
+    let data = read_data_2_compressed_u8(data);
+
+    loop{
+        // let res = demodulator.listen_frame(false, phy_frame::frame_length_length() + phy_frame::FRAME_PAYLOAD_LENGTH + phy_frame::FRAME_PREAMBLE_LENGTH, phy_frame::FRAME_LENGTH_LENGTH_REDUNDANCY).await;
+
+        let res = match demodulator.listen_one_frame(false, phy_frame::frame_length_length() + phy_frame::FRAME_PAYLOAD_LENGTH + phy_frame::FRAME_PREAMBLE_LENGTH, phy_frame::FRAME_LENGTH_LENGTH_REDUNDANCY).await {
+            Some(data) => data,
+            None => {
+                println!("error length");
+                continue;
+            }
+        };
+
+        let mut error_num = 0;
+        let mut index: usize = 0;
+        while index < data_len{
+            let byte_index = index / 8;
+
+            if byte_index >= res.len(){
+                break;
+            }
+
+            let shift_num = 0;
+            if index + 8 > data_len{
+                let shift_num = data_len - index;
+            }
+
+            error_num += ((res[byte_index] >> shift_num) ^ (data[byte_index] >> shift_num)).count_ones();
+            index += 8;
+        }
+
+        println!("error rate = {}", error_num as f32 / data_len as f32);
     }
+}
+
+#[tokio::test]
+async fn test_seconds_listening(){
+
+    let mut demodulator = Demodulation2::new(vec![CARRIER], 48000, "test.txt", modulation::REDUNDANT_PERIODS);
+    let mut debug_vec: Vec<f32> = vec![];
+
+    let mut file = File::open("testset/data.txt").unwrap();
+    let mut data = String::new();
+    file.read_to_string(&mut data).unwrap();
+    let data = data
+        .chars()
+        .map(|c| c.to_digit(10).unwrap() as u8)
+        .collect::<Vec<u8>>();
+
+    // println!("readed data: {:?}", data);
+    let org_bits_len = data.len();
+    let org_data = read_data_2_compressed_u8(data);
+    let org_data_len = org_data.len();
+
+    let mut decoded_data = vec![];    
+    let handle = demodulator.listening(true, phy_frame::frame_length_length() + phy_frame::FRAME_PAYLOAD_LENGTH + phy_frame::FRAME_PREAMBLE_LENGTH, phy_frame::FRAME_LENGTH_LENGTH_REDUNDANCY, &mut decoded_data);
+    let handle = time::timeout(Duration::from_secs(2), handle);
+    handle.await;
+
+    let mut file = File::open("test.txt").unwrap();
+    let mut data = String::new();
+    file.read_to_string(&mut data).unwrap();
+    let data = data
+        .chars()
+        .map(|c| c.to_digit(10).unwrap() as u8)
+        .collect::<Vec<u8>>();
+
+    let mut error_num = 0;
+    let mut index: usize = 0;
+    if data.len() < org_data_len{
+        error_num = org_bits_len as u32
+    }
+    else {
+        while index < org_bits_len{
+            let byte_index = index / 8;
+
+            if byte_index >= org_bits_len{
+                break;
+            }
+
+            let shift_num = 0;
+            if index + 8 > org_bits_len{
+                let shift_num = org_bits_len - index;
+            }
+
+            error_num += ((data[byte_index] >> shift_num) ^ (org_data[byte_index] >> shift_num)).count_ones();
+            index += 8;
+        }
+    }
+    println!("error rate = {}", error_num as f32 / org_bits_len as f32);
+
 }
