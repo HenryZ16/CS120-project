@@ -82,7 +82,7 @@ impl DemodulationState{
 
         match self{
             DemodulationState::DetectPreamble => DemodulationState::RecvFrame,
-            DemodulationState::RecvFrame => DemodulationState::Stop,
+            DemodulationState::RecvFrame => DemodulationState::DetectPreamble,
             DemodulationState::Stop => DemodulationState::Stop,
         }
     }
@@ -522,6 +522,8 @@ impl Demodulation2{
 
         let mut tmp_bits_data = Vec::with_capacity(data_len);
 
+        let mut is_reboot = false;
+
         while let Some(data) = input_stream.next().await{
             if demodulate_state == DemodulationState::Stop{
                 break;
@@ -538,8 +540,11 @@ impl Demodulation2{
 
             if demodulate_state == DemodulationState::DetectPreamble {
                 if tmp_buffer_len <= demodulate_config.preamble_len{
+                    println!("buffer is smaller than preamble");
                     continue;
                 }
+                // println!("start detect preamble");
+                // println!("for end: {}", tmp_buffer_len - self.demodulate_config.preamble_len-1);
                 tmp_buffer.make_contiguous();
                 for i in 0..tmp_buffer_len - self.demodulate_config.preamble_len-1{
                     // let window = tmp_buffer.range(i..i+demodulate_config.preamble_len);
@@ -559,6 +564,7 @@ impl Demodulation2{
                         break;
                     }
                 }
+                // println!("start index: {}", start_index);
 
             }
             
@@ -580,7 +586,10 @@ impl Demodulation2{
             }
 
             if tmp_bits_data.len() >= data_len{
-                demodulate_state = demodulate_state.return_detect_preamble();
+                // demodulate_state = demodulate_state.return_detect_preamble();
+                is_reboot = true;
+                demodulate_state = demodulate_state.next();
+                // println!("current state: {}", demodulate_state == DemodulationState::DetectPreamble);
                 // println!("recv data: {:?}", tmp_bits_data);
                 // println!("data: {:?}", tmp_bits_data);
                 let mut actual_data_len = 0;
@@ -606,25 +615,24 @@ impl Demodulation2{
                 }
                 
                 println!("data len: {}", actual_data_len);
-                if actual_data_len > phy_frame::MAX_FRAME_DATA_LENGTH{
-                    continue;
-                }
-                let compressed_data = read_data_2_compressed_u8(tmp_bits_data);
-                tmp_bits_data = vec![];
-                // println!("compressed data: {:?}", compressed_data);
-                // compressed_data
-                
-                let start_index = (phy_frame::frame_length_length() + phy_frame::FRAME_PREAMBLE_LENGTH) / 8;
-                
-                let payload_data: Vec<u8> = compressed_data[start_index..].to_vec();
-                let mut recv_data = PHYFrame::payload_2_data(PHYFrame::construct_payload_format(payload_data)).unwrap()[0..(actual_data_len + 7) / 8].to_vec();
-                if write_to_file{
-                    println!("writing");
-                    let recv_data = read_compressed_u8_2_data(recv_data);
-                    self.writer.write_all(&recv_data.into_iter().map(|x| x + b'0').collect::<Vec<u8>>()).unwrap();
-                }
-                else {
-                    decoded_data.append(&mut recv_data);
+                if actual_data_len <= phy_frame::MAX_FRAME_DATA_LENGTH{
+                    let compressed_data = read_data_2_compressed_u8(tmp_bits_data);
+                    tmp_bits_data = vec![];
+                    // println!("compressed data: {:?}", compressed_data);
+                    // compressed_data
+                    
+                    let bit_start_index = (phy_frame::frame_length_length() + phy_frame::FRAME_PREAMBLE_LENGTH) / 8;
+                    
+                    let payload_data: Vec<u8> = compressed_data[bit_start_index..].to_vec();
+                    let mut recv_data = PHYFrame::payload_2_data(PHYFrame::construct_payload_format(payload_data)).unwrap()[0..(actual_data_len + 7) / 8].to_vec();
+                    if write_to_file{
+                        println!("writing");
+                        let recv_data = read_compressed_u8_2_data(recv_data)[0..actual_data_len].to_vec();
+                        self.writer.write_all(&recv_data.into_iter().map(|x| x + b'0').collect::<Vec<u8>>()).unwrap();
+                    }
+                    else {
+                        decoded_data.append(&mut recv_data);
+                    }
                 }
             }
             
@@ -634,10 +642,10 @@ impl Demodulation2{
                 tmp_buffer.pop_front();
             }
     
-            start_index = if start_index == usize::MAX {usize::MAX} else {0};
+            start_index = if start_index == usize::MAX || is_reboot {is_reboot = false; usize::MAX} else {0};
             tmp_buffer_len = tmp_buffer.len();
 
-            // println!("tmp buffer len: {}", tmp_buffer_len);
+            // println!("tmp buffer len: {}, state: {:?}, start_index: {}", tmp_buffer_len, demodulate_state, start_index);
         }
 
     }

@@ -321,9 +321,9 @@ fn test_plot_wav(){
     root.present().unwrap();
 }
 
-const CARRIER: u32 = 2000;
+const CARRIER: u32 = 3000;
 const LEN: usize = 500;
-const REDUNDENT: usize = 4;
+const REDUNDENT: usize = 3;
 
 #[test]
 fn test_simple_gen(){
@@ -474,7 +474,7 @@ async fn test_seconds_listening(){
 
     let mut decoded_data = vec![];    
     let handle = demodulator.listening(true, phy_frame::frame_length_length() + phy_frame::FRAME_PAYLOAD_LENGTH + phy_frame::FRAME_PREAMBLE_LENGTH, phy_frame::FRAME_LENGTH_LENGTH_REDUNDANCY, &mut decoded_data);
-    let handle = time::timeout(Duration::from_secs(2), handle);
+    let handle = time::timeout(Duration::from_secs(16), handle);
     handle.await;
 
     let mut file = File::open("test.txt").unwrap();
@@ -488,6 +488,7 @@ async fn test_seconds_listening(){
     let mut error_num = 0;
     let mut index: usize = 0;
     if data.len() < org_data_len{
+        println!{"wrong length: {}", data.len()};
         error_num = org_bits_len as u32
     }
     else {
