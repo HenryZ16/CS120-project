@@ -1,12 +1,13 @@
-use crate::acoustic_modem::phy_frame::{self, FRAME_LENGTH_LENGTH_REDUNDANCY};
+use crate::acoustic_modem::phy_frame::{self, PHYFrame, FRAME_LENGTH_LENGTH_REDUNDANCY};
 use crate::asio_stream::InputAudioStream;
-use crate::utils::read_data_2_compressed_u8;
+use crate::utils::{read_compressed_u8_2_data, read_data_2_compressed_u8};
 use anyhow::Error;
 use cpal::traits::{DeviceTrait, HostTrait};
 use cpal::{SampleRate, SupportedStreamConfig, Device};
 use futures::StreamExt;
 use num_traits::pow;
 use plotters::data;
+use plotters::element::CoordMapper;
 use tokio::select;
 use std::collections::VecDeque;
 use std::io::Write;
@@ -339,6 +340,7 @@ impl Demodulation2{
     
             start_index = if start_index == usize::MAX {usize::MAX} else {0};
             tmp_buffer_len = tmp_buffer.len();
+            println!("tmp buffer len: {}", tmp_buffer_len);
         }
 
         if write_to_file{
@@ -350,7 +352,7 @@ impl Demodulation2{
         tmp_bits_data
     }
 
-    pub async fn listen_frame(&mut self, write_to_file: bool, data_len: usize, redundent_times: usize) -> Vec<u8>{
+    pub async fn listen_one_frame(&mut self, write_to_file: bool, data_len: usize, redundent_times: usize) -> Option<Vec<u8>>{
         let mut redundent = 1;
         if redundent_times > 1{
             redundent = redundent_times;
@@ -389,6 +391,7 @@ impl Demodulation2{
                 tmp_buffer.push_back(processed_signal);
             }
 
+            // tmp_buffer.extend(data.iter());
 
             if demodulate_state == DemodulationState::DetectPreamble {
                 if tmp_buffer_len <= demodulate_config.preamble_len{
@@ -430,7 +433,7 @@ impl Demodulation2{
                     
                     tmp_bits_data.push(if dot_product >= 0.0 {0} else {1});
                 }
-                println!("current recv length: {}", tmp_bits_data.len());
+                // println!("current recv length: {}", tmp_bits_data.len());
             }
 
             if tmp_bits_data.len() >= data_len{
@@ -445,6 +448,8 @@ impl Demodulation2{
     
             start_index = if start_index == usize::MAX {usize::MAX} else {0};
             tmp_buffer_len = tmp_buffer.len();
+
+            println!("tmp buffer len: {}", tmp_buffer_len);
         }
 
         if write_to_file{
@@ -463,7 +468,7 @@ impl Demodulation2{
             }
 
             if count == redundent{
-                println!("one_number: {}", one_number);
+                // println!("one_number: {}", one_number);
                 actual_data_len <<= 1;
                 if one_number > redundent / 2{
                     actual_data_len += 1
@@ -475,8 +480,168 @@ impl Demodulation2{
         }
 
         println!("data len: {}", actual_data_len);
-        read_data_2_compressed_u8(tmp_bits_data)
+        if actual_data_len > phy_frame::MAX_FRAME_DATA_LENGTH{
+            return None;
+        }
+        let compressed_data = read_data_2_compressed_u8(tmp_bits_data);
+        println!("compressed data: {:?}", compressed_data);
+        // compressed_data
+
+        let start_index = (phy_frame::frame_length_length() + phy_frame::FRAME_PREAMBLE_LENGTH) / 8;
+
+        let payload_data: Vec<u8> = compressed_data[start_index..].to_vec();
+        // println!("len payload: {}", payload_data.len());
+        // println!("payload data: {:?}", payload_data);
+        Some(PHYFrame::payload_2_data(PHYFrame::construct_payload_format(payload_data)).unwrap()[0..(actual_data_len + 7) / 8].to_vec())
     }
+
+    pub async fn listening(&mut self, write_to_file: bool, data_len: usize, redundent_times: usize, decoded_data:&mut Vec<u8>) {
+        let mut redundent = 1;
+        if redundent_times > 1{
+            redundent = redundent_times;
+        }
+
+        let data_len = data_len;
+
+        let mut input_stream = self.input_config.create_input_stream();
+        let demodulate_config = &self.demodulate_config;
+        let alpha_check = 0.31;
+        let mut prev = 0.0;
+
+        let mut demodulate_state = DemodulationState::DetectPreamble;
+
+        let mut avg_power = 0.0;
+        let power_lim_preamble = 30.0;
+        let factor = 1.0 / 64.0;
+
+        let mut tmp_buffer: VecDeque<f32> = VecDeque::with_capacity(15 * demodulate_config.preamble_len.max(demodulate_config.ref_signal_len[0]));
+        let mut tmp_buffer_len = tmp_buffer.len();
+
+        let mut local_max = 0.0;
+        let mut start_index = usize::MAX;
+
+        let mut tmp_bits_data = Vec::with_capacity(data_len);
+
+        while let Some(data) = input_stream.next().await{
+            if demodulate_state == DemodulationState::Stop{
+                break;
+            } 
+            tmp_buffer_len += data.len();
+            for i in data{
+                avg_power = avg_power * (1.0 - factor) + i.abs() as f32 * factor;
+                let processed_signal = i * alpha_check + prev * (1.0 - alpha_check);
+                prev = i;
+                tmp_buffer.push_back(processed_signal);
+            }
+
+            // tmp_buffer.extend(data.iter());
+
+            if demodulate_state == DemodulationState::DetectPreamble {
+                if tmp_buffer_len <= demodulate_config.preamble_len{
+                    continue;
+                }
+                tmp_buffer.make_contiguous();
+                for i in 0..tmp_buffer_len - self.demodulate_config.preamble_len-1{
+                    // let window = tmp_buffer.range(i..i+demodulate_config.preamble_len);
+                    let window = &tmp_buffer.as_slices().0[i..i+demodulate_config.preamble_len];
+                    let dot_product = dot_product(window, &demodulate_config.preamble);
+
+                    if dot_product > avg_power * 2.0 && dot_product > local_max && dot_product > power_lim_preamble{
+                        println!("detected");
+                        local_max = dot_product;
+                        start_index = i + 1;
+                    }
+                    else if start_index != usize::MAX && i - start_index > demodulate_config.preamble_len && local_max > power_lim_preamble{
+                        local_max = 0.0;
+                        start_index += demodulate_config.preamble_len - 1;
+                        demodulate_state = demodulate_state.next();
+                        println!("detected preamble");
+                        break;
+                    }
+                }
+
+            }
+            
+            if demodulate_state == DemodulationState::RecvFrame{
+                if tmp_buffer_len - start_index <= demodulate_config.ref_signal_len[0]{
+                    println!("tmp buffer is not long enough");
+                    continue;
+                }
+                tmp_buffer.make_contiguous();
+
+                while tmp_buffer_len - start_index >= demodulate_config.ref_signal_len[0] && tmp_bits_data.len() < data_len {
+                    let dot_product = dot_product(&tmp_buffer.as_slices().0[start_index..start_index+demodulate_config.ref_signal_len[0]], &self.demodulate_config.ref_signal[0]);
+
+                    start_index += demodulate_config.ref_signal_len[0];
+                    
+                    tmp_bits_data.push(if dot_product >= 0.0 {0} else {1});
+                }
+                // println!("current recv length: {}", tmp_bits_data.len());
+            }
+
+            if tmp_bits_data.len() >= data_len{
+                demodulate_state = demodulate_state.return_detect_preamble();
+                // println!("recv data: {:?}", tmp_bits_data);
+                // println!("data: {:?}", tmp_bits_data);
+                let mut actual_data_len = 0;
+                let mut one_number = 0;
+                let mut count = 0;
+                for i in phy_frame::FRAME_PREAMBLE_LENGTH..phy_frame::FRAME_PREAMBLE_LENGTH+phy_frame::frame_length_length(){
+                    count += 1;
+                    
+                    if tmp_bits_data[i] == 1{
+                        one_number += 1;
+                    }
+                    
+                    if count == redundent{
+                        // println!("one_number: {}", one_number);
+                        actual_data_len <<= 1;
+                        if one_number > redundent / 2{
+                            actual_data_len += 1
+                        }
+                        
+                        one_number = 0;
+                        count = 0;
+                    }
+                }
+                
+                println!("data len: {}", actual_data_len);
+                if actual_data_len > phy_frame::MAX_FRAME_DATA_LENGTH{
+                    continue;
+                }
+                let compressed_data = read_data_2_compressed_u8(tmp_bits_data);
+                tmp_bits_data = vec![];
+                // println!("compressed data: {:?}", compressed_data);
+                // compressed_data
+                
+                let start_index = (phy_frame::frame_length_length() + phy_frame::FRAME_PREAMBLE_LENGTH) / 8;
+                
+                let payload_data: Vec<u8> = compressed_data[start_index..].to_vec();
+                let mut recv_data = PHYFrame::payload_2_data(PHYFrame::construct_payload_format(payload_data)).unwrap()[0..(actual_data_len + 7) / 8].to_vec();
+                if write_to_file{
+                    println!("writing");
+                    let recv_data = read_compressed_u8_2_data(recv_data);
+                    self.writer.write_all(&recv_data.into_iter().map(|x| x + b'0').collect::<Vec<u8>>()).unwrap();
+                }
+                else {
+                    decoded_data.append(&mut recv_data);
+                }
+            }
+            
+            let pop_times = if start_index == usize::MAX {tmp_buffer_len - demodulate_config.preamble_len+1} else {start_index};
+    
+            for i in 0..pop_times{
+                tmp_buffer.pop_front();
+            }
+    
+            start_index = if start_index == usize::MAX {usize::MAX} else {0};
+            tmp_buffer_len = tmp_buffer.len();
+
+            // println!("tmp buffer len: {}", tmp_buffer_len);
+        }
+
+    }
+
 }
 
 fn range_dot_product_vec(range: std::collections::vec_deque::Iter<'_, f32>, ref_vec: &Vec<f32>) -> f32{
