@@ -139,6 +139,9 @@ impl Modulator {
                 .unwrap();
             len -= phy_frame::MAX_FRAME_DATA_LENGTH as isize;
             loop_cnt += 1;
+
+            // wait for a while
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
         }
 
         // send the last frame
@@ -233,6 +236,10 @@ impl Modulator {
             // for debug
             output.push_back(modulated_signal.clone());
 
+            for i in 0..100{
+                modulated_signal.push(0.0);
+            }
+
             // write to wav file
             for sample in modulated_signal {
                 writer.write_sample(sample).unwrap();
@@ -240,6 +247,8 @@ impl Modulator {
 
             len -= phy_frame::MAX_FRAME_DATA_LENGTH as isize;
             loop_cnt += 1;
+
+            
         }
 
         // send the last frame
@@ -290,7 +299,7 @@ impl Modulator {
             let bit = bits[bit_id];
             let freq = self.carrier_freq[carrrier_freq_id];
             for i in 0..sample_cnt_each_bit {
-                let sample = (if bit == 0 { 1.0 } else { -1.0 })
+                let sample = (if bit == 0 { 1.0 } else if bit== 1 { -1.0 } else { 0.0 })
                     * (2.0
                         * std::f64::consts::PI
                         * freq as f64

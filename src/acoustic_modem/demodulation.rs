@@ -540,19 +540,19 @@ impl Demodulation2{
 
             if demodulate_state == DemodulationState::DetectPreamble {
                 if tmp_buffer_len <= demodulate_config.preamble_len{
-                    println!("buffer is smaller than preamble");
+                    // println!("buffer is smaller than preamble");
                     continue;
                 }
                 // println!("start detect preamble");
                 // println!("for end: {}", tmp_buffer_len - self.demodulate_config.preamble_len-1);
                 tmp_buffer.make_contiguous();
-                for i in 0..tmp_buffer_len - self.demodulate_config.preamble_len-1{
+                for i in 0..tmp_buffer_len - demodulate_config.preamble_len-1{
                     // let window = tmp_buffer.range(i..i+demodulate_config.preamble_len);
                     let window = &tmp_buffer.as_slices().0[i..i+demodulate_config.preamble_len];
                     let dot_product = dot_product(window, &demodulate_config.preamble);
 
                     if dot_product > avg_power * 2.0 && dot_product > local_max && dot_product > power_lim_preamble{
-                        println!("detected");
+                        // println!("detected");
                         local_max = dot_product;
                         start_index = i + 1;
                     }
@@ -561,6 +561,7 @@ impl Demodulation2{
                         start_index += demodulate_config.preamble_len - 1;
                         demodulate_state = demodulate_state.next();
                         println!("detected preamble");
+                        // println!("start index: {}, tmp buffer len: {}", start_index, tmp_buffer_len);
                         break;
                     }
                 }
@@ -569,8 +570,8 @@ impl Demodulation2{
             }
             
             if demodulate_state == DemodulationState::RecvFrame{
-                if tmp_buffer_len - start_index <= demodulate_config.ref_signal_len[0]{
-                    println!("tmp buffer is not long enough");
+                if tmp_buffer_len < start_index || tmp_buffer_len - start_index <= demodulate_config.ref_signal_len[0]{
+                    // println!("tmp buffer is not long enough");
                     continue;
                 }
                 tmp_buffer.make_contiguous();
@@ -592,6 +593,11 @@ impl Demodulation2{
                 // println!("current state: {}", demodulate_state == DemodulationState::DetectPreamble);
                 // println!("recv data: {:?}", tmp_bits_data);
                 // println!("data: {:?}", tmp_bits_data);
+
+                // if tmp_bits_data[0] != 0 && tmp_bits_data[1] != 1{
+                //     println!("false aligned");
+                // }
+
                 let mut actual_data_len = 0;
                 let mut one_number = 0;
                 let mut count = 0;
@@ -617,7 +623,6 @@ impl Demodulation2{
                 println!("data len: {}", actual_data_len);
                 if actual_data_len <= phy_frame::MAX_FRAME_DATA_LENGTH{
                     let compressed_data = read_data_2_compressed_u8(tmp_bits_data);
-                    tmp_bits_data = vec![];
                     // println!("compressed data: {:?}", compressed_data);
                     // compressed_data
                     
@@ -634,6 +639,7 @@ impl Demodulation2{
                         decoded_data.append(&mut recv_data);
                     }
                 }
+                tmp_bits_data = Vec::with_capacity(data_len);
             }
             
             let pop_times = if start_index == usize::MAX {tmp_buffer_len - demodulate_config.preamble_len+1} else {start_index};
@@ -645,7 +651,7 @@ impl Demodulation2{
             start_index = if start_index == usize::MAX || is_reboot {is_reboot = false; usize::MAX} else {0};
             tmp_buffer_len = tmp_buffer.len();
 
-            // println!("tmp buffer len: {}, state: {:?}, start_index: {}", tmp_buffer_len, demodulate_state, start_index);
+            println!("tmp buffer len: {}, state: {:?}, start_index: {}", tmp_buffer_len, demodulate_state, start_index);
         }
 
     }

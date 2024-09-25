@@ -474,7 +474,7 @@ async fn test_seconds_listening(){
 
     let mut decoded_data = vec![];    
     let handle = demodulator.listening(true, phy_frame::frame_length_length() + phy_frame::FRAME_PAYLOAD_LENGTH + phy_frame::FRAME_PREAMBLE_LENGTH, phy_frame::FRAME_LENGTH_LENGTH_REDUNDANCY, &mut decoded_data);
-    let handle = time::timeout(Duration::from_secs(16), handle);
+    let handle = time::timeout(Duration::from_secs(20), handle);
     handle.await;
 
     let mut file = File::open("test.txt").unwrap();
