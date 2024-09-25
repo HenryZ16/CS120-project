@@ -596,7 +596,7 @@ impl Demodulation2 {
         data_len: usize,
         decoded_data: &mut Vec<u8>,
     ) {
-        let rs_length = ReedSolomon::new(1, 1).unwrap();
+        let rs_length = ReedSolomon::new(2, 2).unwrap();
 
         let mut redundent = 1;
 
@@ -713,31 +713,34 @@ impl Demodulation2 {
                 //     println!("false aligned");
                 // }
 
-                let mut actual_data_len = 0;
-                let mut one_number = 0;
-                let mut count = 0;
-                for i in phy_frame::FRAME_PREAMBLE_LENGTH
-                    ..phy_frame::FRAME_PREAMBLE_LENGTH + phy_frame::FRAME_LENGTH_LENGTH
-                {
-                        // println!("one_number: {}", one_number);
-                        actual_data_len <<= 1;
-                        actual_data_len += tmp_bits_data[i] as usize;
-                }
+                // let mut actual_data_len = 0;
+                // let mut one_number = 0;
+                // let mut count = 0;
+                // for i in phy_frame::FRAME_PREAMBLE_LENGTH
+                //     ..phy_frame::FRAME_PREAMBLE_LENGTH + phy_frame::FRAME_LENGTH_LENGTH
+                // {
+                //         // println!("one_number: {}", one_number);
+                //         actual_data_len <<= 1;
+                //         actual_data_len += tmp_bits_data[i] as usize;
+                // }
 
+                let compressed_data = read_data_2_compressed_u8(tmp_bits_data);
+
+                let bit_start_index =
+                    (phy_frame::FRAME_LENGTH_LENGTH + phy_frame::FRAME_PREAMBLE_LENGTH) / 8;
+                let mut length_data: Vec<_> = compressed_data[1..bit_start_index]
+                    .chunks(2)
+                    .map(|chunk| Some(chunk.to_vec()))
+                    .collect();
+                println!("length: {:?}", length_data);
+                rs_length.reconstruct(&mut length_data);
+                
+                println!("length data: {}", length_data[0].clone().unwrap()[0]);
+
+                let actual_data_len = ((length_data[0].clone().unwrap()[0] as usize) << 8) + length_data[0].clone().unwrap()[1] as usize;
 
                 println!("data len: {}", actual_data_len);
                 if actual_data_len <= phy_frame::MAX_FRAME_DATA_LENGTH {
-                    let compressed_data = read_data_2_compressed_u8(tmp_bits_data);
-
-                    let bit_start_index =
-                        (phy_frame::FRAME_LENGTH_LENGTH + phy_frame::FRAME_PREAMBLE_LENGTH) / 8;
-                    let mut length_data: Vec<_> = compressed_data[..start_index]
-                        .chunks(1)
-                        .map(|chunk| Some(chunk.to_vec()))
-                        .collect();
-                    rs_length.reconstruct(&mut length_data).unwrap();
-                    
-                    let actual_data_len = ((length_data[0].clone().unwrap()[0] as usize) << 8) + length_data[0].clone().unwrap()[0] as usize;
 
                     let payload_data: Vec<u8> = compressed_data[bit_start_index..].to_vec();
                     let mut recv_data =
