@@ -91,6 +91,8 @@ impl Modulator {
     //   - get the whole frame bits
     //   - modulate the bits
     //   - send the modulated signal
+    // @param data: the input data in compressed u8 format
+    // @param len: the length of the input data indicating the number of bits (before compression)
     pub async fn send_bits(&mut self, data: Vec<u8>, len: isize) -> VecDeque<Vec<f32>> {
         // TODO: impl OFDM
         println!("[send_bits] send bits: {:?}", len);
@@ -148,7 +150,12 @@ impl Modulator {
         }
         let frame = phy_frame::PHYFrame::new(len as usize, payload);
         let frame_bits = frame.get_whole_frame_bits();
-        let modulated_psk_signal = self.modulate(&utils::read_compressed_u8_2_data(frame_bits), 0);
+        let decompressed_data = utils::read_compressed_u8_2_data(frame_bits);
+        println!(
+            "[send_bits] decompressed_data.len(): {}",
+            decompressed_data.len()
+        );
+        let modulated_psk_signal = self.modulate(&decompressed_data, 0);
 
         // add FSK preamble
         let preamble = Modulator::modulate_fsk_preamble();
