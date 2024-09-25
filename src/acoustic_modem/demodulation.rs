@@ -8,6 +8,7 @@ use futures::StreamExt;
 use num_traits::pow;
 use plotters::data;
 use plotters::element::CoordMapper;
+use reed_solomon_erasure::galois_8::ReedSolomon;
 use std::collections::VecDeque;
 use std::fs::File;
 use std::io::Write;
@@ -595,6 +596,8 @@ impl Demodulation2 {
         data_len: usize,
         decoded_data: &mut Vec<u8>,
     ) {
+        let rs_length = ReedSolomon::new(1, 1).unwrap();
+
         let mut redundent = 1;
 
         let data_len = data_len;
@@ -620,7 +623,7 @@ impl Demodulation2 {
         let mut local_max = 0.0;
         let mut start_index = usize::MAX;
 
-        let mut tmp_bits_data = Vec::with_capacity(data_len);
+        let mut tmp_bits_data: Vec<u8> = Vec::with_capacity(data_len);
 
         let mut is_reboot = false;
 
@@ -716,32 +719,25 @@ impl Demodulation2 {
                 for i in phy_frame::FRAME_PREAMBLE_LENGTH
                     ..phy_frame::FRAME_PREAMBLE_LENGTH + phy_frame::FRAME_LENGTH_LENGTH
                 {
-                    count += 1;
-
-                    if tmp_bits_data[i] == 1 {
-                        one_number += 1;
-                    }
-
-                    if count == redundent {
                         // println!("one_number: {}", one_number);
                         actual_data_len <<= 1;
-                        if one_number > redundent / 2 {
-                            actual_data_len += 1
-                        }
-
-                        one_number = 0;
-                        count = 0;
-                    }
+                        actual_data_len += tmp_bits_data[i] as usize;
                 }
+
 
                 println!("data len: {}", actual_data_len);
                 if actual_data_len <= phy_frame::MAX_FRAME_DATA_LENGTH {
                     let compressed_data = read_data_2_compressed_u8(tmp_bits_data);
-                    // println!("compressed data: {:?}", compressed_data);
-                    // compressed_data
 
                     let bit_start_index =
                         (phy_frame::FRAME_LENGTH_LENGTH + phy_frame::FRAME_PREAMBLE_LENGTH) / 8;
+                    let mut length_data: Vec<_> = compressed_data[..start_index]
+                        .chunks(1)
+                        .map(|chunk| Some(chunk.to_vec()))
+                        .collect();
+                    rs_length.reconstruct(&mut length_data).unwrap();
+                    
+                    let actual_data_len = ((length_data[0].clone().unwrap()[0] as usize) << 8) + length_data[0].clone().unwrap()[0] as usize;
 
                     let payload_data: Vec<u8> = compressed_data[bit_start_index..].to_vec();
                     let mut recv_data =

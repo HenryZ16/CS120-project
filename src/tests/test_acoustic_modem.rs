@@ -11,6 +11,7 @@ use plotters::{data, prelude::*};
 use rand::thread_rng;
 use rand::Rng;
 use rand_distr::Normal;
+use reed_solomon_erasure::ReedSolomon;
 use tokio::{signal, task, time};
 use tokio::time::sleep;
 
@@ -423,7 +424,7 @@ async fn test_listen(){
     loop{
         // let res = demodulator.listen_frame(false, phy_frame::frame_length_length() + phy_frame::FRAME_PAYLOAD_LENGTH + phy_frame::FRAME_PREAMBLE_LENGTH, phy_frame::FRAME_LENGTH_LENGTH_REDUNDANCY).await;
 
-        let res = match demodulator.listen_one_frame(false, phy_frame::frame_length_length() + phy_frame::FRAME_PAYLOAD_LENGTH + phy_frame::FRAME_PREAMBLE_LENGTH, phy_frame::FRAME_LENGTH_LENGTH_REDUNDANCY).await {
+        let res = match demodulator.listen_one_frame(false,  phy_frame::FRAME_PAYLOAD_LENGTH + phy_frame::FRAME_PREAMBLE_LENGTH, 0).await {
             Some(data) => data,
             None => {
                 println!("error length");
@@ -473,7 +474,7 @@ async fn test_seconds_listening(){
     let org_data_len = org_data.len();
 
     let mut decoded_data = vec![];    
-    let handle = demodulator.listening(true, phy_frame::frame_length_length() + phy_frame::FRAME_PAYLOAD_LENGTH + phy_frame::FRAME_PREAMBLE_LENGTH, phy_frame::FRAME_LENGTH_LENGTH_REDUNDANCY, &mut decoded_data);
+    let handle = demodulator.listening(true, phy_frame::FRAME_PAYLOAD_LENGTH + phy_frame::FRAME_PREAMBLE_LENGTH, &mut decoded_data);
     let handle = time::timeout(Duration::from_secs(20), handle);
     handle.await;
 
@@ -509,5 +510,39 @@ async fn test_seconds_listening(){
         }
     }
     println!("error rate = {}", error_num as f32 / org_bits_len as f32);
+
+}
+
+#[test]
+fn test_reed_solomon(){
+    use reed_solomon_erasure::galois_8::ReedSolomon;
+    // 创建一个Reed-Solomon编码器/解码器
+    let rs = ReedSolomon::new(3, 2).unwrap(); // 3个数据块，2个校验块
+
+    // 原始数据
+    let mut data = vec![
+        vec![1u8, 2, 3], // 数据块1
+        vec![4u8, 5, 6], // 数据块2
+        vec![7u8, 8, 9], // 数据块3
+        vec![0u8, 0, 0], // 校验块1
+        vec![0u8, 0, 0], // 校验块2
+    ];
+
+    // 编码数据
+    rs.encode(&mut data).unwrap();
+    println!("encoded data: {:?}", data);
+
+    // 模拟数据损坏
+    data[1][0] = 1; // 损坏数据块2的第一个字节
+    // data[2][1] = 42; // 损坏数据块3的第二个字节
+
+    // 将数据转换为Option类型的Vec
+    let mut slice = data.iter().cloned().map(Some).collect::<Vec<_>>();
+
+    // 进行解码
+    rs.reconstruct(&mut slice).unwrap();
+
+    // 打印解码后的数据
+    println!("decoded data: {:?}", slice);
 
 }
