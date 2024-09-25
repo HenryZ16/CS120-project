@@ -4,15 +4,11 @@ use reed_solomon_erasure::galois_8::ReedSolomon;
 
 pub const MAX_FRAME_DATA_LENGTH: usize = 480;
 pub const FRAME_PAYLOAD_LENGTH: usize = 512;
-pub const FRAME_LENGTH_LENGTH_REDUNDANCY: usize = 3;
-pub const FRAME_PREAMBLE: u32 = 0b0101010101;
-pub const FRAME_PREAMBLE_LENGTH: usize = 10;
+pub const FRAME_PREAMBLE: u32 = 0b01010101;
+pub const FRAME_PREAMBLE_LENGTH: usize = 8;
+pub const FRAME_LENGTH_LENGTH: usize = 32;
 
 const U8_MASK: u8 = 0b11111111;
-
-pub fn frame_length_length() -> usize {
-    FRAME_LENGTH_LENGTH_REDUNDANCY * 10
-}
 
 pub struct PHYFrame {
     length: usize,
@@ -35,48 +31,52 @@ impl PHYFrame {
     // vec![payload 7:0], ...
     pub fn get_whole_frame_bits(&self) -> Vec<u8> {
         // the length of length bits and preamble bits must be a multiple of 8
-        assert_eq!((frame_length_length() + FRAME_PREAMBLE_LENGTH) % 8, 0);
+        assert_eq!(FRAME_LENGTH_LENGTH % 8, 0);
+        assert_eq!(FRAME_PREAMBLE_LENGTH % 8, 0);
 
         let mut whole_frame_bits: Vec<u8> = vec![];
 
-        // Preamble
-        let preamble = FRAME_PREAMBLE;
-        let mut preamble_length = FRAME_PREAMBLE_LENGTH as isize;
-        preamble_length -= 8;
-        while preamble_length > 0 {
-            let byte = (preamble >> preamble_length) as u8;
-            whole_frame_bits.push(byte);
-            preamble_length -= 8;
+        // Preamble: 8bits
+        let mut preamble_left: isize = FRAME_PREAMBLE_LENGTH as isize;
+        preamble_left -= 8;
+        while preamble_left >= 0 {
+            whole_frame_bits.push((FRAME_PREAMBLE >> preamble_left) as u8 & U8_MASK);
+            preamble_left -= 8;
         }
-
         println!("[get_whole_frame_bits] preamble: {:?}", whole_frame_bits);
 
-        // Length
-        // compute the length of length bits
+        // Length: use RS encoding
         let mut length: u64 = 0;
-        let length_length = (frame_length_length() / FRAME_LENGTH_LENGTH_REDUNDANCY) as isize;
+        let length_length = (FRAME_LENGTH_LENGTH / 2) as isize;
         println!("[get_whole_frame_bits] length_length: {:?}", length_length);
         for i in (0..length_length).rev() {
-            for _ in 0..FRAME_LENGTH_LENGTH_REDUNDANCY {
-                length |= (self.length >> i) as u64 & 1;
-                length <<= 1;
-            }
+            length |= (self.length >> i) as u64 & 1;
+            length <<= 1;
         }
         length >>= 1;
         println!("[get_whole_frame_bits] self.length: {:?}", self.length);
 
-        let mut length_length = frame_length_length() as isize;
-        if preamble_length < 0 {
-            length_length += preamble_length;
-            let mut byte = (preamble << -preamble_length) as u8 & U8_MASK;
-            byte |= (length >> length_length) as u8;
-            whole_frame_bits.push(byte);
-        }
-
-        while length_length > 0 {
+        // RS encoding
+        let rs = ReedSolomon::new(
+            (FRAME_LENGTH_LENGTH / 2) / 16,
+            (FRAME_LENGTH_LENGTH / 2) / 16,
+        )
+        .unwrap();
+        let mut length_shards = vec![vec![], vec![]];
+        let mut length_length: isize = (FRAME_LENGTH_LENGTH / 2) as isize;
+        length_length -= 8;
+        while length_length >= 0 {
+            length_shards[0].push((length >> length_length) as u8 & U8_MASK);
+            length_shards[1].push(0);
             length_length -= 8;
-            let byte = (length >> length_length) as u8 & U8_MASK;
-            whole_frame_bits.push(byte);
+        }
+        println!("[get_whole_frame_bits] length_shards: {:?}", length_shards);
+        rs.encode(&mut length_shards).unwrap();
+
+        for i in 0..2 {
+            for j in 0..(FRAME_LENGTH_LENGTH / 16) {
+                whole_frame_bits.push(length_shards[i][j]);
+            }
         }
 
         println!("[get_whole_frame_bits] length: {:?}", whole_frame_bits);
@@ -139,8 +139,8 @@ impl PHYFrame {
         .unwrap();
         rs.encode(&mut payload).unwrap();
 
-        println!("payload: {:?}", payload);
-        println!("payload length: {:?}", payload.len());
+        println!("[data_2_payload] payload: {:?}", payload);
+        println!("[data_2_payload] payload length: {:?}", payload.len());
 
         return Ok(payload);
     }

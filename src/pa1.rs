@@ -101,10 +101,9 @@ pub async fn obj_3_recv_file() -> Result<u32> {
     let mut decoded_data = vec![];
     let handle = demodulator.listening(
         true,
-        phy_frame::frame_length_length()
+        phy_frame::FRAME_LENGTH_LENGTH
             + phy_frame::FRAME_PAYLOAD_LENGTH
             + phy_frame::FRAME_PREAMBLE_LENGTH,
-        phy_frame::FRAME_LENGTH_LENGTH_REDUNDANCY,
         &mut decoded_data,
     );
     let handle = time::timeout(Duration::from_secs(15), handle);
