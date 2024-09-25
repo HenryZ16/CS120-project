@@ -1,6 +1,10 @@
+use crate::acoustic_modem::demodulation::Demodulation2;
+use crate::acoustic_modem::modulation;
 use crate::acoustic_modem::modulation::Modulator;
 use crate::pa0;
 use crate::utils;
+use crate::acoustic_modem::phy_frame;
+use tokio::time::{self, Duration};
 use anyhow::{Error, Result};
 // use cpal::{
 //     traits::{DeviceTrait, HostTrait},
@@ -8,6 +12,10 @@ use anyhow::{Error, Result};
 // };
 use std::fs::File;
 use std::io::Read;
+use std::vec;
+
+const CARRIER: u32 = 3000;
+const SAMPLE_RATE: u32 = 48000;
 
 pub async fn obj_2() -> Result<u32> {
     let mut modulator_1 = Modulator::new(vec![1000, 10000], 48000, false);
@@ -82,6 +90,19 @@ pub async fn obj_3_send_file() -> Result<u32> {
     return Ok(0);
 }
 
+pub async fn obj_3_recv_file() -> Result<u32> {
+    let mut demodulator = Demodulation2::new(vec![CARRIER], SAMPLE_RATE, "output.txt", modulation::REDUNDANT_PERIODS);
+
+    let mut decoded_data = vec![];    
+    let handle = demodulator.listening(true, phy_frame::frame_length_length() + phy_frame::FRAME_PAYLOAD_LENGTH + phy_frame::FRAME_PREAMBLE_LENGTH, phy_frame::FRAME_LENGTH_LENGTH_REDUNDANCY, &mut decoded_data);
+    let handle = time::timeout(Duration::from_secs(15), handle);
+    println!("[pa1-obj3-receive] Start");
+    handle.await;
+    println!("[pa1-obj3-recrive] Stop");
+
+    return Ok(0);
+}
+
 pub async fn pa1(sel: i32, additional_type: &str) -> Result<u32> {
     let available_sel = vec![0, 1, 2, 3];
     if !available_sel.contains(&sel) {
@@ -131,6 +152,13 @@ pub async fn pa1(sel: i32, additional_type: &str) -> Result<u32> {
                     }
                 }
                 println!("Objective 3 end");
+            }
+            "receive_file" =>{
+                println!("Objective 3 start");
+                match obj_3_recv_file().await{
+                    Ok(_) => {println!("Objective 3 stop successfully");}
+                    _ => {println!("Objective 3 failed");}
+                }
             }
             _ => {
                 println!("Unsupported function.");
