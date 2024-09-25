@@ -37,7 +37,7 @@ pub async fn obj_3_send() -> Result<u32> {
 
     // modulator
     let sample_rate = 48000;
-    let carrier_freq = 6000;
+    let carrier_freq = CARRIER;
     let mut modulator = Modulator::new(vec![carrier_freq], sample_rate, false);
 
     // send
@@ -70,7 +70,7 @@ pub async fn obj_3_send_file() -> Result<u32> {
 
     // modulator
     let sample_rate = 48000;
-    let carrier_freq = 6000;
+    let carrier_freq = CARRIER;
     let mut modulator = Modulator::new(vec![carrier_freq], sample_rate, false);
 
     // send
