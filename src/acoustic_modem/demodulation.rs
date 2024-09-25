@@ -651,7 +651,7 @@ impl Demodulation2{
             start_index = if start_index == usize::MAX || is_reboot {is_reboot = false; usize::MAX} else {0};
             tmp_buffer_len = tmp_buffer.len();
 
-            println!("tmp buffer len: {}, state: {:?}, start_index: {}", tmp_buffer_len, demodulate_state, start_index);
+            // println!("tmp buffer len: {}, state: {:?}, start_index: {}", tmp_buffer_len, demodulate_state, start_index);
         }
 
     }
