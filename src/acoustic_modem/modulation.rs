@@ -85,9 +85,9 @@ impl Modulator {
             .unwrap();
     }
 
-    // [Preamble : 10][Length : 30][Payload : 1024]
+    // [Preamble : 8][Payload : 36 x 6 = 216]
     // for each frame:
-    //   - split the data into 960 bits for each frame
+    //   - split the data into 96 bits for each frame
     //   - get the whole frame bits
     //   - modulate the bits
     //   - send the modulated signal

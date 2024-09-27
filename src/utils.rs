@@ -47,3 +47,38 @@ pub fn read_compressed_u8_2_data(data: Vec<u8>) -> Vec<u8> {
     }
     return decompressed_data;
 }
+
+pub fn u8_2_code_rs_hexbit(data: Vec<u8>) -> Vec<code_rs::bits::Hexbit> {
+    use code_rs::bits::Hexbit;
+
+    // ensure that the length of data bits is a common divisor of 6 and 8: length mod 3 = 0
+    assert_eq!(data.len() % 3, 0);
+
+    let mut hexbits = vec![];
+    for i in (0..data.len()).step_by(3) {
+        // [7-2][1-0 + 7-4][3-0 + 7-6][5-0]
+        hexbits.push(Hexbit::new((data[i] >> 2) as u8));
+        hexbits.push(Hexbit::new(((data[i] & 0b11) << 4) | (data[i + 1] >> 4)));
+        hexbits.push(Hexbit::new(
+            ((data[i + 1] & 0b1111) << 2) | (data[i + 2] >> 6),
+        ));
+        hexbits.push(Hexbit::new(data[i + 2] & 0b111111));
+    }
+
+    return hexbits;
+}
+
+pub fn code_rs_hexbit_2_u8(data: Vec<code_rs::bits::Hexbit>) -> Vec<u8> {
+    // ensure that the length of data bits is a common divisor of 6 and 8: mod 4
+    assert_eq!(data.len() % 4, 0);
+
+    let mut u8s = vec![];
+    for i in (0..data.len()).step_by(4) {
+        // [5-0 + 5-4][3-0 + 5-2][1-0 + 5-0]
+        u8s.push((data[i].bits() << 2) | (data[i + 1].bits() >> 4));
+        u8s.push((data[i + 1].bits() << 4) | (data[i + 2].bits() >> 2));
+        u8s.push((data[i + 2].bits() << 6) | data[i + 3].bits());
+    }
+
+    return u8s;
+}

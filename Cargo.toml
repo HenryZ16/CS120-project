@@ -5,7 +5,8 @@ edition = "2021"
 
 [dependencies]
 plotters = "0.3.6"
-reed-solomon-erasure = "4.0"
+ldpc= "*"
+code-rs = "*"   
 num-integer = "*"
 num-traits = "*"
 anyhow = "*"
