@@ -7,12 +7,11 @@ Input data
 */
 use super::phy_frame;
 use crate::asio_stream::{AudioTrack, OutputAudioStream};
-use crate::utils;
+use crate::utils::{self, Byte};
 use cpal::traits::{DeviceTrait, HostTrait};
-use cpal::{HostId, SampleRate, SupportedStreamConfig};
+use cpal::{SampleRate, SupportedStreamConfig};
 use futures::SinkExt;
 use hound::{WavSpec, WavWriter};
-use rand_distr::Standard;
 
 const SAMPLE_RATE: u32 = 48000;
 pub const REDUNDANT_PERIODS: usize = 4;
@@ -93,7 +92,7 @@ impl Modulator {
     //   - send the modulated signal
     // @param data: the input data in compressed u8 format
     // @param len: the length of the input data indicating the number of bits (before compression)
-    pub async fn send_bits(&mut self, data: Vec<u8>, len: isize) -> VecDeque<Vec<f32>> {
+    pub async fn send_bits(&mut self, data: Vec<Byte>, len: isize) -> VecDeque<Vec<f32>> {
         // TODO: impl OFDM
         println!("[send_bits] send bits: {:?}", len);
         let mut len = len;
@@ -287,6 +286,8 @@ impl Modulator {
 
     // translate the bits into modulated signal
     pub fn modulate(&self, bits: &Vec<u8>, carrrier_freq_id: usize) -> Vec<f32> {
+        println!("output: {:?}, length: {}", bits, bits.len());
+
         // TODO: PSK
         let mut modulated_signal = vec![];
         // redundant periods for each bit

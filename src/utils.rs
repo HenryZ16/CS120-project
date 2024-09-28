@@ -2,6 +2,9 @@ use rand::Rng;
 use std::fs::File;
 use std::io::Write;
 
+pub type Bit = u8;
+pub type Byte = u8;
+
 pub fn gen_random_data(len: usize) -> Vec<u8> {
     let mut rng = rand::thread_rng();
     let mut data = vec![];
@@ -19,7 +22,7 @@ pub fn gen_random_data_file(len: usize) {
     }
 }
 
-pub fn read_data_2_compressed_u8(data: Vec<u8>) -> Vec<u8> {
+pub fn read_data_2_compressed_u8(data: Vec<Bit>) -> Vec<Byte> {
     let mut compressed_data = vec![];
     let mut cnt = 0;
     let mut byte = 0;
@@ -38,7 +41,7 @@ pub fn read_data_2_compressed_u8(data: Vec<u8>) -> Vec<u8> {
     return compressed_data;
 }
 
-pub fn read_compressed_u8_2_data(data: Vec<u8>) -> Vec<u8> {
+pub fn read_compressed_u8_2_data(data: Vec<Byte>) -> Vec<Bit> {
     let mut decompressed_data = vec![];
     for i in 0..data.len() {
         for j in 0..8 {
@@ -48,7 +51,7 @@ pub fn read_compressed_u8_2_data(data: Vec<u8>) -> Vec<u8> {
     return decompressed_data;
 }
 
-pub fn u8_2_code_rs_hexbit(data: Vec<u8>) -> Vec<code_rs::bits::Hexbit> {
+pub fn u8_2_code_rs_hexbit(data: Vec<Byte>) -> Vec<code_rs::bits::Hexbit> {
     use code_rs::bits::Hexbit;
 
     // ensure that the length of data bits is a common divisor of 6 and 8: length mod 3 = 0
@@ -68,7 +71,7 @@ pub fn u8_2_code_rs_hexbit(data: Vec<u8>) -> Vec<code_rs::bits::Hexbit> {
     return hexbits;
 }
 
-pub fn code_rs_hexbit_2_u8(data: Vec<code_rs::bits::Hexbit>) -> Vec<u8> {
+pub fn code_rs_hexbit_2_u8(data: Vec<code_rs::bits::Hexbit>) -> Vec<Byte> {
     // ensure that the length of data bits is a common divisor of 6 and 8: mod 4
     assert_eq!(data.len() % 4, 0);
 

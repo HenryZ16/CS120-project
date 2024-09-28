@@ -1,15 +1,12 @@
-use crate::utils;
+use crate::utils::{self, Bit, Byte};
 use anyhow::{Error, Result};
 use code_rs::bits::Hexbit;
 use code_rs::coding::reed_solomon;
 
 pub const MAX_FRAME_DATA_LENGTH: usize = 96;
 pub const FRAME_PAYLOAD_LENGTH: usize = 216;
-pub const FRAME_PREAMBLE: u32 = 0b01010101;
-pub const FRAME_PREAMBLE_LENGTH: usize = 8;
 pub const FRAME_LENGTH_LENGTH: usize = 12;
 
-const U8_MASK: u8 = 0b11111111;
 
 pub struct PHYFrame {
     length: usize,
@@ -23,12 +20,12 @@ impl PHYFrame {
     // Preserved for future use: <2 Hexbits>
     // Parity: <16 Hexbits>
     // Payload Total: <36 Hexbits>
-    pub fn new(length: usize, data: Vec<u8>) -> Self {
+    pub fn new(length: usize, data: Vec<Byte>) -> Self {
         let payload = PHYFrame::data_2_payload(data, length).unwrap();
         PHYFrame { length, payload }
     }
 
-    pub fn get_whole_frame_bits(&self) -> Vec<u8> {
+    pub fn get_whole_frame_bits(&self) -> Vec<Bit> {
         // No PSK preamble. Just tranverse Vec<Hexbit> into Vec<u8>
         return utils::code_rs_hexbit_2_u8(self.payload.clone());
     }
@@ -69,13 +66,13 @@ impl PHYFrame {
         reed_solomon::long::encode(&mut array_data);
         let payload = array_data.to_vec();
 
-        println!("[data_2_payload] payload: {:?}", payload);
+        println!("[data_2_payload] payload: {:?}, length: {}", payload, payload.len());
 
         return Ok(payload);
     }
 
     // reconstruct & get back the data
-    pub fn payload_2_data(payload: Vec<Hexbit>) -> Result<(Vec<u8>, usize), Error> {
+    pub fn payload_2_data(payload: Vec<Hexbit>) -> Result<(Vec<Byte>, usize), Error> {
         // RS decoding
         let mut array_payload: [Hexbit; 36] = payload.try_into().unwrap();
         reed_solomon::long::decode(&mut array_payload);
@@ -85,7 +82,7 @@ impl PHYFrame {
         let length = hexbits_length_2_usize_length(payload[0..2].to_vec());
 
         // get the data
-        let data = utils::code_rs_hexbit_2_u8(payload[2..21].to_vec());
+        let data = utils::code_rs_hexbit_2_u8(payload[2..22].to_vec());
 
         return Ok((data, length));
     }
@@ -167,9 +164,9 @@ impl SimpleFrame {
 }
 
 pub fn gen_preamble(sample_rate: u32) -> Vec<f32> {
-    let start = 1e2;
-    let end = 1e4;
-    let half_length = 340;
+    let start = 2e3;
+    let end = 6e3;
+    let half_length = 320;
     let dx: f64 = 1.0 / sample_rate as f64;
     let step = (end - start) as f64 / half_length as f64;
     let mut fp: Vec<f64> = (0..half_length).map(|i| start + i as f64 * step).collect();
