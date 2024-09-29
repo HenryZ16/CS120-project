@@ -1,6 +1,8 @@
 use crate::acoustic_modem::phy_frame::{self, PHYFrame};
 use crate::asio_stream::InputAudioStream;
-use crate::utils::{self, read_compressed_u8_2_data, read_data_2_compressed_u8, u8_2_code_rs_hexbit, Bit, Byte};
+use crate::utils::{
+    self, read_compressed_u8_2_data, read_data_2_compressed_u8, u8_2_code_rs_hexbit, Bit, Byte,
+};
 use anyhow::Error;
 use cpal::traits::{DeviceTrait, HostTrait};
 use cpal::{Device, SampleRate, SupportedStreamConfig};
@@ -505,7 +507,7 @@ impl Demodulation2 {
                         &self.demodulate_config.ref_signal[0],
                     );
 
-                    start_index += demodulate_config.ref_signal_len[0];
+                    start_index += demodulate_config.ref_signal_len[0] - 1;
 
                     tmp_bits_data.push(if dot_product >= 0.0 { 0 } else { 1 });
                 }
@@ -521,24 +523,26 @@ impl Demodulation2 {
                 let result = decode(tmp_bits_data);
                 tmp_bits_data = Vec::with_capacity(data_len);
 
-                match result{
-                    Ok((vec, length)) =>{
+                match result {
+                    Ok((vec, length)) => {
                         // println!("length: {}", length);
-                        if length > phy_frame::MAX_FRAME_DATA_LENGTH{
+                        if length > phy_frame::MAX_FRAME_DATA_LENGTH {
                             println!("wrong data length");
-                        }
-                        else{
-
+                        } else {
                             let decompressed = read_compressed_u8_2_data(vec)[0..length].to_vec();
-                        
-                            if write_to_file{
-                                let to_write = &decompressed.clone().iter().map(|x| *x + b'0').collect::<Vec<u8>>();
+
+                            if write_to_file {
+                                let to_write = &decompressed
+                                    .clone()
+                                    .iter()
+                                    .map(|x| *x + b'0')
+                                    .collect::<Vec<u8>>();
                                 // println!("to write: {:?}", to_write);
                                 self.writer.write_all(to_write).unwrap();
                             }
                             decoded_data.extend_from_slice(&decompressed[0..length]);
                         }
-                    },
+                    }
 
                     Err(_) => {
                         println!("Error: received invalid data");
@@ -565,13 +569,12 @@ impl Demodulation2 {
             tmp_buffer_len = tmp_buffer.len();
         }
     }
-
 }
 
 fn decode(input_data: Vec<Bit>) -> Result<(Vec<Byte>, usize), Error> {
     // println!("input data: {:?}, data length: {}", input_data, input_data.len());
     let hexbits = u8_2_code_rs_hexbit(read_data_2_compressed_u8(input_data));
 
-    // println!("hexbits: {:?}, hexbit length: {}", hexbits, hexbits.len());    
+    // println!("hexbits: {:?}, hexbit length: {}", hexbits, hexbits.len());
     PHYFrame::payload_2_data(hexbits)
 }
