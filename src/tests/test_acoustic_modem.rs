@@ -95,196 +95,6 @@ async fn test_modulation() {
         .await;
 }
 
-// #[tokio::test]
-// async fn test_demodulation_detect_windowshift() {
-//     let sample_rate = 48000;
-//     let carrier_freq = 1000;
-
-//     let normal = Normal::new(0.0, 0.3).unwrap();
-//     let mut rng = thread_rng();
-
-//     let demodulator = Demodulation::new(vec![carrier_freq], 48000, false);
-
-//     let mut padding: Vec<f32> = (0..0).map(|_| rng.sample(&normal)).collect();
-//     let mut back_padding: Vec<f32> = (0..1).map(|_| rng.sample(&normal)).collect();
-
-//     let t = (0..(sample_rate / carrier_freq) * 2).map(|t| t as f32 / sample_rate as f32);
-
-//     let mut test_vec = t
-//         .map(|t| (2.0 * std::f32::consts::PI * t * carrier_freq as f32).sin() + rng.sample(&normal))
-//         .collect::<Vec<f32>>();
-
-//     padding.append(&mut test_vec);
-//     padding.append(&mut back_padding);
-
-//     let mut buffer = Vec::new();
-//     buffer.push(demodulator.detect_windowshift(&padding[..], 0.0, 0));
-
-//     println!("buffer: {:?}", buffer);
-// }
-
-// #[tokio::test]
-// async fn test_demodulation_detect_preamble(){
-//     let sample_rate = 48000;
-//     let carrier_freq = 1000;
-//     let demodulator = Demodulation::new(vec![carrier_freq], 48000, false);
-
-//     let padding_lock = demodulator.buffer.clone();
-
-//     let handle1 = task::spawn(
-//         async move{
-//             // let _normal = Normal::new(0.0, 0.4).unwrap();
-//             // let mut rng = thread_rng();
-//             let mut padding = padding_lock.lock().await;
-
-//             padding.push_back((0..20).map(|_| 0.0).collect());
-
-//             // let mut padding: Vec<f32> = (0..0).map(|_| rng.sample(&normal)).collect();
-//             let back_padding: Vec<f32> = (0..0).map(|_| 0.0).collect();
-
-//             let phase_base = (0..(sample_rate / carrier_freq)).map(|t| t as f32 / sample_rate as f32);
-//             let phase1 = phase_base.clone().map(|t| (2.0 * std::f32::consts::PI * t * carrier_freq as f32).sin()).collect::<Vec<f32>>();
-//             let phase0 = phase_base.clone().map(|t| (2.0 * std::f32::consts::PI * t * carrier_freq as f32 + std::f32::consts::PI).sin()).collect::<Vec<f32>>();
-
-//             // padding.push_back(phase1.clone());
-//             // padding.push_back(phase1.clone());
-//             // padding.push_back(phase0.clone());
-//             // padding.push_back(phase0.clone());
-//             // padding.push_back(phase1.clone());
-//             drop(padding);
-//             println!("send 1st sequence");
-
-//             for i in 1..5{
-//                 let mut padding = padding_lock.lock().await;
-//                 padding.push_back(phase0.clone());
-//                 padding.push_back(phase1.clone());
-//                 drop(padding);
-//                 let _ = sleep(Duration::from_millis(500));
-//                 println!("send {}st sequence", i + 1);
-//             }
-
-//             let mut padding = padding_lock.lock().await;
-//             padding.push_back(phase0.clone());
-//             padding.push_back(phase1.clone());
-//             drop(padding);
-//             let _ = sleep(Duration::from_millis(500));
-
-//             let mut padding = padding_lock.lock().await;
-//             padding.push_back(back_padding);
-//             drop(padding);
-//         }
-//     );
-
-//     // join!(handle1);
-//     // let res = demodulator.detect_preamble(3);
-
-//     let handle2 = task::spawn(
-//         async move{demodulator.detect_preamble(4).await.unwrap();}
-//     );
-
-//     handle1.await.unwrap();
-//     handle2.await.unwrap();
-//     // println!("res: {:?}", res.await.expect("error"));
-// }
-
-// #[tokio::test]
-// async fn test_listen_directly(){
-//     let sample_rate = 48000;
-//     let carrier_freq = 1500;
-//     let mut demodulator = Demodulation::new(vec![carrier_freq], 48000, false);
-//     let mut modulation = Modulator::new(vec![carrier_freq], sample_rate, false);
-
-//     let data = vec![1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 1, 1];
-//     // let data = [1; 2048].to_vec();
-//     let data = utils::read_data_2_compressed_u8(data);
-//     let buffer = demodulator.buffer.clone();
-
-//     let signal = modulation.send_bits_2_file(data.clone(), data.len() as isize, "test.wav").await;
-
-//     plot(signal[0].clone());
-
-//     let ref_signal = Modulator::modulate_fsk_preamble();
-
-//     println!("dot product: {:?}", demodulation::dot_product_iter(signal[0].iter(), ref_signal.iter()));
-
-//     // let mut buffer = buffer.lock().await;
-//     // for vec in signal{
-//     //     buffer.push_back(vec);
-//     // }
-
-//     // drop(buffer);
-
-//     // demodulator.listening(1).await;
-
-//     // let mut buffer = Vec::new();
-//     // for vec in signal{
-//     //     // buffer.push_back(vec);
-//     //     buffer.extend(vec);
-//     // }
-
-//     // let mut recv_data: Vec<u8> = Vec::new();
-//     // let mut index = 384;
-//     // println!("sample buffer: {:?}", buffer[index..index + 48].to_vec());
-//     // while index < buffer.len(){
-//     //     recv_data.push(demodulator.detect_windowshift(&buffer, 12.0, index).unwrap().received_bit);
-//     //     index += 48;
-//     // }
-
-//     // let recv_data = utils::read_data_2_compressed_u8(recv_data);
-//     // println!("len of recv_data: {}", recv_data.len());
-//     // println!("recv_data: {:?}", recv_data);
-// }
-
-// #[tokio::test]
-// async fn test_listening()
-// {
-//     let sample_rate = 48000;
-//     let carrier_freq = 1000;
-//     let mut demodulator = Demodulation::new(vec![carrier_freq], sample_rate, false);
-
-//     demodulator.listening(5).await;
-// }
-
-// #[tokio::test]
-// async fn test_2_listening(){
-//     use std::collections::VecDeque;
-
-//     let sample_rate = 48000;
-//     let carrier_freq = 1500;
-//     let mut demodulator = Demodulation2::new(vec![carrier_freq], sample_rate, false, "test.txt");
-
-//     // read wav from file
-//     let file_path = "testset/output.wav";
-//     // let file_path = "testset/send.wav";
-//     // let file_path = "test.wav";
-//     let mut reader = hound::WavReader::open(file_path).unwrap();
-//     let data: Vec<f32> = reader.samples::<f32>()
-//         .map(|s| s.unwrap())
-//         .collect();
-
-//     // plot(data.clone()).unwrap();
-
-//     let mut test_data = VecDeque::new();
-//     let mut count = 0;
-//     for i in 0..data.len(){
-//         if count == 0{
-//             test_data.push_back(Vec::new());
-//         }
-//         test_data.back_mut().unwrap().push(data[i]);
-//         count += 1;
-//         if count == 640{
-//             count = 0;
-//         }
-//     }
-//     let mut debug_vec = vec![];
-
-//     println!("start listening");
-//     let result = demodulator.listening(true, test_data, &mut debug_vec).await;
-//     // let result = demodulator.listening(true, VecDeque::new().push_back(data.clone()), &mut debug_vec).await;
-
-//     plot(debug_vec).unwrap();
-// }
-
 #[test]
 fn test_plot_wav() {
     let mut reader = hound::WavReader::open("test_simple.wav").unwrap();
@@ -353,7 +163,7 @@ async fn test_simple_listen() {
     use std::io::BufReader;
 
     let reader = File::open("ref_signal.txt").unwrap();
-    let mut reader = BufReader::new(reader);
+    let reader = BufReader::new(reader);
     let mut ref_data = vec![];
     for data in reader.bytes() {
         ref_data.push(data.unwrap() - b'0');
@@ -393,141 +203,24 @@ async fn test_frame_gen() {
     let data_len = data.len() as isize;
     let data = read_data_2_compressed_u8(data);
 
-    let signal = modulation
+    let _signal = modulation
         .send_bits_2_file(data, data_len, "test.wav")
         .await;
 }
 
-// #[tokio::test]
-// async fn test_listen() {
-//     let mut demodulator = Demodulation2::new(
-//         vec![CARRIER],
-//         48000,
-//         "test.txt",
-//         modulation::REDUNDANT_PERIODS,
-//     );
-//     let mut debug_vec: Vec<f32> = vec![];
+#[tokio::test]
+async fn test_seconds_listening() {
+    let mut demodulator = Demodulation2::new(
+        vec![CARRIER],
+        48000,
+        "output.txt",
+        modulation::REDUNDANT_PERIODS,
+    );
 
-//     let mut file = File::open("testset/data.txt").unwrap();
-//     let mut data = String::new();
-//     file.read_to_string(&mut data).unwrap();
-//     let data = data
-//         .chars()
-//         .map(|c| c.to_digit(10).unwrap() as u8)
-//         .collect::<Vec<u8>>();
+    let mut decoded_data = vec![];
+    let handle = demodulator.listening(true, phy_frame::FRAME_PAYLOAD_LENGTH, &mut decoded_data);
+    let handle = time::timeout(Duration::from_secs(20), handle);
+    handle.await.unwrap_err();
 
-//     // println!("readed data: {:?}", data);
-//     let data_len = data.len();
-//     let data = read_data_2_compressed_u8(data);
-
-//     loop {
-//         // let res = demodulator.listen_frame(false, phy_frame::frame_length_length() + phy_frame::FRAME_PAYLOAD_LENGTH + phy_frame::FRAME_PREAMBLE_LENGTH, phy_frame::FRAME_LENGTH_LENGTH_REDUNDANCY).await;
-
-//         let res = match demodulator
-//             .listen_one_frame(
-//                 false,
-//                 phy_frame::frame_length_length()
-//                     + phy_frame::FRAME_PAYLOAD_LENGTH
-//                     + phy_frame::FRAME_PREAMBLE_LENGTH,
-//                 phy_frame::FRAME_LENGTH_LENGTH_REDUNDANCY,
-//             )
-//             .await
-//         {
-//             Some(data) => data,
-//             None => {
-//                 println!("error length");
-//                 continue;
-//             }
-//         };
-
-//         let mut error_num = 0;
-//         let mut index: usize = 0;
-//         while index < data_len {
-//             let byte_index = index / 8;
-
-//             if byte_index >= res.len() {
-//                 break;
-//             }
-
-//             let shift_num = 0;
-//             if index + 8 > data_len {
-//                 let shift_num = data_len - index;
-//             }
-
-//             error_num +=
-//                 ((res[byte_index] >> shift_num) ^ (data[byte_index] >> shift_num)).count_ones();
-//             index += 8;
-//         }
-
-//         println!("error rate = {}", error_num as f32 / data_len as f32);
-//     }
-// }
-
-// #[tokio::test]
-// async fn test_seconds_listening() {
-//     let mut demodulator = Demodulation2::new(
-//         vec![CARRIER],
-//         48000,
-//         "test.txt",
-//         modulation::REDUNDANT_PERIODS,
-//     );
-//     let mut debug_vec: Vec<f32> = vec![];
-
-//     let mut file = File::open("testset/data.txt").unwrap();
-//     let mut data = String::new();
-//     file.read_to_string(&mut data).unwrap();
-//     let data = data
-//         .chars()
-//         .map(|c| c.to_digit(10).unwrap() as u8)
-//         .collect::<Vec<u8>>();
-
-//     // println!("readed data: {:?}", data);
-//     let org_bits_len = data.len();
-//     let org_data = read_data_2_compressed_u8(data);
-//     let org_data_len = org_data.len();
-
-//     let mut decoded_data = vec![];
-//     let handle = demodulator.listening(
-//         true,
-//         phy_frame::frame_length_length()
-//             + phy_frame::FRAME_PAYLOAD_LENGTH
-//             + phy_frame::FRAME_PREAMBLE_LENGTH,
-//         phy_frame::FRAME_LENGTH_LENGTH_REDUNDANCY,
-//         &mut decoded_data,
-//     );
-//     let handle = time::timeout(Duration::from_secs(20), handle);
-//     handle.await;
-
-//     let mut file = File::open("test.txt").unwrap();
-//     let mut data = String::new();
-//     file.read_to_string(&mut data).unwrap();
-//     let data = data
-//         .chars()
-//         .map(|c| c.to_digit(10).unwrap() as u8)
-//         .collect::<Vec<u8>>();
-
-//     let mut error_num = 0;
-//     let mut index: usize = 0;
-//     if data.len() < org_data_len {
-//         println! {"wrong length: {}", data.len()};
-//         error_num = org_bits_len as u32
-//     } else {
-//         while index < org_bits_len {
-//             let byte_index = index / 8;
-
-//             if byte_index >= org_bits_len {
-//                 break;
-//             }
-
-//             let shift_num = 0;
-//             if index + 8 > org_bits_len {
-//                 let shift_num = org_bits_len - index;
-//             }
-
-//             error_num += ((data[byte_index] >> shift_num) ^ (org_data[byte_index] >> shift_num))
-//                 .count_ones();
-//             index += 8;
-//         }
-//     }
-//     println!("error rate = {}", error_num as f32 / org_bits_len as f32);
-// }
+    // println!("received data: {:?}", decoded_data);
+}
