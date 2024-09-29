@@ -8,7 +8,6 @@ use futures::StreamExt;
 use num_traits::pow;
 use plotters::data;
 use plotters::element::CoordMapper;
-use reed_solomon_erasure::galois_8::ReedSolomon;
 use std::collections::VecDeque;
 use std::fs::File;
 use std::io::Write;
