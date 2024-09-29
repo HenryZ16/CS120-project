@@ -99,11 +99,7 @@ pub async fn obj_3_recv_file() -> Result<u32> {
     );
 
     let mut decoded_data = vec![];
-    let handle = demodulator.listening(
-        true,
-            phy_frame::FRAME_PAYLOAD_LENGTH,
-        &mut decoded_data,
-    );
+    let handle = demodulator.listening(true, phy_frame::FRAME_PAYLOAD_LENGTH, &mut decoded_data);
     let handle = time::timeout(Duration::from_secs(15), handle);
     println!("[pa1-obj3-receive] Start");
     handle.await.unwrap_err();

@@ -7,7 +7,6 @@ pub const MAX_FRAME_DATA_LENGTH: usize = 96;
 pub const FRAME_PAYLOAD_LENGTH: usize = 216;
 pub const FRAME_LENGTH_LENGTH: usize = 12;
 
-
 pub struct PHYFrame {
     length: usize,
     payload: Vec<Hexbit>,
@@ -66,7 +65,11 @@ impl PHYFrame {
         reed_solomon::long::encode(&mut array_data);
         let payload = array_data.to_vec();
 
-        println!("[data_2_payload] payload: {:?}, length: {}", payload, payload.len());
+        println!(
+            "[data_2_payload] payload: {:?}, length: {}",
+            payload,
+            payload.len()
+        );
 
         return Ok(payload);
     }
@@ -77,6 +80,12 @@ impl PHYFrame {
         let mut array_payload: [Hexbit; 36] = payload.try_into().unwrap();
         reed_solomon::long::decode(&mut array_payload);
         let payload = array_payload.to_vec();
+
+        println!(
+            "[payload_2_data] payload: {:?}, length: {}",
+            payload,
+            payload.len()
+        );
 
         // get the length
         let length = hexbits_length_2_usize_length(payload[0..2].to_vec());
