@@ -3,8 +3,8 @@ use anyhow::{Error, Result};
 use code_rs::bits::Hexbit;
 use code_rs::coding::reed_solomon;
 
-pub const MAX_FRAME_DATA_LENGTH: usize = 96;
-pub const FRAME_PAYLOAD_LENGTH: usize = 216;
+pub const MAX_FRAME_DATA_LENGTH: usize = 72;
+pub const FRAME_PAYLOAD_LENGTH: usize = 144;
 pub const FRAME_LENGTH_LENGTH: usize = 12;
 
 pub struct PHYFrame {
@@ -15,10 +15,10 @@ pub struct PHYFrame {
 impl PHYFrame {
     // Preamble: 01010101
     // Length: <2 Hexbits>
-    // Data: <16 Hexbits>
+    // Data: <12 Hexbits>
     // Preserved for future use: <2 Hexbits>
-    // Parity: <16 Hexbits>
-    // Payload Total: <36 Hexbits>
+    // Parity: <8 Hexbits>
+    // Payload Total: <24 Hexbits>
     pub fn new(length: usize, data: Vec<Byte>) -> Self {
         let payload = PHYFrame::data_2_payload(data, length).unwrap();
         PHYFrame { length, payload }
@@ -61,8 +61,8 @@ impl PHYFrame {
         let data = hexbits_data;
 
         // RS encoding
-        let mut array_data: [Hexbit; 36] = data.try_into().unwrap();
-        reed_solomon::long::encode(&mut array_data);
+        let mut array_data: [Hexbit; 24] = data.try_into().unwrap();
+        reed_solomon::medium::encode(&mut array_data);
         let payload = array_data.to_vec();
 
         println!(
@@ -77,8 +77,8 @@ impl PHYFrame {
     // reconstruct & get back the data
     pub fn payload_2_data(payload: Vec<Hexbit>) -> Result<(Vec<Byte>, usize), Error> {
         // RS decoding
-        let mut array_payload: [Hexbit; 36] = payload.try_into().unwrap();
-        reed_solomon::long::decode(&mut array_payload);
+        let mut array_payload: [Hexbit; 24] = payload.try_into().unwrap();
+        reed_solomon::medium::decode(&mut array_payload);
         let payload = array_payload.to_vec();
 
         println!(
