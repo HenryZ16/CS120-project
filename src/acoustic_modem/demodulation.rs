@@ -507,7 +507,7 @@ impl Demodulation2 {
                         &self.demodulate_config.ref_signal[0],
                     );
 
-                    start_index += demodulate_config.ref_signal_len[0] - 1;
+                    start_index += demodulate_config.ref_signal_len[0];
 
                     tmp_bits_data.push(if dot_product >= 0.0 { 0 } else { 1 });
                 }
