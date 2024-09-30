@@ -280,7 +280,7 @@ impl Demodulation2 {
         let mut demodulate_state = DemodulationState::DetectPreamble;
 
         let mut avg_power = 0.0;
-        let power_lim_preamble = 30.0;
+        let power_lim_preamble = 5.0;
         let factor = 1.0 / 64.0;
 
         let mut tmp_buffer: VecDeque<f32> = VecDeque::with_capacity(

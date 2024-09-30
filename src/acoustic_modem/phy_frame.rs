@@ -81,11 +81,11 @@ impl PHYFrame {
         reed_solomon::medium::decode(&mut array_payload);
         let payload = array_payload.to_vec();
 
-        println!(
-            "[payload_2_data] payload: {:?}, length: {}",
-            payload,
-            payload.len()
-        );
+        // println!(
+        //     "[payload_2_data] payload: {:?}, length: {}",
+        //     payload,
+        //     payload.len()
+        // );
 
         // get the length
         let length = hexbits_length_2_usize_length(payload[0..2].to_vec());

@@ -14,7 +14,7 @@ use futures::SinkExt;
 use hound::{WavSpec, WavWriter};
 
 const SAMPLE_RATE: u32 = 48000;
-pub const REDUNDANT_PERIODS: usize = 4;
+pub const REDUNDANT_PERIODS: usize = 5;
 
 pub struct Modulator {
     carrier_freq: Vec<u32>,
