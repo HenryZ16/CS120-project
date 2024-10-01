@@ -93,9 +93,6 @@ impl DemodulationState {
         }
     }
 
-    pub fn return_detect_preamble(&self) -> Self {
-        DemodulationState::DetectPreamble
-    }
 }
 
 pub fn dot_product(input: &[f32], ref_signal: &[f32]) -> f32 {
@@ -104,79 +101,6 @@ pub fn dot_product(input: &[f32], ref_signal: &[f32]) -> f32 {
     }
 
     dot_product_iter(input.iter(), ref_signal.iter())
-}
-
-pub fn smooth(input: &[f32], window_size: i32) -> Vec<f32> {
-    let mut smoothed_input = Vec::new();
-
-    for i in 0..input.len() {
-        let mut sum = 0.0;
-        for j in i as i32 - window_size / 2..i as i32 + window_size / 2 {
-            if j < 0 {
-                sum += input[(j + input.len() as i32) as usize];
-            } else if j >= input.len() as i32 {
-                sum += input[j as usize - input.len()];
-            } else {
-                sum += input[j as usize];
-            }
-        }
-        smoothed_input.push(sum / window_size as f32);
-    }
-
-    smoothed_input
-}
-
-pub fn exponential_smooth(input: &[f32], prev_signal: &mut f32, alpha: f32) -> Vec<f32> {
-    let mut smoothed_input = Vec::new();
-
-    for i in 0..input.len() {
-        let smoothed = alpha * input[i] + (1.0 - alpha) * *prev_signal;
-        smoothed_input.push(smoothed);
-        *prev_signal = smoothed;
-    }
-    smoothed_input
-}
-
-pub fn dot_product_smooth(input: &[f32], ref_signal: &[f64], window_size: i32) -> f64 {
-    if input.len() != ref_signal.len() {
-        panic!("Input length is not equal to reference signal length");
-    }
-
-    let mut smoothed_input = Vec::new();
-
-    for i in 0..input.len() {
-        let mut sum = 0.0;
-        for j in i as i32 - window_size / 2..i as i32 + window_size / 2 {
-            if j < 0 {
-                sum += input[(j + input.len() as i32) as usize] as f64;
-            } else if j >= input.len() as i32 {
-                sum += input[j as usize - input.len()] as f64;
-            } else {
-                sum += input[j as usize] as f64;
-            }
-        }
-        smoothed_input.push(sum / window_size as f64);
-    }
-
-    dot_product_iter(smoothed_input.iter(), ref_signal.iter().map(|x| *x))
-}
-
-pub fn dot_product_exponential_smooth(
-    input: &[f32],
-    ref_signal: &[f64],
-    prev_signal: &mut f32,
-    alpha: f32,
-) -> f64 {
-    if input.len() != ref_signal.len() {
-        panic!("Input length is not equal to reference signal length");
-    }
-
-    let mut smoothed_input = exponential_smooth(input, prev_signal, alpha);
-
-    dot_product_iter(
-        smoothed_input.iter().map(|x| *x as f64),
-        ref_signal.iter().map(|x| *x),
-    )
 }
 
 pub fn dot_product_iter<I, J, T, U, V>(iter1: I, iter2: J) -> V
@@ -206,13 +130,7 @@ impl Demodulation2 {
         output_file: &str,
         redundent_times: usize,
     ) -> Self {
-        let mut redundent = 1;
-
-        if redundent_times > 1 {
-            redundent = redundent_times;
-        }
-
-        // let host = cpal::host_from_id(HostId::Asio).expect("failed to initialise ASIO host");
+        // let host = cpal::host_from_id(cpal::HostId::Asio).expect("failed to initialise ASIO host");
         let host = cpal::default_host();
         let device = host.input_devices().expect("failed to find input device");
         let device = device
@@ -417,13 +335,13 @@ impl Demodulation2 {
 
         let mut input_stream = self.input_config.create_input_stream();
         let demodulate_config = &self.demodulate_config;
-        let alpha_check = 1.0;
+        let alpha_check = 0.31;
         let mut prev = 0.0;
 
         let mut demodulate_state = DemodulationState::DetectPreamble;
 
         let mut avg_power = 0.0;
-        let power_lim_preamble = 30.0;
+        let power_lim_preamble = 10.0;
         let factor = 1.0 / 64.0;
 
         let mut tmp_buffer: VecDeque<f32> = VecDeque::with_capacity(
@@ -572,7 +490,7 @@ impl Demodulation2 {
 }
 
 fn decode(input_data: Vec<Bit>) -> Result<(Vec<Byte>, usize), Error> {
-    // println!("input data: {:?}, data length: {}", input_data, input_data.len());
+    println!("input data: {:?}, data length: {}", input_data, input_data.len());
     let hexbits = u8_2_code_rs_hexbit(read_data_2_compressed_u8(input_data));
 
     // println!("hexbits: {:?}, hexbit length: {}", hexbits, hexbits.len());

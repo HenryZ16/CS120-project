@@ -174,8 +174,8 @@ impl SimpleFrame {
 
 pub fn gen_preamble(sample_rate: u32) -> Vec<f32> {
     let start = 2e3;
-    let end = 6e3;
-    let half_length = 320;
+    let end = 8e3;
+    let half_length = 240;
     let dx: f64 = 1.0 / sample_rate as f64;
     let step = (end - start) as f64 / half_length as f64;
     let mut fp: Vec<f64> = (0..half_length).map(|i| start + i as f64 * step).collect();

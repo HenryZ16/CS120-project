@@ -15,6 +15,8 @@ async fn obj_1(host: &Host) {
         .default_input_device()
         .expect("failed to get default input device");
 
+    println!("input device: {:?}", input_device.name().unwrap());
+
     let output_device = host
         .default_output_device()
         .expect("failed to get default output device");
@@ -25,8 +27,14 @@ async fn obj_1(host: &Host) {
         1,
         SampleRate(48000),
         default_config.buffer_size().clone(),
-        default_config.sample_format(),
+        cpal::SampleFormat::I32,
     );
+
+    let support_config = input_device.supported_input_configs().unwrap();
+    println!("support config");
+    for i in support_config{
+        println!("{:?}", i);
+    }
 
     println!("config: {:?}", config);
 
