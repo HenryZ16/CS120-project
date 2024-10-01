@@ -219,9 +219,11 @@ async fn test_seconds_listening() {
     );
 
     let mut decoded_data = vec![];
-    let handle = demodulator.listening(true, phy_frame::FRAME_PAYLOAD_LENGTH, &mut decoded_data);
-    let handle = time::timeout(Duration::from_secs(20), handle);
-    handle.await.unwrap_err();
+    let mut debug_vec = vec![];
+    let handle = demodulator.listening(true, phy_frame::FRAME_PAYLOAD_LENGTH, &mut decoded_data, &mut debug_vec);
+    let handle = time::timeout(Duration::from_secs(5), handle);
+    handle.await.unwrap();
+    plot(debug_vec).unwrap();
 
     // println!("received data: {:?}", decoded_data);
 }

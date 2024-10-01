@@ -330,6 +330,7 @@ impl Demodulation2 {
         write_to_file: bool,
         data_len: usize,
         decoded_data: &mut Vec<u8>,
+        debug_vec: &mut Vec<f32>
     ) {
         let data_len = data_len;
 
@@ -386,6 +387,8 @@ impl Demodulation2 {
                         // println!("detected");
                         local_max = dot_product;
                         start_index = i + 1;
+                        debug_vec.clear();
+                        debug_vec.extend(window);
                     } else if start_index != usize::MAX
                         && i - start_index > demodulate_config.preamble_len
                         && local_max > power_lim_preamble
@@ -418,6 +421,8 @@ impl Demodulation2 {
                             [start_index..start_index + demodulate_config.ref_signal_len[0]],
                         &self.demodulate_config.ref_signal[0],
                     );
+                    debug_vec.extend(&tmp_buffer.as_slices().0
+                            [start_index..start_index + demodulate_config.ref_signal_len[0]]);
 
                     start_index += demodulate_config.ref_signal_len[0];
 
@@ -429,7 +434,7 @@ impl Demodulation2 {
             if tmp_bits_data.len() >= data_len {
                 // demodulate_state = demodulate_state.return_detect_preamble();
                 is_reboot = true;
-                demodulate_state = demodulate_state.next();
+                // demodulate_state = demodulate_state.next();
                 demodulate_state = DemodulationState::Stop;
 
                 let result = decode(tmp_bits_data);
