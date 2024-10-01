@@ -16,7 +16,7 @@ use tokio::{signal, task, time};
 
 use hound::{WavSpec, WavWriter};
 
-fn plot(modulated_signal: Vec<f32>) -> Result<(), Box<dyn std::error::Error>> {
+fn plot(modulated_signal: Vec<f32>, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
     // get the first 10000 samples
     let mut coordinates = vec![];
     for (i, sample) in modulated_signal.iter().enumerate() {
@@ -27,7 +27,7 @@ fn plot(modulated_signal: Vec<f32>) -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let drawing_area =
-        SVGBackend::new("testset/modulated_data_wave.svg", (3000, 200)).into_drawing_area();
+        SVGBackend::new(filename, (3000, 200)).into_drawing_area();
     drawing_area.fill(&WHITE).unwrap();
     let mut chart_builder = ChartBuilder::on(&drawing_area);
     chart_builder
@@ -55,15 +55,14 @@ fn plot(modulated_signal: Vec<f32>) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-#[test]
-fn test_plot() {
+fn file_plot(input_file: &str, output_file: &str) {
     // read wav from file
-    let file_path = "testset/output1.wav";
+    let file_path = input_file;
     // let file_path = "test.wav";
     let mut reader = hound::WavReader::open(file_path).unwrap();
     let data: Vec<f32> = reader.samples::<f32>().map(|s| s.unwrap()).collect();
 
-    plot(data).unwrap();
+    plot(data, output_file).unwrap();
 }
 
 #[tokio::test]
@@ -84,7 +83,7 @@ async fn test_modulation() {
     let modulated_signal = modulator.modulate(&data, 0);
 
     // show figure of the modulated_signal: Vec<f32>
-    plot(modulated_signal.clone()).unwrap();
+    plot(modulated_signal.clone(), "testset/modulated_data_wave.svg").unwrap();
 
     // send
     modulator
@@ -126,9 +125,10 @@ fn test_plot_wav() {
     root.present().unwrap();
 }
 
-const CARRIER: u32 = 2000;
+const CARRIER: u32 = 4000;
 const LEN: usize = 100;
 const REDUNDENT: usize = 3;
+const PADDING: usize = 0;
 
 #[test]
 fn test_simple_gen() {
@@ -136,9 +136,9 @@ fn test_simple_gen() {
     let sample_rate = 48000;
     let simple_frame = phy_frame::SimpleFrame::new(carrier, LEN);
 
-    let output_wav = simple_frame.into_audio(REDUNDENT);
+    let output_wav = simple_frame.into_audio(REDUNDENT, PADDING);
 
-    // plot(output_wav).unwrap();
+    plot(output_wav.clone(), "output_wav.svg").unwrap();
 
     // file write use
     let spec = WavSpec {
@@ -171,7 +171,7 @@ async fn test_simple_listen() {
 
     // println!("ref: {:?}", ref_data);
     // loop {
-        let res = demodulator.simple_listen(true, &mut debug_vec, LEN).await;
+        let res = demodulator.simple_listen(true, &mut debug_vec, LEN, PADDING).await;
         let mut diff_num = 0;
         for i in 0..ref_data.len() {
             if ref_data[i] != res[i] {
@@ -179,8 +179,8 @@ async fn test_simple_listen() {
             }
         }
 
-        println!("debug vec: {:?}", debug_vec);
-        plot(debug_vec).unwrap();
+        // println!("debug vec: {:?}", debug_vec);
+        plot(debug_vec, "recv_wav.svg").unwrap();
         println!("error percent: {}", diff_num as f32 / ref_data.len() as f32);
     // }
 }
@@ -207,6 +207,8 @@ async fn test_frame_gen() {
     let _signal = modulation
         .send_bits_2_file(data, data_len, "test.wav")
         .await;
+
+    file_plot("test.wav", "output_wav.svg");
 }
 
 #[tokio::test]
@@ -223,7 +225,7 @@ async fn test_seconds_listening() {
     let handle = demodulator.listening(true, phy_frame::FRAME_PAYLOAD_LENGTH, &mut decoded_data, &mut debug_vec);
     let handle = time::timeout(Duration::from_secs(5), handle);
     handle.await.unwrap();
-    plot(debug_vec).unwrap();
+    plot(debug_vec, "recv_wav.svg").unwrap();
 
     // println!("received data: {:?}", decoded_data);
 }

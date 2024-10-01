@@ -149,13 +149,15 @@ impl SimpleFrame {
         }
     }
 
-    pub fn into_audio(&self, redundent_times: usize) -> Vec<f32> {
+    pub fn into_audio(&self, redundent_times: usize, padding_len: usize) -> Vec<f32> {
         let mut redundent = 1;
         if redundent_times > 1 {
             redundent = redundent_times;
         }
-        let mut res: Vec<f32> = (0..100).map(|x| (2.0 * std::f32::consts::PI * x as f32 / 48000.0 * 10000 as f32).sin()).collect();
+        let mut res: Vec<f32> = (0..1000).map(|x| (2.0 * std::f32::consts::PI * x as f32 / 48000.0 * 10000 as f32).sin()).collect();
         res.extend(gen_preamble(self.sample_rate).iter());
+        let padding = vec![0.0; padding_len];
+        res.extend(padding.iter());
 
         for &bit in &self.data {
             if bit == 0 {
@@ -176,7 +178,7 @@ impl SimpleFrame {
 
 pub fn gen_preamble(sample_rate: u32) -> Vec<f32> {
     let start = 1e3;
-    let end = 8e3;
+    let end = 6e3;
     let half_length = 340;
     let dx: f64 = 1.0 / sample_rate as f64;
     let step = (end - start) as f64 / half_length as f64;

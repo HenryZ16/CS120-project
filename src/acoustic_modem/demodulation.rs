@@ -130,8 +130,8 @@ impl Demodulation2 {
         output_file: &str,
         redundent_times: usize,
     ) -> Self {
-        let host = cpal::host_from_id(cpal::HostId::Asio).expect("failed to initialise ASIO host");
-        // let host = cpal::default_host();
+        // let host = cpal::host_from_id(cpal::HostId::Asio).expect("failed to initialise ASIO host");
+        let host = cpal::default_host();
         let device = host.input_devices().expect("failed to find input device");
         let device = device
             .into_iter()
@@ -141,8 +141,8 @@ impl Demodulation2 {
 
         let default_config = device.default_input_config().unwrap();
         let config = SupportedStreamConfig::new(
-            // default_config.channels(),    
-            1,                   // mono
+            default_config.channels(),    
+            // 1,                   // mono
             SampleRate(sample_rate), // sample rate
             default_config.buffer_size().clone(),
             default_config.sample_format(),
@@ -190,18 +190,19 @@ impl Demodulation2 {
         write_to_file: bool,
         debug_vec: &mut Vec<f32>,
         data_len: usize,
+        padding_len: usize
     ) -> Vec<u8> {
         let data_len = data_len;
 
         let mut input_stream = self.input_config.create_input_stream();
         let demodulate_config = &self.demodulate_config;
-        let alpha_check = 0.31;
+        let alpha_check = 1.0;
         let mut prev = 0.0;
 
         let mut demodulate_state = DemodulationState::DetectPreamble;
 
         let mut avg_power = 0.0;
-        let power_lim_preamble = 5.0;
+        let power_lim_preamble = 1.0;
         let factor = 1.0 / 64.0;
 
         let mut tmp_buffer: VecDeque<f32> = VecDeque::with_capacity(
@@ -229,11 +230,11 @@ impl Demodulation2 {
 
 
             if demodulate_state == DemodulationState::DetectPreamble {
-                if tmp_buffer_len <= demodulate_config.preamble_len {
+                if tmp_buffer_len <= demodulate_config.preamble_len + padding_len {
                     continue;
                 }
                 tmp_buffer.make_contiguous();
-                for i in 0..tmp_buffer_len - self.demodulate_config.preamble_len - 1 {
+                for i in 0..tmp_buffer_len - self.demodulate_config.preamble_len - 1 - padding_len {
                     // let window = tmp_buffer.range(i..i+demodulate_config.preamble_len);
                     let window = &tmp_buffer.as_slices().0[i..i + demodulate_config.preamble_len];
                     let dot_product = dot_product(window, &demodulate_config.preamble);
@@ -252,7 +253,7 @@ impl Demodulation2 {
                         && local_max > power_lim_preamble
                     {
                         local_max = 0.0;
-                        start_index += demodulate_config.preamble_len - 1;
+                        start_index += demodulate_config.preamble_len - 1 + padding_len;
                         demodulate_state = demodulate_state.next();
                         println!("detected preamble");
                         break;
