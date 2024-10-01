@@ -126,8 +126,8 @@ fn test_plot_wav() {
     root.present().unwrap();
 }
 
-const CARRIER: u32 = 3000;
-const LEN: usize = 500;
+const CARRIER: u32 = 2000;
+const LEN: usize = 100;
 const REDUNDENT: usize = 3;
 
 #[test]
@@ -170,7 +170,7 @@ async fn test_simple_listen() {
     }
 
     // println!("ref: {:?}", ref_data);
-    loop {
+    // loop {
         let res = demodulator.simple_listen(true, &mut debug_vec, LEN).await;
         let mut diff_num = 0;
         for i in 0..ref_data.len() {
@@ -179,9 +179,10 @@ async fn test_simple_listen() {
             }
         }
 
-        plot(debug_vec.clone()).unwrap();
+        println!("debug vec: {:?}", debug_vec);
+        plot(debug_vec).unwrap();
         println!("error percent: {}", diff_num as f32 / ref_data.len() as f32);
-    }
+    // }
 }
 
 #[tokio::test]
