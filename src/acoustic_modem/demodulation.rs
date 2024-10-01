@@ -243,7 +243,7 @@ impl Demodulation2 {
                         && dot_product > local_max
                         && dot_product > power_lim_preamble
                     {
-                        println!("detected");
+                        // println!("detected");
                         local_max = dot_product;
                         start_index = i + 1;
                         debug_vec.clear();
