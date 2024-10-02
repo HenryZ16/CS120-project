@@ -1,28 +1,17 @@
 use crate::acoustic_modem::phy_frame::{self, PHYFrame};
 use crate::asio_stream::InputAudioStream;
 use crate::utils::{
-    self, read_compressed_u8_2_data, read_data_2_compressed_u8, u8_2_code_rs_hexbit, Bit, Byte,
+    read_compressed_u8_2_data, read_data_2_compressed_u8, u8_2_code_rs_hexbit, Bit, Byte,
 };
 use anyhow::Error;
+use biquad::{Biquad, Coefficients, DirectForm1, ToHertz, Type::BandPass};
 use cpal::traits::{DeviceTrait, HostTrait};
 use cpal::{Device, SampleRate, SupportedStreamConfig};
 use futures::StreamExt;
-use num_traits::pow;
-use plotters::data;
-use plotters::element::CoordMapper;
 use std::collections::VecDeque;
 use std::fs::File;
 use std::io::Write;
 use std::ops::{Add, Mul};
-use std::sync::Arc;
-use std::vec;
-use tokio::select;
-use tokio::{
-    sync::{oneshot, Mutex},
-    time::{timeout, Duration},
-};
-
-use super::modulation::{self, Modulator};
 
 struct InputStreamConfig {
     config: SupportedStreamConfig,
@@ -92,7 +81,6 @@ impl DemodulationState {
             DemodulationState::Stop => DemodulationState::Stop,
         }
     }
-
 }
 
 pub fn dot_product(input: &[f32], ref_signal: &[f32]) -> f32 {
@@ -141,7 +129,7 @@ impl Demodulation2 {
 
         let default_config = device.default_input_config().unwrap();
         let config = SupportedStreamConfig::new(
-            default_config.channels(),    
+            default_config.channels(),
             // 1,                   // mono
             SampleRate(sample_rate), // sample rate
             default_config.buffer_size().clone(),
@@ -190,7 +178,7 @@ impl Demodulation2 {
         write_to_file: bool,
         debug_vec: &mut Vec<f32>,
         data_len: usize,
-        padding_len: usize
+        padding_len: usize,
     ) -> Vec<u8> {
         let data_len = data_len;
 
@@ -219,6 +207,18 @@ impl Demodulation2 {
         let channels = self.input_config.config.channels() as usize;
         // let mut res = vec![];
 
+        let low_cutoff = 1000.0;
+        let high_cutoff = 9000.0;
+        let coeffs = Coefficients::<f32>::from_params(
+            BandPass,
+            demodulate_config.sample_rate.hz(),
+            ((high_cutoff + low_cutoff) / 2.0).hz(),
+            high_cutoff - low_cutoff,
+        )
+        .unwrap();
+        
+        let mut filter = DirectForm1::<f32>::new(coeffs);
+
         while let Some(data) = input_stream.next().await {
             if demodulate_state == DemodulationState::Stop {
                 break;
@@ -226,8 +226,8 @@ impl Demodulation2 {
 
             // debug_vec.extend(data.clone().iter());
             tmp_buffer_len += data.len() / channels;
+            // let data = data.iter().map(|&sample| filter.run(sample)).collect();
             move_data_into_buffer(data, &mut tmp_buffer, alpha_check, channels, &mut prev);
-
 
             if demodulate_state == DemodulationState::DetectPreamble {
                 if tmp_buffer_len <= demodulate_config.preamble_len + padding_len {
@@ -277,7 +277,10 @@ impl Demodulation2 {
                             [start_index..start_index + demodulate_config.ref_signal_len[0]],
                         &self.demodulate_config.ref_signal[0],
                     );
-                    debug_vec.extend(tmp_buffer.range(start_index..start_index + demodulate_config.ref_signal_len[0]));
+                    debug_vec.extend(
+                        tmp_buffer
+                            .range(start_index..start_index + demodulate_config.ref_signal_len[0]),
+                    );
 
                     start_index += demodulate_config.ref_signal_len[0];
 
@@ -331,7 +334,7 @@ impl Demodulation2 {
         write_to_file: bool,
         data_len: usize,
         decoded_data: &mut Vec<u8>,
-        debug_vec: &mut Vec<f32>
+        debug_vec: &mut Vec<f32>,
     ) {
         let data_len = data_len;
 
@@ -382,9 +385,7 @@ impl Demodulation2 {
                     let window = &tmp_buffer.as_slices().0[i..i + demodulate_config.preamble_len];
                     let dot_product = dot_product(window, &demodulate_config.preamble);
 
-                    if dot_product > local_max
-                        && dot_product > power_lim_preamble
-                    {
+                    if dot_product > local_max && dot_product > power_lim_preamble {
                         // println!("detected");
                         local_max = dot_product;
                         start_index = i + 1;
@@ -422,8 +423,10 @@ impl Demodulation2 {
                             [start_index..start_index + demodulate_config.ref_signal_len[0]],
                         &self.demodulate_config.ref_signal[0],
                     );
-                    debug_vec.extend(&tmp_buffer.as_slices().0
-                            [start_index..start_index + demodulate_config.ref_signal_len[0]]);
+                    debug_vec.extend(
+                        &tmp_buffer.as_slices().0
+                            [start_index..start_index + demodulate_config.ref_signal_len[0]],
+                    );
 
                     start_index += demodulate_config.ref_signal_len[0];
 
@@ -492,19 +495,29 @@ impl Demodulation2 {
 }
 
 fn decode(input_data: Vec<Bit>) -> Result<(Vec<Byte>, usize), Error> {
-    println!("input data: {:?}, data length: {}", input_data, input_data.len());
+    println!(
+        "input data: {:?}, data length: {}",
+        input_data,
+        input_data.len()
+    );
     let hexbits = u8_2_code_rs_hexbit(read_data_2_compressed_u8(input_data));
 
     // println!("hexbits: {:?}, hexbit length: {}", hexbits, hexbits.len());
     PHYFrame::payload_2_data(hexbits)
 }
 
-fn move_data_into_buffer(data: Vec<f32>, buffer: &mut VecDeque<f32>, smooth_alpha: f32, channels: usize, prev: &mut f32){
+fn move_data_into_buffer(
+    data: Vec<f32>,
+    buffer: &mut VecDeque<f32>,
+    smooth_alpha: f32,
+    channels: usize,
+    prev: &mut f32,
+) {
     for (index, &i) in data.iter().enumerate() {
-        if index % channels == 0{
+        if index % channels == 0 {
             let processed_signal = i * smooth_alpha + *prev * (1.0 - smooth_alpha);
             *prev = i;
-            buffer.push_back(processed_signal);                    
+            buffer.push_back(processed_signal);
         }
     }
 }

@@ -1,18 +1,14 @@
 use std::fs::File;
-use std::io::{Read, Write};
+use std::io::Read;
 use std::time::Duration;
-use std::{error, result, vec};
+use std::vec;
 
-use crate::acoustic_modem::demodulation::{dot_product_iter, Demodulation2};
+use crate::acoustic_modem::demodulation::Demodulation2;
 use crate::acoustic_modem::modulation::Modulator;
-use crate::acoustic_modem::{self, demodulation, modulation, phy_frame};
+use crate::acoustic_modem::{modulation, phy_frame};
 use crate::utils::{self, read_data_2_compressed_u8};
-use plotters::{data, prelude::*};
-use rand::thread_rng;
-use rand::Rng;
-use rand_distr::Normal;
-use tokio::time::sleep;
-use tokio::{signal, task, time};
+use plotters::prelude::*;
+use tokio::time;
 
 use hound::{WavSpec, WavWriter};
 
@@ -35,7 +31,7 @@ fn plot(modulated_signal: Vec<f32>, filename: &str) -> Result<(), Box<dyn std::e
         .set_left_and_bottom_label_area_size(20);
 
     let mut chart_context = chart_builder
-        .build_cartesian_2d(0.0..10000.0, -1.1..1.1)
+        .build_cartesian_2d(0.0..10000.0, -0.4..0.4)
         .unwrap();
     chart_context.configure_mesh().draw().unwrap();
 
@@ -125,9 +121,9 @@ fn test_plot_wav() {
     root.present().unwrap();
 }
 
-const CARRIER: u32 = 6000;
+const CARRIER: u32 = 3000;
 const LEN: usize = 100;
-const REDUNDENT: usize = 4;
+const REDUNDENT: usize = 2;
 const PADDING: usize = 0;
 
 #[test]
@@ -170,7 +166,7 @@ async fn test_simple_listen() {
     }
 
     // println!("ref: {:?}", ref_data);
-    loop {
+    // loop {
         let res = demodulator.simple_listen(true, &mut debug_vec, LEN, PADDING).await;
         let mut diff_num = 0;
         for i in 0..ref_data.len() {
@@ -180,9 +176,9 @@ async fn test_simple_listen() {
         }
 
         // println!("debug vec: {:?}", debug_vec);
-        // plot(debug_vec, "recv_wav.svg").unwrap();
+        plot(debug_vec, "recv_wav.svg").unwrap();
         println!("error percent: {}", diff_num as f32 / ref_data.len() as f32);
-    }
+    // }
 }
 
 #[tokio::test]
