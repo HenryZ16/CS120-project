@@ -14,7 +14,7 @@ use std::fs::File;
 use std::io::Read;
 use std::vec;
 
-const CARRIER: u32 = 8000;
+const CARRIER: u32 = 2000;
 const SAMPLE_RATE: u32 = 48000;
 
 pub async fn obj_2() -> Result<u32> {

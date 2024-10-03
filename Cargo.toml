@@ -22,7 +22,6 @@ rand_distr = "0.4"
 rustflags = ["-Awarnings"]
 
 [profile.release]
-codegen-units = 1
 lto = "fat"
 panic = "abort"
 opt-level = 3

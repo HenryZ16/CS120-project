@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::vec;
 
 /*
 Input data
@@ -84,23 +85,15 @@ impl Modulator {
             .unwrap();
     }
 
-    // [Preamble : 8][Payload : 36 x 6 = 216]
-    // for each frame:
-    //   - split the data into 96 bits for each frame
-    //   - get the whole frame bits
-    //   - modulate the bits
-    //   - send the modulated signal
-    // @param data: the input data in compressed u8 format
-    // @param len: the length of the input data indicating the number of bits (before compression)
-    pub async fn send_bits(&mut self, data: Vec<Byte>, len: isize) -> VecDeque<Vec<f32>> {
+    pub async fn bits_2_wave(&mut self, data: Vec<Byte>, len: isize) -> Vec<f32> {
         // TODO: impl OFDM
         println!("[send_bits] send bits: {:?}", len);
+
+        let mut modulated_signal: Vec<f32> = vec![];
         let mut len = len;
         let mut loop_cnt = 0;
-        len -= phy_frame::MAX_FRAME_DATA_LENGTH as isize;
 
-        // for debug
-        let mut output = VecDeque::new();
+        len -= phy_frame::MAX_FRAME_DATA_LENGTH as isize;
 
         while len > 0 {
             let mut payload = vec![];
@@ -111,41 +104,32 @@ impl Modulator {
             let frame_bits = frame.get_whole_frame_bits();
             let decompressed_data = utils::read_compressed_u8_2_data(frame_bits);
             println!(
-                "[send_bits] decompressed_data.len(): {}",
+                "[bits_2_wave] decompressed_data.len(): {}",
                 decompressed_data.len()
             );
             let modulated_psk_signal = self.modulate(&decompressed_data, 0);
 
             // add FSK preamble
             let preamble = phy_frame::gen_preamble(self.sample_rate);
-            let mut modulated_signal = preamble.clone();
+            modulated_signal.extend(preamble.clone());
             modulated_signal.extend(modulated_psk_signal.clone());
 
             println!(
-                "[send_bits] modulated_signal.len(): {}",
+                "[bits_2_wave] modulated_signal.len(): {}",
                 modulated_signal.len()
             );
 
-            // for debug
-            output.push_back(modulated_signal.clone());
-
-            self.output_stream
-                .send(AudioTrack::new(
-                    modulated_signal.into_iter(),
-                    self.config.clone(),
-                ))
-                .await
-                .unwrap();
             len -= phy_frame::MAX_FRAME_DATA_LENGTH as isize;
             loop_cnt += 1;
 
             // wait for a while
             // tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
+            modulated_signal.extend(vec![0.0; 48]);
         }
 
         // send the last frame
         len += phy_frame::MAX_FRAME_DATA_LENGTH as isize;
-        println!("[send_bits] remaining len: {:?}", len);
+        println!("[bits_2_wave] remaining len: {:?}", len);
         let mut payload = vec![];
         for i in 0..((len + 7) / 8) {
             payload.push(data[i as usize + loop_cnt * (phy_frame::MAX_FRAME_DATA_LENGTH / 8)]);
@@ -154,20 +138,38 @@ impl Modulator {
         let frame_bits = frame.get_whole_frame_bits();
         let decompressed_data = utils::read_compressed_u8_2_data(frame_bits);
         println!(
-            "[send_bits] decompressed_data.len(): {}",
+            "[bits_2_wave] decompressed_data.len(): {}",
             decompressed_data.len()
         );
         let modulated_psk_signal = self.modulate(&decompressed_data, 0);
 
         // add FSK preamble
         let preamble = phy_frame::gen_preamble(self.sample_rate);
-        let mut modulated_signal = preamble.clone();
+        modulated_signal.extend(preamble.clone());
         modulated_signal.extend(modulated_psk_signal.clone());
 
         println!(
-            "[send_bits] modulated_signal.len(): {}",
+            "[bits_2_wave] modulated_signal.len(): {}",
             modulated_signal.len()
         );
+        println!("[bits_2_wave] send {} frames", loop_cnt + 1);
+
+        return modulated_signal;
+    }
+
+    // [Preamble : 8][Payload : 36 x 6 = 216]
+    // for each frame:
+    //   - split the data into 96 bits for each frame
+    //   - get the whole frame bits
+    //   - modulate the bits
+    //   - send the modulated signal
+    // @param data: the input data in compressed u8 format
+    // @param len: the length of the input data indicating the number of bits (before compression)
+    pub async fn send_bits(&mut self, data: Vec<Byte>, len: isize) -> VecDeque<Vec<f32>> {
+        // for debug
+        let mut output = VecDeque::new();
+
+        let modulated_signal: Vec<f32> = self.bits_2_wave(data, len).await;
 
         // for debug
         output.push_back(modulated_signal.clone());
@@ -179,7 +181,6 @@ impl Modulator {
             ))
             .await
             .unwrap();
-        println!("[send_bits] send {} frames", loop_cnt + 1);
 
         // for debug
         return output;
@@ -191,14 +192,13 @@ impl Modulator {
         len: isize,
         filename: &str,
     ) -> VecDeque<Vec<f32>> {
-        // TODO: impl OFDM
-        println!("[send_bits] send bits: {:?}", len);
-        let mut len = len;
-        let mut loop_cnt = 0;
-        len -= phy_frame::MAX_FRAME_DATA_LENGTH as isize;
-
         // for debug
         let mut output = VecDeque::new();
+
+        let modulated_signal: Vec<f32> = self.bits_2_wave(data, len).await;
+
+        // for debug
+        output.push_back(modulated_signal.clone());
 
         // file write use
         let spec = WavSpec {
@@ -209,75 +209,10 @@ impl Modulator {
         };
         let mut writer = WavWriter::create(filename, spec).unwrap();
 
-        while len > 0 {
-            let mut payload = vec![];
-            for i in 0..(phy_frame::MAX_FRAME_DATA_LENGTH / 8) {
-                payload.push(data[i + loop_cnt * (phy_frame::MAX_FRAME_DATA_LENGTH / 8)]);
-            }
-            let frame = phy_frame::PHYFrame::new(phy_frame::MAX_FRAME_DATA_LENGTH, payload);
-            let frame_bits = frame.get_whole_frame_bits();
-            let decompressed_data = utils::read_compressed_u8_2_data(frame_bits);
-            println!(
-                "[send_bits] decompressed_data.len(): {}",
-                decompressed_data.len()
-            );
-            let modulated_psk_signal = self.modulate(&decompressed_data, 0);
-
-            // add FSK preamble
-            let preamble = phy_frame::gen_preamble(self.sample_rate);
-            let mut modulated_signal = preamble.clone();
-            modulated_signal.extend(modulated_psk_signal.clone());
-            println!(
-                "[send_bits] modulated_signal.len(): {}",
-                modulated_signal.len()
-            );
-
-            // for debug
-            output.push_back(modulated_signal.clone());
-
-            for i in 0..100 {
-                modulated_signal.push(0.0);
-            }
-
-            // write to wav file
-            for sample in modulated_signal {
-                writer.write_sample(sample).unwrap();
-            }
-
-            len -= phy_frame::MAX_FRAME_DATA_LENGTH as isize;
-            loop_cnt += 1;
-        }
-
-        // send the last frame
-        len += phy_frame::MAX_FRAME_DATA_LENGTH as isize;
-        println!("[send_bits] remaining len: {:?}", len);
-        let mut payload = vec![];
-        for i in 0..((len + 7) / 8) {
-            payload.push(data[i as usize + loop_cnt * (phy_frame::MAX_FRAME_DATA_LENGTH / 8)]);
-        }
-        let frame = phy_frame::PHYFrame::new(len as usize, payload);
-        let frame_bits = frame.get_whole_frame_bits();
-        let modulated_psk_signal = self.modulate(&utils::read_compressed_u8_2_data(frame_bits), 0);
-
-        // add FSK preamble
-        let preamble = phy_frame::gen_preamble(self.sample_rate);
-        let mut modulated_signal = preamble.clone();
-        modulated_signal.extend(modulated_psk_signal.clone());
-
-        println!(
-            "[send_bits] modulated_signal.len(): {}",
-            modulated_signal.len()
-        );
-
-        // for debug
-        output.push_back(modulated_signal.clone());
-
         // write to wav file
         for sample in modulated_signal {
             writer.write_sample(sample).unwrap();
         }
-        println!("[send_bits] send {} frames", loop_cnt + 1);
-
         writer.finalize().unwrap();
 
         // for debug
