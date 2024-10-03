@@ -15,6 +15,8 @@ async fn obj_1(host: &Host) {
         .default_input_device()
         .expect("failed to get default input device");
 
+    println!("input device: {:?}", input_device.name().unwrap());
+
     let output_device = host
         .default_output_device()
         .expect("failed to get default output device");
@@ -25,8 +27,14 @@ async fn obj_1(host: &Host) {
         1,
         SampleRate(48000),
         default_config.buffer_size().clone(),
-        default_config.sample_format(),
+        cpal::SampleFormat::I32,
     );
+
+    let support_config = input_device.supported_input_configs().unwrap();
+    println!("support config");
+    for i in support_config{
+        println!("{:?}", i);
+    }
 
     println!("config: {:?}", config);
 
@@ -112,7 +120,7 @@ async fn obj_2(host: &Host) {
 
 pub async fn pa0(sel: i32) -> Result<u32> {
     let host = cpal::default_host();
-    // let host = cpal::host_from_id(cpal::available_hosts()[1]).unwrap();
+    let host = cpal::host_from_id(cpal::HostId::Asio).unwrap();
     let available_sel = vec![0, 1, 2];
     if !available_sel.contains(&sel) {
         return Err(Error::msg("Invalid selection"));

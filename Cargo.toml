@@ -17,6 +17,7 @@ rodio = "0.19"
 cpal = { version = "*", features = ["asio"] }
 rand = "0.8"
 rand_distr = "0.4"
+biquad = "0.3"
 
 [build]
 rustflags = ["-Awarnings"]
@@ -24,4 +25,4 @@ rustflags = ["-Awarnings"]
 [profile.release]
 lto = "fat"
 panic = "abort"
-opt-level = 3
+opt-level = 0

@@ -1,28 +1,17 @@
 use crate::acoustic_modem::phy_frame::{self, PHYFrame};
 use crate::asio_stream::InputAudioStream;
 use crate::utils::{
-    self, read_compressed_u8_2_data, read_data_2_compressed_u8, u8_2_code_rs_hexbit, Bit, Byte,
+    read_compressed_u8_2_data, read_data_2_compressed_u8, u8_2_code_rs_hexbit, Bit, Byte,
 };
 use anyhow::Error;
+use biquad::{Biquad, Coefficients, DirectForm1, ToHertz, Type::BandPass};
 use cpal::traits::{DeviceTrait, HostTrait};
 use cpal::{Device, SampleRate, SupportedStreamConfig};
 use futures::StreamExt;
-use num_traits::pow;
-use plotters::data;
-use plotters::element::CoordMapper;
 use std::collections::VecDeque;
 use std::fs::File;
 use std::io::Write;
 use std::ops::{Add, Mul};
-use std::sync::Arc;
-use std::vec;
-use tokio::select;
-use tokio::{
-    sync::{oneshot, Mutex},
-    time::{timeout, Duration},
-};
-
-use super::modulation::{self, Modulator};
 
 struct InputStreamConfig {
     config: SupportedStreamConfig,
@@ -92,10 +81,6 @@ impl DemodulationState {
             DemodulationState::Stop => DemodulationState::Stop,
         }
     }
-
-    pub fn return_detect_preamble(&self) -> Self {
-        DemodulationState::DetectPreamble
-    }
 }
 
 pub fn dot_product(input: &[f32], ref_signal: &[f32]) -> f32 {
@@ -104,79 +89,6 @@ pub fn dot_product(input: &[f32], ref_signal: &[f32]) -> f32 {
     }
 
     dot_product_iter(input.iter(), ref_signal.iter())
-}
-
-pub fn smooth(input: &[f32], window_size: i32) -> Vec<f32> {
-    let mut smoothed_input = Vec::new();
-
-    for i in 0..input.len() {
-        let mut sum = 0.0;
-        for j in i as i32 - window_size / 2..i as i32 + window_size / 2 {
-            if j < 0 {
-                sum += input[(j + input.len() as i32) as usize];
-            } else if j >= input.len() as i32 {
-                sum += input[j as usize - input.len()];
-            } else {
-                sum += input[j as usize];
-            }
-        }
-        smoothed_input.push(sum / window_size as f32);
-    }
-
-    smoothed_input
-}
-
-pub fn exponential_smooth(input: &[f32], prev_signal: &mut f32, alpha: f32) -> Vec<f32> {
-    let mut smoothed_input = Vec::new();
-
-    for i in 0..input.len() {
-        let smoothed = alpha * input[i] + (1.0 - alpha) * *prev_signal;
-        smoothed_input.push(smoothed);
-        *prev_signal = smoothed;
-    }
-    smoothed_input
-}
-
-pub fn dot_product_smooth(input: &[f32], ref_signal: &[f64], window_size: i32) -> f64 {
-    if input.len() != ref_signal.len() {
-        panic!("Input length is not equal to reference signal length");
-    }
-
-    let mut smoothed_input = Vec::new();
-
-    for i in 0..input.len() {
-        let mut sum = 0.0;
-        for j in i as i32 - window_size / 2..i as i32 + window_size / 2 {
-            if j < 0 {
-                sum += input[(j + input.len() as i32) as usize] as f64;
-            } else if j >= input.len() as i32 {
-                sum += input[j as usize - input.len()] as f64;
-            } else {
-                sum += input[j as usize] as f64;
-            }
-        }
-        smoothed_input.push(sum / window_size as f64);
-    }
-
-    dot_product_iter(smoothed_input.iter(), ref_signal.iter().map(|x| *x))
-}
-
-pub fn dot_product_exponential_smooth(
-    input: &[f32],
-    ref_signal: &[f64],
-    prev_signal: &mut f32,
-    alpha: f32,
-) -> f64 {
-    if input.len() != ref_signal.len() {
-        panic!("Input length is not equal to reference signal length");
-    }
-
-    let mut smoothed_input = exponential_smooth(input, prev_signal, alpha);
-
-    dot_product_iter(
-        smoothed_input.iter().map(|x| *x as f64),
-        ref_signal.iter().map(|x| *x),
-    )
 }
 
 pub fn dot_product_iter<I, J, T, U, V>(iter1: I, iter2: J) -> V
@@ -206,13 +118,7 @@ impl Demodulation2 {
         output_file: &str,
         redundent_times: usize,
     ) -> Self {
-        let mut redundent = 1;
-
-        if redundent_times > 1 {
-            redundent = redundent_times;
-        }
-
-        // let host = cpal::host_from_id(HostId::Asio).expect("failed to initialise ASIO host");
+        // let host = cpal::host_from_id(cpal::HostId::Asio).expect("failed to initialise ASIO host");
         let host = cpal::default_host();
         let device = host.input_devices().expect("failed to find input device");
         let device = device
@@ -223,11 +129,14 @@ impl Demodulation2 {
 
         let default_config = device.default_input_config().unwrap();
         let config = SupportedStreamConfig::new(
-            1,                       // mono
+            default_config.channels(),
+            // 1,                   // mono
             SampleRate(sample_rate), // sample rate
             default_config.buffer_size().clone(),
             default_config.sample_format(),
         );
+
+        println!("config: {:?}", config);
 
         let input_stream_config = InputStreamConfig::new(config, device);
 
@@ -269,18 +178,19 @@ impl Demodulation2 {
         write_to_file: bool,
         debug_vec: &mut Vec<f32>,
         data_len: usize,
+        padding_len: usize,
     ) -> Vec<u8> {
         let data_len = data_len;
 
         let mut input_stream = self.input_config.create_input_stream();
         let demodulate_config = &self.demodulate_config;
-        let alpha_check = 0.31;
+        let alpha_check = 1.0;
         let mut prev = 0.0;
 
         let mut demodulate_state = DemodulationState::DetectPreamble;
 
         let mut avg_power = 0.0;
-        let power_lim_preamble = 30.0;
+        let power_lim_preamble = 1.0;
         let factor = 1.0 / 64.0;
 
         let mut tmp_buffer: VecDeque<f32> = VecDeque::with_capacity(
@@ -294,7 +204,20 @@ impl Demodulation2 {
         let mut start_index = usize::MAX;
 
         let mut tmp_bits_data = Vec::with_capacity(data_len);
+        let channels = self.input_config.config.channels() as usize;
         // let mut res = vec![];
+
+        let low_cutoff = 1000.0;
+        let high_cutoff = 9000.0;
+        let coeffs = Coefficients::<f32>::from_params(
+            BandPass,
+            demodulate_config.sample_rate.hz(),
+            ((high_cutoff + low_cutoff) / 2.0).hz(),
+            high_cutoff - low_cutoff,
+        )
+        .unwrap();
+        
+        let mut filter = DirectForm1::<f32>::new(coeffs);
 
         while let Some(data) = input_stream.next().await {
             if demodulate_state == DemodulationState::Stop {
@@ -302,20 +225,16 @@ impl Demodulation2 {
             }
 
             // debug_vec.extend(data.clone().iter());
-            tmp_buffer_len += data.len();
-            for i in data {
-                avg_power = avg_power * (1.0 - factor) + i.abs() as f32 * factor;
-                let processed_signal = i * alpha_check + prev * (1.0 - alpha_check);
-                prev = i;
-                tmp_buffer.push_back(processed_signal);
-            }
+            tmp_buffer_len += data.len() / channels;
+            // let data = data.iter().map(|&sample| filter.run(sample)).collect();
+            move_data_into_buffer(data, &mut tmp_buffer, alpha_check, channels, &mut prev);
 
             if demodulate_state == DemodulationState::DetectPreamble {
-                if tmp_buffer_len <= demodulate_config.preamble_len {
+                if tmp_buffer_len <= demodulate_config.preamble_len + padding_len {
                     continue;
                 }
                 tmp_buffer.make_contiguous();
-                for i in 0..tmp_buffer_len - self.demodulate_config.preamble_len - 1 {
+                for i in 0..tmp_buffer_len - self.demodulate_config.preamble_len - 1 - padding_len {
                     // let window = tmp_buffer.range(i..i+demodulate_config.preamble_len);
                     let window = &tmp_buffer.as_slices().0[i..i + demodulate_config.preamble_len];
                     let dot_product = dot_product(window, &demodulate_config.preamble);
@@ -324,17 +243,17 @@ impl Demodulation2 {
                         && dot_product > local_max
                         && dot_product > power_lim_preamble
                     {
-                        println!("detected");
+                        // println!("detected");
                         local_max = dot_product;
                         start_index = i + 1;
-                        // debug_vec.clear();
-                        // debug_vec.extend(window);
+                        debug_vec.clear();
+                        debug_vec.extend(window);
                     } else if start_index != usize::MAX
                         && i - start_index > demodulate_config.preamble_len
                         && local_max > power_lim_preamble
                     {
                         local_max = 0.0;
-                        start_index += demodulate_config.preamble_len - 1;
+                        start_index += demodulate_config.preamble_len - 1 + padding_len;
                         demodulate_state = demodulate_state.next();
                         println!("detected preamble");
                         break;
@@ -358,17 +277,20 @@ impl Demodulation2 {
                             [start_index..start_index + demodulate_config.ref_signal_len[0]],
                         &self.demodulate_config.ref_signal[0],
                     );
-                    // debug_vec.extend(tmp_buffer.range(start_index..start_index + demodulate_config.ref_signal_len[0]));
+                    debug_vec.extend(
+                        tmp_buffer
+                            .range(start_index..start_index + demodulate_config.ref_signal_len[0]),
+                    );
 
                     start_index += demodulate_config.ref_signal_len[0];
 
                     tmp_bits_data.push(if dot_product >= 0.0 { 0 } else { 1 });
                 }
-                println!("current recv length: {}", tmp_bits_data.len());
+                // println!("current recv length: {}", tmp_bits_data.len());
             }
 
             if tmp_bits_data.len() >= data_len {
-                demodulate_state = demodulate_state.next();
+                demodulate_state = DemodulationState::Stop;
             }
 
             let pop_times = if start_index == usize::MAX {
@@ -387,7 +309,7 @@ impl Demodulation2 {
                 0
             };
             tmp_buffer_len = tmp_buffer.len();
-            println!("tmp buffer len: {}", tmp_buffer_len);
+            // println!("tmp buffer len: {}", tmp_buffer_len);
         }
 
         if write_to_file {
@@ -412,19 +334,18 @@ impl Demodulation2 {
         write_to_file: bool,
         data_len: usize,
         decoded_data: &mut Vec<u8>,
+        debug_vec: &mut Vec<f32>,
     ) {
         let data_len = data_len;
 
         let mut input_stream = self.input_config.create_input_stream();
         let demodulate_config = &self.demodulate_config;
-        let alpha_check = 1.0;
+        let alpha_check = 0.31;
         let mut prev = 0.0;
 
         let mut demodulate_state = DemodulationState::DetectPreamble;
 
-        let mut avg_power = 0.0;
-        let power_lim_preamble = 30.0;
-        let factor = 1.0 / 64.0;
+        let power_lim_preamble = 5.0;
 
         let mut tmp_buffer: VecDeque<f32> = VecDeque::with_capacity(
             5 * demodulate_config
@@ -440,17 +361,14 @@ impl Demodulation2 {
 
         let mut is_reboot = false;
 
+        let channels = self.input_config.config.channels() as usize;
+
         while let Some(data) = input_stream.next().await {
             if demodulate_state == DemodulationState::Stop {
                 break;
             }
-            tmp_buffer_len += data.len();
-            for i in data {
-                avg_power = avg_power * (1.0 - factor) + i.abs() as f32 * factor;
-                let processed_signal = i * alpha_check + prev * (1.0 - alpha_check);
-                prev = i;
-                tmp_buffer.push_back(processed_signal);
-            }
+            tmp_buffer_len += data.len() / channels;
+            move_data_into_buffer(data, &mut tmp_buffer, alpha_check, channels, &mut prev);
 
             // tmp_buffer.extend(data.iter());
 
@@ -467,13 +385,12 @@ impl Demodulation2 {
                     let window = &tmp_buffer.as_slices().0[i..i + demodulate_config.preamble_len];
                     let dot_product = dot_product(window, &demodulate_config.preamble);
 
-                    if dot_product > avg_power * 2.0
-                        && dot_product > local_max
-                        && dot_product > power_lim_preamble
-                    {
+                    if dot_product > local_max && dot_product > power_lim_preamble {
                         // println!("detected");
                         local_max = dot_product;
                         start_index = i + 1;
+                        debug_vec.clear();
+                        debug_vec.extend(window);
                     } else if start_index != usize::MAX
                         && i - start_index > demodulate_config.preamble_len
                         && local_max > power_lim_preamble
@@ -506,6 +423,10 @@ impl Demodulation2 {
                             [start_index..start_index + demodulate_config.ref_signal_len[0]],
                         &self.demodulate_config.ref_signal[0],
                     );
+                    debug_vec.extend(
+                        &tmp_buffer.as_slices().0
+                            [start_index..start_index + demodulate_config.ref_signal_len[0]],
+                    );
 
                     start_index += demodulate_config.ref_signal_len[0];
 
@@ -517,8 +438,8 @@ impl Demodulation2 {
             if tmp_bits_data.len() >= data_len {
                 // demodulate_state = demodulate_state.return_detect_preamble();
                 is_reboot = true;
-                demodulate_state = demodulate_state.next();
-                // demodulate_state = DemodulationState::Stop;
+                // demodulate_state = demodulate_state.next();
+                demodulate_state = DemodulationState::Stop;
 
                 let result = decode(tmp_bits_data);
                 tmp_bits_data = Vec::with_capacity(data_len);
@@ -567,14 +488,36 @@ impl Demodulation2 {
                 0
             };
             tmp_buffer_len = tmp_buffer.len();
+
+            // println!("buffer len: {}", tmp_buffer_len);
         }
     }
 }
 
 fn decode(input_data: Vec<Bit>) -> Result<(Vec<Byte>, usize), Error> {
-    // println!("input data: {:?}, data length: {}", input_data, input_data.len());
+    println!(
+        "input data: {:?}, data length: {}",
+        input_data,
+        input_data.len()
+    );
     let hexbits = u8_2_code_rs_hexbit(read_data_2_compressed_u8(input_data));
 
     // println!("hexbits: {:?}, hexbit length: {}", hexbits, hexbits.len());
     PHYFrame::payload_2_data(hexbits)
+}
+
+fn move_data_into_buffer(
+    data: Vec<f32>,
+    buffer: &mut VecDeque<f32>,
+    smooth_alpha: f32,
+    channels: usize,
+    prev: &mut f32,
+) {
+    for (index, &i) in data.iter().enumerate() {
+        if index % channels == 0 {
+            let processed_signal = i * smooth_alpha + *prev * (1.0 - smooth_alpha);
+            *prev = i;
+            buffer.push_back(processed_signal);
+        }
+    }
 }
