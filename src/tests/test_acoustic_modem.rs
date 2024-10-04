@@ -3,7 +3,7 @@ use std::io::Read;
 use std::time::Duration;
 use std::vec;
 
-use crate::acoustic_modem::demodulation::Demodulation2;
+use crate::acoustic_modem::demodulation::{self, Demodulation2};
 use crate::acoustic_modem::modulation::Modulator;
 use crate::acoustic_modem::{modulation, phy_frame};
 use crate::utils::{self, read_data_2_compressed_u8};
@@ -31,7 +31,7 @@ fn plot(modulated_signal: Vec<f32>, filename: &str) -> Result<(), Box<dyn std::e
         .set_left_and_bottom_label_area_size(20);
 
     let mut chart_context = chart_builder
-        .build_cartesian_2d(0.0..10000.0, -0.4..0.4)
+        .build_cartesian_2d(0.0..10000.0, -1.1..1.1)
         .unwrap();
     chart_context.configure_mesh().draw().unwrap();
 
@@ -121,7 +121,7 @@ fn test_plot_wav() {
     root.present().unwrap();
 }
 
-const CARRIER: u32 = 3000;
+const CARRIER: u32 = 2000;
 const LEN: usize = 100;
 const REDUNDENT: usize = 2;
 const PADDING: usize = 0;
@@ -224,4 +224,41 @@ async fn test_seconds_listening() {
     plot(debug_vec, "recv_wav.svg").unwrap();
 
     // println!("received data: {:?}", decoded_data);
+}
+
+#[tokio::test]
+async fn test_ofdm_gen() {
+    let mut modulation = Modulator::new(vec![CARRIER, CARRIER*2], 48000, true);
+
+    let data = vec![0,1,1,0,1,0,0,1,0,1];
+    // let mut file = File::open("testset/data.txt").unwrap();
+    // let mut data = String::new();
+    // file.read_to_string(&mut data).unwrap();
+    // let data = data
+    //     .chars()
+    //     .map(|c| c.to_digit(10).unwrap() as u8)
+    //     .collect::<Vec<u8>>();
+
+    // println!("readed data: {:?}", data);
+    let data_len = data.len() as isize;
+    let data = read_data_2_compressed_u8(data);
+
+    let _signal = modulation
+        .send_bits_2_file(data, data_len, "test.wav")
+        .await;
+
+    file_plot("test.wav", "output_wav.svg");
+}
+
+#[tokio::test]
+async fn test_ofdm_listen() {
+    let mut demodulator = Demodulation2::new(
+        vec![CARRIER, CARRIER * 2], 48000, "output.txt", modulation::REDUNDANT_PERIODS);
+    
+    let mut decoded_data = vec![];
+    let mut debug_vec = vec![];
+    let handle = demodulator.listening(true, phy_frame::FRAME_PAYLOAD_LENGTH, &mut decoded_data, &mut debug_vec);
+    let handle = time::timeout(Duration::from_secs(5), handle);
+    handle.await.unwrap();
+    plot(debug_vec, "recv_wav.svg").unwrap();   
 }

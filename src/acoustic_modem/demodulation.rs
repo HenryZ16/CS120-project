@@ -36,7 +36,7 @@ struct DemodulationConfig {
     carrier_freq: Vec<u32>,
     sample_rate: u32,
     ref_signal: Vec<Vec<f32>>,
-    ref_signal_len: Vec<usize>,
+    ref_signal_len: usize,
     preamble_len: usize,
     preamble: Vec<f32>,
 }
@@ -49,7 +49,7 @@ impl DemodulationConfig {
         carrier_freq: Vec<u32>,
         sample_rate: u32,
         ref_signal: Vec<Vec<f32>>,
-        ref_signal_len: Vec<usize>,
+        ref_signal_len: usize,
     ) -> Self {
         let preamble = phy_frame::gen_preamble(sample_rate);
         // println!("preamble len: {}", preamble.len());
@@ -106,7 +106,6 @@ where
 
 pub struct Demodulation2 {
     input_config: InputStreamConfig,
-    // pub buffer: VecDeque<Vec<f32>>,
     demodulate_config: DemodulationConfig,
     writer: File,
 }
@@ -145,12 +144,11 @@ impl Demodulation2 {
         carrier_freq.sort();
 
         let mut ref_signal = Vec::new();
-        let mut ref_signal_len = Vec::new();
+        let ref_len = (sample_rate / carrier_freq[0]) as usize * redundent_times;
+        println!("ref len: {}", ref_len);
 
         for i in 0..carrier_freq.len() {
             let carrier = carrier_freq.get(i).unwrap();
-            let ref_len = (sample_rate / *carrier) as usize * redundent_times;
-            ref_signal_len.push(ref_len);
             let ref_sin = (0..ref_len)
                 .map(|t| {
                     (2.0 * std::f32::consts::PI * *carrier as f32 * (t as f32 / sample_rate as f32))
@@ -161,7 +159,7 @@ impl Demodulation2 {
         }
 
         let demodulation_config =
-            DemodulationConfig::new(carrier_freq, sample_rate, ref_signal, ref_signal_len);
+            DemodulationConfig::new(carrier_freq, sample_rate, ref_signal, ref_len);
 
         let writer = File::create(output_file).unwrap();
 
@@ -196,7 +194,7 @@ impl Demodulation2 {
         let mut tmp_buffer: VecDeque<f32> = VecDeque::with_capacity(
             15 * demodulate_config
                 .preamble_len
-                .max(demodulate_config.ref_signal_len[0]),
+                .max(demodulate_config.ref_signal_len),
         );
         let mut tmp_buffer_len = tmp_buffer.len();
 
@@ -262,27 +260,27 @@ impl Demodulation2 {
             }
 
             if demodulate_state == DemodulationState::RecvFrame {
-                if tmp_buffer_len - start_index <= demodulate_config.ref_signal_len[0] {
+                if tmp_buffer_len - start_index <= demodulate_config.ref_signal_len {
                     println!("tmp buffer is not long enough");
                     continue;
                 }
                 tmp_buffer.make_contiguous();
 
-                while tmp_buffer_len - start_index >= demodulate_config.ref_signal_len[0]
+                while tmp_buffer_len - start_index >= demodulate_config.ref_signal_len
                     && tmp_bits_data.len() < data_len
                 {
-                    // let dot_product = range_dot_product_vec(tmp_buffer.range(start_index..start_index+demodulate_config.ref_signal_len[0]), &self.demodulate_config.ref_signal[0]);
+                    // let dot_product = range_dot_product_vec(tmp_buffer.range(start_index..start_index+demodulate_config.ref_signal_len), &self.demodulate_config.ref_signal[0]);
                     let dot_product = dot_product(
                         &tmp_buffer.as_slices().0
-                            [start_index..start_index + demodulate_config.ref_signal_len[0]],
+                            [start_index..start_index + demodulate_config.ref_signal_len],
                         &self.demodulate_config.ref_signal[0],
                     );
                     debug_vec.extend(
                         tmp_buffer
-                            .range(start_index..start_index + demodulate_config.ref_signal_len[0]),
+                            .range(start_index..start_index + demodulate_config.ref_signal_len),
                     );
 
-                    start_index += demodulate_config.ref_signal_len[0];
+                    start_index += demodulate_config.ref_signal_len;
 
                     tmp_bits_data.push(if dot_product >= 0.0 { 0 } else { 1 });
                 }
@@ -336,7 +334,7 @@ impl Demodulation2 {
         decoded_data: &mut Vec<u8>,
         debug_vec: &mut Vec<f32>,
     ) {
-        let data_len = data_len;
+        // let data_len = data_len;
 
         let mut input_stream = self.input_config.create_input_stream();
         let demodulate_config = &self.demodulate_config;
@@ -350,14 +348,15 @@ impl Demodulation2 {
         let mut tmp_buffer: VecDeque<f32> = VecDeque::with_capacity(
             5 * demodulate_config
                 .preamble_len
-                .max(demodulate_config.ref_signal_len[0]),
+                .max(demodulate_config.ref_signal_len),
         );
         let mut tmp_buffer_len = tmp_buffer.len();
 
         let mut local_max = 0.0;
         let mut start_index = usize::MAX;
 
-        let mut tmp_bits_data = Vec::with_capacity(data_len);
+        let carrier_num = demodulate_config.carrier_freq.len();
+        let mut tmp_bits_data = vec![Vec::with_capacity(data_len); carrier_num];
 
         let mut is_reboot = false;
 
@@ -408,29 +407,29 @@ impl Demodulation2 {
 
             if demodulate_state == DemodulationState::RecvFrame {
                 if tmp_buffer_len < start_index
-                    || tmp_buffer_len - start_index <= demodulate_config.ref_signal_len[0]
+                    || tmp_buffer_len - start_index <= demodulate_config.ref_signal_len
                 {
                     // println!("tmp buffer is not long enough");
                     continue;
                 }
                 tmp_buffer.make_contiguous();
 
-                while tmp_buffer_len - start_index >= demodulate_config.ref_signal_len[0]
-                    && tmp_bits_data.len() < data_len
+                while tmp_buffer_len - start_index >= demodulate_config.ref_signal_len
+                    && tmp_bits_data[0].len() < data_len
                 {
-                    let dot_product = dot_product(
-                        &tmp_buffer.as_slices().0
-                            [start_index..start_index + demodulate_config.ref_signal_len[0]],
-                        &self.demodulate_config.ref_signal[0],
-                    );
-                    debug_vec.extend(
-                        &tmp_buffer.as_slices().0
-                            [start_index..start_index + demodulate_config.ref_signal_len[0]],
-                    );
-
-                    start_index += demodulate_config.ref_signal_len[0];
-
-                    tmp_bits_data.push(if dot_product >= 0.0 { 0 } else { 1 });
+                    let window = &tmp_buffer.as_slices().0
+                                [start_index..start_index + demodulate_config.ref_signal_len];
+                    for i in 0..carrier_num{
+                        let dot_product = dot_product(
+                            window,
+                            &self.demodulate_config.ref_signal[i],
+                        );
+                        debug_vec.extend(
+                            window,
+                        );
+                        tmp_bits_data[i].push(if dot_product >= 0.0 { 0 } else { 1 });
+                    }
+                    start_index += demodulate_config.ref_signal_len;
                 }
                 // println!("current recv length: {}", tmp_bits_data.len());
             }
@@ -441,34 +440,36 @@ impl Demodulation2 {
                 // demodulate_state = demodulate_state.next();
                 demodulate_state = DemodulationState::Stop;
 
-                let result = decode(tmp_bits_data);
-                tmp_bits_data = Vec::with_capacity(data_len);
+                for i in 0..carrier_num{                    
+                    let result = decode(tmp_bits_data[i].clone());
+                    // tmp_bits_data[i] = Vec::with_capacity(data_len);
 
-                match result {
-                    Ok((vec, length)) => {
-                        // println!("length: {}", length);
-                        if length > phy_frame::MAX_FRAME_DATA_LENGTH {
-                            println!("wrong data length");
-                        } else {
-                            let decompressed = read_compressed_u8_2_data(vec)[0..length].to_vec();
+                    match result {
+                        Ok((vec, length)) => {
+                            // println!("length: {}", length);
+                            if length > phy_frame::MAX_FRAME_DATA_LENGTH {
+                                println!("wrong data length");
+                            } else {
+                                let decompressed = read_compressed_u8_2_data(vec)[0..length].to_vec();
 
-                            if write_to_file {
-                                let to_write = &decompressed
-                                    .clone()
-                                    .iter()
-                                    .map(|x| *x + b'0')
-                                    .collect::<Vec<u8>>();
-                                // println!("to write: {:?}", to_write);
-                                self.writer.write_all(to_write).unwrap();
+                                if write_to_file {
+                                    let to_write = &decompressed
+                                        .clone()
+                                        .iter()
+                                        .map(|x| *x + b'0')
+                                        .collect::<Vec<u8>>();
+                                    // println!("to write: {:?}", to_write);
+                                    self.writer.write_all(to_write).unwrap();
+                                }
+                                decoded_data.extend_from_slice(&decompressed[0..length]);
                             }
-                            decoded_data.extend_from_slice(&decompressed[0..length]);
                         }
-                    }
 
-                    Err(_) => {
-                        println!("Error: received invalid data");
-                    }
-                };
+                        Err(_) => {
+                            println!("Error: received invalid data");
+                        }
+                    };
+                }
             }
 
             let pop_times = if start_index == usize::MAX {

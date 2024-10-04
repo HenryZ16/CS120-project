@@ -1,3 +1,5 @@
 target*
 testset*
 .vscode
+*.wav
+*.svg
