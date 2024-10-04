@@ -14,7 +14,7 @@ use std::fs::File;
 use std::io::Read;
 use std::vec;
 
-const CARRIER: u32 = 2000;
+const CARRIER: u32 = 4000;
 const SAMPLE_RATE: u32 = 48000;
 
 pub async fn obj_2() -> Result<u32> {
@@ -106,7 +106,7 @@ pub async fn obj_3_recv_file() -> Result<u32> {
         &mut decoded_data,
         &mut debug_vec,
     );
-    let handle = time::timeout(Duration::from_secs(15), handle);
+    let handle = time::timeout(Duration::from_secs(25), handle);
     println!("[pa1-obj3-receive] Start");
     handle.await.unwrap_err();
     println!("[pa1-obj3-recrive] Stop");

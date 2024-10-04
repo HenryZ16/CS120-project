@@ -15,7 +15,7 @@ use futures::SinkExt;
 use hound::{WavSpec, WavWriter};
 
 const SAMPLE_RATE: u32 = 48000;
-pub const REDUNDANT_PERIODS: usize = 4;
+pub const REDUNDANT_PERIODS: usize = 3;
 
 pub struct Modulator {
     carrier_freq: Vec<u32>,
@@ -124,7 +124,7 @@ impl Modulator {
 
             // wait for a while
             // tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
-            modulated_signal.extend(vec![0.0; 48]);
+            modulated_signal.extend(vec![0.0; 100]);
         }
 
         // send the last frame

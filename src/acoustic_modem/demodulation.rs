@@ -255,7 +255,7 @@ impl Demodulation2 {
                         local_max = 0.0;
                         start_index += demodulate_config.preamble_len - 1 + padding_len;
                         demodulate_state = demodulate_state.next();
-                        println!("detected preamble");
+                        // println!("detected preamble");
                         break;
                     }
                 }
@@ -398,7 +398,7 @@ impl Demodulation2 {
                         local_max = 0.0;
                         start_index += demodulate_config.preamble_len - 1;
                         demodulate_state = demodulate_state.next();
-                        println!("detected preamble");
+                        // println!("detected preamble");
                         // println!("start index: {}, tmp buffer len: {}", start_index, tmp_buffer_len);
                         break;
                     }
@@ -438,8 +438,8 @@ impl Demodulation2 {
             if tmp_bits_data.len() >= data_len {
                 // demodulate_state = demodulate_state.return_detect_preamble();
                 is_reboot = true;
-                // demodulate_state = demodulate_state.next();
-                demodulate_state = DemodulationState::Stop;
+                demodulate_state = demodulate_state.next();
+                // demodulate_state = DemodulationState::Stop;
 
                 let result = decode(tmp_bits_data);
                 tmp_bits_data = Vec::with_capacity(data_len);
@@ -495,11 +495,11 @@ impl Demodulation2 {
 }
 
 fn decode(input_data: Vec<Bit>) -> Result<(Vec<Byte>, usize), Error> {
-    println!(
-        "input data: {:?}, data length: {}",
-        input_data,
-        input_data.len()
-    );
+    // println!(
+    //     "input data: {:?}, data length: {}",
+    //     input_data,
+    //     input_data.len()
+    // );
     let hexbits = u8_2_code_rs_hexbit(read_data_2_compressed_u8(input_data));
 
     // println!("hexbits: {:?}, hexbit length: {}", hexbits, hexbits.len());
