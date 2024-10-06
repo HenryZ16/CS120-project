@@ -76,7 +76,11 @@ pub async fn obj_3_send_file() -> Result<u32> {
 
     // modulator
     let sample_rate = 48000;
-    let mut modulator = Modulator::new(vec![CARRIER, CARRIER_2, CARRIER_3], sample_rate, true);
+    let mut modulator = Modulator::new(
+        vec![CARRIER, CARRIER_2, CARRIER_3, CARRIER_4],
+        sample_rate,
+        true,
+    );
 
     // send
     modulator
@@ -110,7 +114,7 @@ pub async fn obj_3_recv_file() -> Result<u32> {
         phy_frame::FRAME_PAYLOAD_LENGTH,
         &mut decoded_data,
         &mut debug_vec,
-        vec![]
+        vec![],
     );
     let handle = time::timeout(Duration::from_secs(15), handle);
     println!("[pa1-obj3-receive] Start");

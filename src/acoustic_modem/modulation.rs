@@ -17,7 +17,7 @@ use hound::{WavSpec, WavWriter};
 const SAMPLE_RATE: u32 = 48000;
 
 // If OFDM is enabled, the carrier_freq represents the redundant periods of the lowest frequency
-pub const REDUNDANT_PERIODS: usize = 12;
+pub const REDUNDANT_PERIODS: usize = 2;
 
 pub struct Modulator {
     carrier_freq: Vec<u32>,
@@ -91,7 +91,9 @@ impl Modulator {
         println!("[send_bits] send bits: {:?}", len);
 
         // warm up
-        let mut modulated_signal: Vec<f32> = (0..0).map(|x| (2.0 * std::f32::consts::PI * x as f32 / 48000.0 * 5000 as f32).sin()).collect();
+        let mut modulated_signal: Vec<f32> = (0..0)
+            .map(|x| (2.0 * std::f32::consts::PI * x as f32 / 48000.0 * 5000 as f32).sin())
+            .collect();
 
         let mut len = len;
         let mut loop_cnt = 0;
@@ -181,6 +183,13 @@ impl Modulator {
                         decompressed_data.len()
                     );
                     let modulated_psk_signal_i = self.modulate(&decompressed_data, i);
+
+                    // nomalization - make the power of each carrier equal
+                    let modulated_psk_signal_i: Vec<f32> = modulated_psk_signal_i
+                        .iter()
+                        .map(|&x| x / (4f32.powf(i as f32)) as f32)
+                        .collect();
+
                     if i == 0 {
                         modulated_psk_signal.extend(modulated_psk_signal_i.clone());
                     } else {
@@ -192,10 +201,12 @@ impl Modulator {
                     }
                 }
 
-                // nomalization
+                // nomalization - make the maximum of the sequence equal to 1
+                let divisor = (1..(carrier_cnt + 1))
+                    .fold(0.0, |acc, x| acc + 1.0 / (4f32.powf(x as f32)) as f32);
                 modulated_psk_signal = modulated_psk_signal
                     .iter()
-                    .map(|&x| x / carrier_cnt as f32)
+                    .map(|&x| x / divisor as f32)
                     .collect();
 
                 // add FSK preamble
@@ -247,6 +258,13 @@ impl Modulator {
                     decompressed_data.len()
                 );
                 let modulated_psk_signal_i = self.modulate(&decompressed_data, i);
+
+                // nomalization - make the power of each carrier equal
+                let modulated_psk_signal_i: Vec<f32> = modulated_psk_signal_i
+                    .iter()
+                    .map(|&x| x / (4f32.powf(i as f32)) as f32)
+                    .collect();
+
                 if i == 0 {
                     modulated_psk_signal.extend(modulated_psk_signal_i.clone());
                 } else {
@@ -262,10 +280,12 @@ impl Modulator {
                 }
             }
 
-            // nomalization
+            // nomalization - make the maximum of the sequence equal to 1
+            let divisor =
+                (1..(carrier_cnt + 1)).fold(0.0, |acc, x| acc + 1.0 / (4f32.powf(x as f32)) as f32);
             modulated_psk_signal = modulated_psk_signal
                 .iter()
-                .map(|&x| x / carrier_cnt as f32)
+                .map(|&x| x / divisor as f32)
                 .collect();
 
             // add FSK preamble
@@ -357,8 +377,11 @@ impl Modulator {
         // redundant periods for each bit
         let sample_cnt_each_bit =
             self.sample_rate * self.redundant_periods as u32 / self.carrier_freq[0];
-        
-        println!("frequence {}, with sample num {}", self.carrier_freq[carrrier_freq_id], sample_cnt_each_bit);
+
+        println!(
+            "frequence {}, with sample num {}",
+            self.carrier_freq[carrrier_freq_id], sample_cnt_each_bit
+        );
         let mut bit_id = 0;
         while bit_id < bits.len() {
             let bit = bits[bit_id];
