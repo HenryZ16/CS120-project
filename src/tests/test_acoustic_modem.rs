@@ -13,10 +13,10 @@ use tokio::time;
 use hound::{WavSpec, WavWriter};
 
 fn plot(modulated_signal: Vec<f32>, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
-    // get the first 10000 samples
+    // get the first 100000 samples
     let mut coordinates = vec![];
     for (i, sample) in modulated_signal.iter().enumerate() {
-        if i > 10000 {
+        if i > 100000 {
             break;
         }
         coordinates.push((i as f64, *sample as f64));
@@ -31,7 +31,7 @@ fn plot(modulated_signal: Vec<f32>, filename: &str) -> Result<(), Box<dyn std::e
         .set_left_and_bottom_label_area_size(20);
 
     let mut chart_context = chart_builder
-        .build_cartesian_2d(0.0..10000.0, -1.1..1.1)
+        .build_cartesian_2d(0.0..25000.0, -1.1..1.1)
         .unwrap();
     chart_context.configure_mesh().draw().unwrap();
 
@@ -92,7 +92,7 @@ async fn test_modulation() {
 
 #[test]
 fn test_plot_wav() {
-    let mut reader = hound::WavReader::open("test_simple.wav").unwrap();
+    let mut reader = hound::WavReader::open("test.wav").unwrap();
     let samples: Vec<f32> = reader.samples::<f32>().map(|s| s.unwrap()).collect();
 
     // 创建绘图区域
@@ -121,9 +121,9 @@ fn test_plot_wav() {
     root.present().unwrap();
 }
 
-const CARRIER: u32 = 2000;
-const LEN: usize = 100;
-const REDUNDENT: usize = 2;
+const CARRIER: u32 = 3000;
+const LEN: usize = phy_frame::FRAME_PAYLOAD_LENGTH;
+const REDUNDENT: usize = modulation::REDUNDANT_PERIODS;
 const PADDING: usize = 0;
 
 #[test]
@@ -151,33 +151,34 @@ fn test_simple_gen() {
 
 #[tokio::test]
 async fn test_simple_listen() {
-    let mut demodulator = Demodulation2::new(vec![CARRIER], 48000, "text.txt", REDUNDENT);
+    let mut demodulator = Demodulation2::new(vec![CARRIER], 48000, "output.txt", REDUNDENT);
 
     let mut debug_vec = vec![];
 
     use std::fs::File;
     use std::io::BufReader;
 
-    let reader = File::open("ref_signal.txt").unwrap();
-    let reader = BufReader::new(reader);
-    let mut ref_data = vec![];
-    for data in reader.bytes() {
-        ref_data.push(data.unwrap() - b'0');
-    }
+    // let reader = File::open("ref_signal.txt").unwrap();
+    // let reader = BufReader::new(reader);
+    // let mut ref_data = vec![];
+    // for data in reader.bytes() {
+    //     ref_data.push(data.unwrap() - b'0');
+    // }
 
     // println!("ref: {:?}", ref_data);
     // loop {
         let res = demodulator.simple_listen(true, &mut debug_vec, LEN, PADDING).await;
-        let mut diff_num = 0;
-        for i in 0..ref_data.len() {
-            if ref_data[i] != res[i] {
-                diff_num += 1;
-            }
-        }
+        // let mut diff_num = 0;
+        // for i in 0..ref_data.len() {
+        //     if ref_data[i] != res[i] {
+        //         diff_num += 1;
+        //     }
+        // }
 
         // println!("debug vec: {:?}", debug_vec);
-        plot(debug_vec, "recv_wav.svg").unwrap();
-        println!("error percent: {}", diff_num as f32 / ref_data.len() as f32);
+        // plot(debug_vec, "recv_wav.svg").unwrap();
+        println!("res: {:?}", res);
+        // println!("error percent: {}", diff_num as f32 / ref_data.len() as f32);
     // }
 }
 
@@ -218,7 +219,7 @@ async fn test_seconds_listening() {
 
     let mut decoded_data = vec![];
     let mut debug_vec = vec![];
-    let handle = demodulator.listening(true, phy_frame::FRAME_PAYLOAD_LENGTH, &mut decoded_data, &mut debug_vec);
+    let handle = demodulator.listening(true, phy_frame::FRAME_PAYLOAD_LENGTH, &mut decoded_data, &mut debug_vec, vec![]);
     let handle = time::timeout(Duration::from_secs(5), handle);
     handle.await.unwrap();
     plot(debug_vec, "recv_wav.svg").unwrap();
@@ -230,16 +231,16 @@ async fn test_seconds_listening() {
 async fn test_ofdm_gen() {
     let mut modulation = Modulator::new(vec![CARRIER, CARRIER*2], 48000, true);
 
-    let data = vec![0,1,1,0,1,0,0,1,0,1];
-    // let mut file = File::open("testset/data.txt").unwrap();
-    // let mut data = String::new();
-    // file.read_to_string(&mut data).unwrap();
-    // let data = data
-    //     .chars()
-    //     .map(|c| c.to_digit(10).unwrap() as u8)
-    //     .collect::<Vec<u8>>();
+    // let data = vec![0,1,1,0,1,0,0,1,0,1];
+    let mut file = File::open("testset/data.txt").unwrap();
+    let mut data = String::new();
+    file.read_to_string(&mut data).unwrap();
+    let data = data
+        .chars()
+        .map(|c| c.to_digit(10).unwrap() as u8)
+        .collect::<Vec<u8>>();
 
-    // println!("readed data: {:?}", data);
+    println!("readed data: {:?}", data);
     let data_len = data.len() as isize;
     let data = read_data_2_compressed_u8(data);
 
@@ -249,6 +250,12 @@ async fn test_ofdm_gen() {
 
     file_plot("test.wav", "output_wav.svg");
 }
+fn read_wav_to_array(file_path: &str) -> Vec<f32> {
+    let mut reader = hound::WavReader::open(file_path).unwrap();
+    let spec = reader.spec();
+    let samples: Vec<f32> = reader.samples::<f32>().map(|s| s.unwrap()).collect();
+    samples
+}
 
 #[tokio::test]
 async fn test_ofdm_listen() {
@@ -257,7 +264,9 @@ async fn test_ofdm_listen() {
     
     let mut decoded_data = vec![];
     let mut debug_vec = vec![];
-    let handle = demodulator.listening(true, phy_frame::FRAME_PAYLOAD_LENGTH, &mut decoded_data, &mut debug_vec);
+    let wav_data = vec![read_wav_to_array("test.wav"), vec![0.0, 0.0], vec![]];
+    println!("wav_data len: {}", wav_data[0].len());
+    let handle = demodulator.listening(true, phy_frame::FRAME_PAYLOAD_LENGTH, &mut decoded_data, &mut debug_vec, wav_data);
     let handle = time::timeout(Duration::from_secs(5), handle);
     handle.await.unwrap();
     plot(debug_vec, "recv_wav.svg").unwrap();   

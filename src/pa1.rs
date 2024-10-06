@@ -110,6 +110,7 @@ pub async fn obj_3_recv_file() -> Result<u32> {
         phy_frame::FRAME_PAYLOAD_LENGTH,
         &mut decoded_data,
         &mut debug_vec,
+        vec![]
     );
     let handle = time::timeout(Duration::from_secs(15), handle);
     println!("[pa1-obj3-receive] Start");

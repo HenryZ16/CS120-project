@@ -3,3 +3,4 @@ testset*
 .vscode
 *.wav
 *.svg
+*.txt

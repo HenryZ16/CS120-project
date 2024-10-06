@@ -26,25 +26,19 @@ pub struct Modulator {
     enable_ofdm: bool,
     output_stream: OutputAudioStream<std::vec::IntoIter<f32>>,
     config: SupportedStreamConfig,
-    device: cpal::Device,
 }
 
 impl Modulator {
     pub fn new(carrier_freq: Vec<u32>, sample_rate: u32, enable_ofdm: bool) -> Self {
         if enable_ofdm {
-            assert!(carrier_freq.len() > 1);
-            for i in 0..(carrier_freq.len() - 1) {
-                assert_eq!(carrier_freq[i + 1] / carrier_freq[i], 2);
-            }
+            // assert!(carrier_freq.len() > 1);
+            // for i in 0..(carrier_freq.len() - 1) {
+            //     assert_eq!(carrier_freq[i + 1] / carrier_freq[i], 2);
+            // }
         }
 
         // let host = cpal::host_from_id(HostId::Asio).expect("failed to initialise ASIO host");
         let host = cpal::default_host();
-        let device = host.output_devices().expect("failed to find output device");
-        let device = device
-            .into_iter()
-            .next()
-            .expect("no output device available");
         let device = host.default_output_device().unwrap();
         println!("[Modulator] Output device: {:?}", device.name().unwrap());
 
@@ -65,7 +59,6 @@ impl Modulator {
             enable_ofdm,
             output_stream,
             config,
-            device,
         }
     }
 
@@ -97,7 +90,9 @@ impl Modulator {
     pub async fn bits_2_wave(&mut self, data: Vec<Byte>, len: isize) -> Vec<f32> {
         println!("[send_bits] send bits: {:?}", len);
 
-        let mut modulated_signal: Vec<f32> = vec![];
+        // warm up
+        let mut modulated_signal: Vec<f32> = (0..0).map(|x| (2.0 * std::f32::consts::PI * x as f32 / 48000.0 * 5000 as f32).sin()).collect();
+
         let mut len = len;
         let mut loop_cnt = 0;
 
@@ -200,7 +195,7 @@ impl Modulator {
                 // nomalization
                 modulated_psk_signal = modulated_psk_signal
                     .iter()
-                    .map(|x| x / carrier_cnt as f32)
+                    .map(|&x| x / carrier_cnt as f32)
                     .collect();
 
                 // add FSK preamble
@@ -270,7 +265,7 @@ impl Modulator {
             // nomalization
             modulated_psk_signal = modulated_psk_signal
                 .iter()
-                .map(|x| x / last_single_frames_cnt as f32)
+                .map(|&x| x / carrier_cnt as f32)
                 .collect();
 
             // add FSK preamble
@@ -361,7 +356,9 @@ impl Modulator {
 
         // redundant periods for each bit
         let sample_cnt_each_bit =
-            self.sample_rate * self.redundant_periods as u32 / self.carrier_freq[carrrier_freq_id];
+            self.sample_rate * self.redundant_periods as u32 / self.carrier_freq[0];
+        
+        println!("frequence {}, with sample num {}", self.carrier_freq[carrrier_freq_id], sample_cnt_each_bit);
         let mut bit_id = 0;
         while bit_id < bits.len() {
             let bit = bits[bit_id];

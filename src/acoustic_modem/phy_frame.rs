@@ -195,6 +195,8 @@ pub fn gen_preamble(sample_rate: u32) -> Vec<f32> {
         res.push(res[i - 1] + trap_area);
     }
 
+    res.extend(vec![0.0; 100].iter());
+
     res.into_iter()
         .map(|x| (2.0 * std::f64::consts::PI * x).sin() as f32)
         .collect()

@@ -4,7 +4,6 @@ use crate::utils::{
     read_compressed_u8_2_data, read_data_2_compressed_u8, u8_2_code_rs_hexbit, Bit, Byte,
 };
 use anyhow::Error;
-use biquad::{Biquad, Coefficients, DirectForm1, ToHertz, Type::BandPass};
 use cpal::traits::{DeviceTrait, HostTrait};
 use cpal::{Device, SampleRate, SupportedStreamConfig};
 use futures::StreamExt;
@@ -128,8 +127,8 @@ impl Demodulation2 {
 
         let default_config = device.default_input_config().unwrap();
         let config = SupportedStreamConfig::new(
-            default_config.channels(),
-            // 1,                   // mono
+            // default_config.channels(),
+            1,                   // mono
             SampleRate(sample_rate), // sample rate
             default_config.buffer_size().clone(),
             default_config.sample_format(),
@@ -165,7 +164,6 @@ impl Demodulation2 {
 
         Demodulation2 {
             input_config: input_stream_config,
-            // buffer: VecDeque::new(),
             demodulate_config: demodulation_config,
             writer,
         }
@@ -182,7 +180,7 @@ impl Demodulation2 {
 
         let mut input_stream = self.input_config.create_input_stream();
         let demodulate_config = &self.demodulate_config;
-        let alpha_check = 1.0;
+        let alpha_check = 0.31;
         let mut prev = 0.0;
 
         let mut demodulate_state = DemodulationState::DetectPreamble;
@@ -204,18 +202,6 @@ impl Demodulation2 {
         let mut tmp_bits_data = Vec::with_capacity(data_len);
         let channels = self.input_config.config.channels() as usize;
         // let mut res = vec![];
-
-        let low_cutoff = 1000.0;
-        let high_cutoff = 9000.0;
-        let coeffs = Coefficients::<f32>::from_params(
-            BandPass,
-            demodulate_config.sample_rate.hz(),
-            ((high_cutoff + low_cutoff) / 2.0).hz(),
-            high_cutoff - low_cutoff,
-        )
-        .unwrap();
-        
-        let mut filter = DirectForm1::<f32>::new(coeffs);
 
         while let Some(data) = input_stream.next().await {
             if demodulate_state == DemodulationState::Stop {
@@ -261,7 +247,6 @@ impl Demodulation2 {
 
             if demodulate_state == DemodulationState::RecvFrame {
                 if tmp_buffer_len - start_index <= demodulate_config.ref_signal_len {
-                    println!("tmp buffer is not long enough");
                     continue;
                 }
                 tmp_buffer.make_contiguous();
@@ -333,10 +318,11 @@ impl Demodulation2 {
         data_len: usize,
         decoded_data: &mut Vec<u8>,
         debug_vec: &mut Vec<f32>,
+        test_data: Vec<Vec<f32>>
     ) {
         // let data_len = data_len;
 
-        let mut input_stream = self.input_config.create_input_stream();
+        // let mut input_stream = self.input_config.create_input_stream();
         let demodulate_config = &self.demodulate_config;
         let alpha_check = 0.31;
         let mut prev = 0.0;
@@ -356,19 +342,20 @@ impl Demodulation2 {
         let mut start_index = usize::MAX;
 
         let carrier_num = demodulate_config.carrier_freq.len();
+        // let mut tmp_bits_data = vec![vec![0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 1, 0, 0, 1, 1, 1, 0, 0, 1, 0, 1, 0, 1, 1, 0, 1, 1, 1, 0, 0, 1, 1, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1], vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1]];
         let mut tmp_bits_data = vec![Vec::with_capacity(data_len); carrier_num];
-
         let mut is_reboot = false;
 
         let channels = self.input_config.config.channels() as usize;
 
-        while let Some(data) = input_stream.next().await {
+        // while let Some(data) = input_stream.next().await {
+        for data in test_data{
             if demodulate_state == DemodulationState::Stop {
                 break;
             }
             tmp_buffer_len += data.len() / channels;
             move_data_into_buffer(data, &mut tmp_buffer, alpha_check, channels, &mut prev);
-
+            // println!("buffer len: {}", tmp_buffer_len);
             // tmp_buffer.extend(data.iter());
 
             if demodulate_state == DemodulationState::DetectPreamble {
@@ -385,8 +372,8 @@ impl Demodulation2 {
                     let dot_product = dot_product(window, &demodulate_config.preamble);
 
                     if dot_product > local_max && dot_product > power_lim_preamble {
-                        // println!("detected");
                         local_max = dot_product;
+                        println!("detected, local max: {}", local_max);
                         start_index = i + 1;
                         debug_vec.clear();
                         debug_vec.extend(window);
@@ -397,7 +384,7 @@ impl Demodulation2 {
                         local_max = 0.0;
                         start_index += demodulate_config.preamble_len - 1;
                         demodulate_state = demodulate_state.next();
-                        println!("detected preamble");
+                        // println!("detected preamble");
                         // println!("start index: {}, tmp buffer len: {}", start_index, tmp_buffer_len);
                         break;
                     }
@@ -424,17 +411,17 @@ impl Demodulation2 {
                             window,
                             &self.demodulate_config.ref_signal[i],
                         );
-                        debug_vec.extend(
-                            window,
-                        );
                         tmp_bits_data[i].push(if dot_product >= 0.0 { 0 } else { 1 });
                     }
+                    debug_vec.extend(
+                        window,
+                    );
                     start_index += demodulate_config.ref_signal_len;
+                    
                 }
-                // println!("current recv length: {}", tmp_bits_data.len());
             }
 
-            if tmp_bits_data.len() >= data_len {
+            if tmp_bits_data[0].len() >= data_len {
                 // demodulate_state = demodulate_state.return_detect_preamble();
                 is_reboot = true;
                 // demodulate_state = demodulate_state.next();
@@ -446,7 +433,7 @@ impl Demodulation2 {
 
                     match result {
                         Ok((vec, length)) => {
-                            // println!("length: {}", length);
+                            println!("length: {}", length);
                             if length > phy_frame::MAX_FRAME_DATA_LENGTH {
                                 println!("wrong data length");
                             } else {
@@ -462,6 +449,7 @@ impl Demodulation2 {
                                     self.writer.write_all(to_write).unwrap();
                                 }
                                 decoded_data.extend_from_slice(&decompressed[0..length]);
+                                println!("freq {}, received", demodulate_config.carrier_freq[i]);
                             }
                         }
 
@@ -489,7 +477,7 @@ impl Demodulation2 {
                 0
             };
             tmp_buffer_len = tmp_buffer.len();
-
+            // println!("tmp bit len: {:?}", tmp_bits_data[0].len());
             // println!("buffer len: {}", tmp_buffer_len);
         }
     }
@@ -503,7 +491,7 @@ fn decode(input_data: Vec<Bit>) -> Result<(Vec<Byte>, usize), Error> {
     );
     let hexbits = u8_2_code_rs_hexbit(read_data_2_compressed_u8(input_data));
 
-    // println!("hexbits: {:?}, hexbit length: {}", hexbits, hexbits.len());
+    println!("hexbits: {:?}, hexbit length: {}", hexbits, hexbits.len());
     PHYFrame::payload_2_data(hexbits)
 }
 
