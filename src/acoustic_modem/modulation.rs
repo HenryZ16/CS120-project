@@ -17,7 +17,7 @@ use hound::{WavSpec, WavWriter};
 const SAMPLE_RATE: u32 = 48000;
 
 // If OFDM is enabled, the carrier_freq represents the redundant periods of the lowest frequency
-pub const REDUNDANT_PERIODS: usize = 2;
+pub const REDUNDANT_PERIODS: usize = 6;
 
 pub struct Modulator {
     carrier_freq: Vec<u32>,
@@ -29,12 +29,14 @@ pub struct Modulator {
 }
 
 impl Modulator {
-    pub fn new(carrier_freq: Vec<u32>, sample_rate: u32, enable_ofdm: bool) -> Self {
+    pub fn new(carrier_freq_config: Vec<u32>, sample_rate: u32, enable_ofdm: bool) -> Self {
+        let mut carrier_freq = vec![];
         if enable_ofdm {
-            // assert!(carrier_freq.len() > 1);
-            // for i in 0..(carrier_freq.len() - 1) {
-            //     assert_eq!(carrier_freq[i + 1] / carrier_freq[i], 2);
-            // }
+            for i in 0..carrier_freq_config[2] {
+                carrier_freq.push(carrier_freq_config[0] + i * carrier_freq_config[1]);
+            }
+        } else {
+            carrier_freq.push(carrier_freq_config[0]);
         }
 
         // let host = cpal::host_from_id(HostId::Asio).expect("failed to initialise ASIO host");
@@ -187,7 +189,10 @@ impl Modulator {
                     // nomalization - make the power of each carrier equal
                     let modulated_psk_signal_i: Vec<f32> = modulated_psk_signal_i
                         .iter()
-                        .map(|&x| x / (4f32.powf(i as f32)) as f32)
+                        .map(|&x| {
+                            x / ((self.carrier_freq[i] as f32 / self.carrier_freq[0] as f32)
+                                .powf(2.0)) as f32
+                        })
                         .collect();
 
                     if i == 0 {
@@ -202,8 +207,11 @@ impl Modulator {
                 }
 
                 // nomalization - make the maximum of the sequence equal to 1
-                let divisor = (1..(carrier_cnt + 1))
-                    .fold(0.0, |acc, x| acc + 1.0 / (4f32.powf(x as f32)) as f32);
+                let divisor = (1..(carrier_cnt + 1)).fold(0.0, |acc, x| {
+                    acc + 1.0
+                        / ((self.carrier_freq[x - 1] as f32 / self.carrier_freq[0] as f32)
+                            .powf(2.0)) as f32
+                });
                 modulated_psk_signal = modulated_psk_signal
                     .iter()
                     .map(|&x| x / divisor as f32)
@@ -262,7 +270,10 @@ impl Modulator {
                 // nomalization - make the power of each carrier equal
                 let modulated_psk_signal_i: Vec<f32> = modulated_psk_signal_i
                     .iter()
-                    .map(|&x| x / (4f32.powf(i as f32)) as f32)
+                    .map(|&x| {
+                        x / ((self.carrier_freq[i] as f32 / self.carrier_freq[0] as f32).powf(2.0))
+                            as f32
+                    })
                     .collect();
 
                 if i == 0 {
@@ -281,8 +292,11 @@ impl Modulator {
             }
 
             // nomalization - make the maximum of the sequence equal to 1
-            let divisor =
-                (1..(carrier_cnt + 1)).fold(0.0, |acc, x| acc + 1.0 / (4f32.powf(x as f32)) as f32);
+            let divisor = (1..(carrier_cnt + 1)).fold(0.0, |acc, x| {
+                acc + 1.0
+                    / ((self.carrier_freq[x - 1] as f32 / self.carrier_freq[0] as f32).powf(2.0))
+                        as f32
+            });
             modulated_psk_signal = modulated_psk_signal
                 .iter()
                 .map(|&x| x / divisor as f32)
@@ -379,7 +393,7 @@ impl Modulator {
             self.sample_rate * self.redundant_periods as u32 / self.carrier_freq[0];
 
         println!(
-            "frequence {}, with sample num {}",
+            "[modulate] frequence {}, with sample num {}",
             self.carrier_freq[carrrier_freq_id], sample_cnt_each_bit
         );
         let mut bit_id = 0;

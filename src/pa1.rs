@@ -14,10 +14,9 @@ use std::fs::File;
 use std::io::Read;
 use std::vec;
 
-const CARRIER: u32 = 1000;
-const CARRIER_2: u32 = 2000;
-const CARRIER_3: u32 = 4000;
-const CARRIER_4: u32 = 8000;
+const CARRIER_LOW: u32 = 3000;
+const CARRIER_INTERVAL: u32 = 1000;
+const CARRIER_CNT: u32 = 4;
 const SAMPLE_RATE: u32 = 48000;
 
 pub async fn obj_2() -> Result<u32> {
@@ -41,7 +40,7 @@ pub async fn obj_3_send() -> Result<u32> {
     // modulator
     let sample_rate = 48000;
     let mut modulator = Modulator::new(
-        vec![CARRIER, CARRIER_2, CARRIER_3, CARRIER_4],
+        vec![CARRIER_LOW, CARRIER_INTERVAL, CARRIER_CNT],
         sample_rate,
         true,
     );
@@ -77,7 +76,7 @@ pub async fn obj_3_send_file() -> Result<u32> {
     // modulator
     let sample_rate = 48000;
     let mut modulator = Modulator::new(
-        vec![CARRIER, CARRIER_2, CARRIER_3, CARRIER_4],
+        vec![CARRIER_LOW, CARRIER_INTERVAL, CARRIER_CNT],
         sample_rate,
         true,
     );
@@ -101,7 +100,7 @@ pub async fn obj_3_send_file() -> Result<u32> {
 
 pub async fn obj_3_recv_file() -> Result<u32> {
     let mut demodulator = Demodulation2::new(
-        vec![CARRIER],
+        vec![CARRIER_LOW],
         SAMPLE_RATE,
         "output.txt",
         modulation::REDUNDANT_PERIODS,
