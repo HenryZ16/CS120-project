@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::time::Duration;
 use std::vec;
 
@@ -125,6 +125,7 @@ const CARRIER: u32 = 3000;
 const LEN: usize = phy_frame::FRAME_PAYLOAD_LENGTH;
 const REDUNDENT: usize = modulation::REDUNDANT_PERIODS;
 const PADDING: usize = 0;
+static CONFIG: [u32; 3] = [CARRIER, 1000, 4];
 
 #[test]
 fn test_simple_gen() {
@@ -151,7 +152,7 @@ fn test_simple_gen() {
 
 #[tokio::test]
 async fn test_simple_listen() {
-    let mut demodulator = Demodulation2::new(vec![CARRIER], 48000, "output.txt", REDUNDENT);
+    let mut demodulator = Demodulation2::new(CONFIG.into(), 48000, "output.txt", REDUNDENT);
 
     let mut debug_vec = vec![];
 
@@ -186,7 +187,7 @@ async fn test_simple_listen() {
 async fn test_frame_gen() {
     let sample_rate = 48000;
     let carrier = CARRIER;
-    let mut modulation = Modulator::new(vec![carrier], sample_rate, false);
+    let mut modulation = Modulator::new(CONFIG.into(), sample_rate, false);
 
     // let data = vec![0,1,1,0,1,0,0,1,0,1];
     let mut file = File::open("testset/data.txt").unwrap();
@@ -229,7 +230,7 @@ async fn test_seconds_listening() {
 
 #[tokio::test]
 async fn test_ofdm_gen() {
-    let mut modulation = Modulator::new(vec![CARRIER, 1000, 2], 48000, true);
+    let mut modulation = Modulator::new(CONFIG.into(), 48000, true);
 
     // let data = vec![0,1,1,0,1,0,0,1,0,1];
     let mut file = File::open("testset/data.txt").unwrap();
@@ -260,14 +261,18 @@ fn read_wav_to_array(file_path: &str) -> Vec<f32> {
 #[tokio::test]
 async fn test_ofdm_listen() {
     let mut demodulator = Demodulation2::new(
-        vec![CARRIER, CARRIER * 2], 48000, "output.txt", modulation::REDUNDANT_PERIODS);
+        CONFIG.into(), 48000, "output.txt", modulation::REDUNDANT_PERIODS);
     
     let mut decoded_data = vec![];
     let mut debug_vec = vec![];
     let wav_data = vec![read_wav_to_array("test.wav"), vec![0.0, 0.0], vec![]];
     println!("wav_data len: {}", wav_data[0].len());
     let handle = demodulator.listening(true, phy_frame::FRAME_PAYLOAD_LENGTH, &mut decoded_data, &mut debug_vec, wav_data);
-    let handle = time::timeout(Duration::from_secs(5), handle);
+    let handle = time::timeout(Duration::from_secs(8), handle);
     handle.await.unwrap();
-    plot(debug_vec, "recv_wav.svg").unwrap();   
+    let mut writer = File::create("wav_data.txt").unwrap();
+    for sample in &debug_vec{
+        writeln!(writer, "{}", sample).unwrap();
+    }
+    // plot(debug_vec, "recv_wav.svg").unwrap();   
 }

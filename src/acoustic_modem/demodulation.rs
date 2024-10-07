@@ -111,7 +111,7 @@ pub struct Demodulation2 {
 
 impl Demodulation2 {
     pub fn new(
-        carrier_freq: Vec<u32>,
+        carrier_config: Vec<u32>,
         sample_rate: u32,
         output_file: &str,
         redundent_times: usize,
@@ -127,8 +127,8 @@ impl Demodulation2 {
 
         let default_config = device.default_input_config().unwrap();
         let config = SupportedStreamConfig::new(
-            // default_config.channels(),
-            1,                   // mono
+            default_config.channels(),
+            // 1,                   // mono
             SampleRate(sample_rate), // sample rate
             default_config.buffer_size().clone(),
             default_config.sample_format(),
@@ -139,8 +139,11 @@ impl Demodulation2 {
         let input_stream_config = InputStreamConfig::new(config, device);
 
         // sort carrier_freq in ascending order
-        let mut carrier_freq = carrier_freq;
-        carrier_freq.sort();
+        let mut carrier_freq = vec![];
+        for i in 0..carrier_config[2]{
+            carrier_freq.push(carrier_config[0] + i * carrier_config[1]);
+        }
+        println!("carrier freq: {:?}", carrier_freq);
 
         let mut ref_signal = Vec::new();
         let ref_len = (sample_rate / carrier_freq[0]) as usize * redundent_times;
@@ -322,7 +325,7 @@ impl Demodulation2 {
     ) {
         // let data_len = data_len;
 
-        // let mut input_stream = self.input_config.create_input_stream();
+        let mut input_stream = self.input_config.create_input_stream();
         let demodulate_config = &self.demodulate_config;
         let alpha_check = 0.31;
         let mut prev = 0.0;
@@ -348,8 +351,8 @@ impl Demodulation2 {
 
         let channels = self.input_config.config.channels() as usize;
 
-        // while let Some(data) = input_stream.next().await {
-        for data in test_data{
+        while let Some(data) = input_stream.next().await {
+        // for data in test_data{
             if demodulate_state == DemodulationState::Stop {
                 break;
             }
@@ -424,18 +427,17 @@ impl Demodulation2 {
             if tmp_bits_data[0].len() >= data_len {
                 // demodulate_state = demodulate_state.return_detect_preamble();
                 is_reboot = true;
-                // demodulate_state = demodulate_state.next();
-                demodulate_state = DemodulationState::Stop;
+                demodulate_state = demodulate_state.next();
+                // demodulate_state = DemodulationState::Stop;
 
                 for i in 0..carrier_num{                    
                     let result = decode(tmp_bits_data[i].clone());
-                    // tmp_bits_data[i] = Vec::with_capacity(data_len);
-
+                    tmp_bits_data[i].clear();
                     match result {
                         Ok((vec, length)) => {
                             println!("length: {}", length);
                             if length > phy_frame::MAX_FRAME_DATA_LENGTH {
-                                println!("wrong data length");
+                                println!("freq {}, wrong data length", demodulate_config.carrier_freq[i]);
                             } else {
                                 let decompressed = read_compressed_u8_2_data(vec)[0..length].to_vec();
 
