@@ -125,7 +125,7 @@ const CARRIER: u32 = 3000;
 const LEN: usize = phy_frame::FRAME_PAYLOAD_LENGTH;
 const REDUNDENT: usize = modulation::REDUNDANT_PERIODS;
 const PADDING: usize = 0;
-static CONFIG: [u32; 3] = [CARRIER, 1000, 4];
+static CONFIG: [u32; 3] = [CARRIER, 1000, 2];
 
 #[test]
 fn test_simple_gen() {

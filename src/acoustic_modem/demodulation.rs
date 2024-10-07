@@ -143,6 +143,7 @@ impl Demodulation2 {
         for i in 0..carrier_config[2]{
             carrier_freq.push(carrier_config[0] + i * carrier_config[1]);
         }
+        carrier_freq.push(6000);
         println!("carrier freq: {:?}", carrier_freq);
 
         let mut ref_signal = Vec::new();
@@ -189,7 +190,7 @@ impl Demodulation2 {
         let mut demodulate_state = DemodulationState::DetectPreamble;
 
         let mut avg_power = 0.0;
-        let power_lim_preamble = 1.0;
+        let power_lim_preamble = 0.5;
         let factor = 1.0 / 64.0;
 
         let mut tmp_buffer: VecDeque<f32> = VecDeque::with_capacity(
