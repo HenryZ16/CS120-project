@@ -108,6 +108,8 @@ impl Modulator {
                 for i in 0..(phy_frame::MAX_FRAME_DATA_LENGTH / 8) {
                     payload.push(data[i + loop_cnt * (phy_frame::MAX_FRAME_DATA_LENGTH / 8)]);
                 }
+                println!("push in payload data: {:?}", payload);
+                println!("frame len: {}", phy_frame::MAX_FRAME_DATA_LENGTH);
                 let frame = phy_frame::PHYFrame::new(phy_frame::MAX_FRAME_DATA_LENGTH, payload);
                 let frame_bits = frame.get_whole_frame_bits();
                 let decompressed_data = utils::read_compressed_u8_2_data(frame_bits);
@@ -142,6 +144,8 @@ impl Modulator {
             for i in 0..((len + 7) / 8) {
                 payload.push(data[i as usize + loop_cnt * (phy_frame::MAX_FRAME_DATA_LENGTH / 8)]);
             }
+            println!("push in payload data: {:?}", payload);
+            println!("frame len: {}", len);
             let frame = phy_frame::PHYFrame::new(len as usize, payload);
             let frame_bits = frame.get_whole_frame_bits();
             let decompressed_data = utils::read_compressed_u8_2_data(frame_bits);
@@ -177,6 +181,8 @@ impl Modulator {
                                     * (phy_frame::MAX_FRAME_DATA_LENGTH / 8)],
                         );
                     }
+                    println!("push in payload data: {:?}", payload);
+                    println!("frame len: {}", phy_frame::MAX_FRAME_DATA_LENGTH);
                     let frame = phy_frame::PHYFrame::new(phy_frame::MAX_FRAME_DATA_LENGTH, payload);
                     let frame_bits = frame.get_whole_frame_bits();
                     let decompressed_data = utils::read_compressed_u8_2_data(frame_bits);
@@ -243,11 +249,8 @@ impl Modulator {
             let mut last_single_frames_cnt = 0;
             for i in 0..carrier_cnt {
                 let mut payload = vec![];
-                let frame_len = if len > phy_frame::MAX_FRAME_DATA_LENGTH as isize {
-                    (phy_frame::MAX_FRAME_DATA_LENGTH / 8) as isize
-                } else {
-                    (len + 7) / 8
-                };
+                let bit_len = if len > phy_frame::MAX_FRAME_DATA_LENGTH as isize {phy_frame::MAX_FRAME_DATA_LENGTH} else {len as usize};
+                let frame_len = (bit_len + 7) / 8;
                 if len > 0 {
                     for j in 0..frame_len {
                         payload.push(
@@ -258,7 +261,9 @@ impl Modulator {
                     }
                     last_single_frames_cnt += 1;
                 }
-                let frame = phy_frame::PHYFrame::new(frame_len as usize, payload);
+                println!("push in payload data: {:?}", payload);
+                println!("frame len: {}", bit_len);
+                let frame = phy_frame::PHYFrame::new(bit_len, payload);
                 let frame_bits = frame.get_whole_frame_bits();
                 let decompressed_data = utils::read_compressed_u8_2_data(frame_bits);
                 println!(

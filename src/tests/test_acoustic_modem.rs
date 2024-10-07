@@ -229,7 +229,7 @@ async fn test_seconds_listening() {
 
 #[tokio::test]
 async fn test_ofdm_gen() {
-    let mut modulation = Modulator::new(vec![CARRIER, CARRIER*2], 48000, true);
+    let mut modulation = Modulator::new(vec![CARRIER, 1000, 2], 48000, true);
 
     // let data = vec![0,1,1,0,1,0,0,1,0,1];
     let mut file = File::open("testset/data.txt").unwrap();
