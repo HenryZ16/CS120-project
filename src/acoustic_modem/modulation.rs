@@ -17,7 +17,7 @@ use hound::{WavSpec, WavWriter};
 const SAMPLE_RATE: u32 = 48000;
 
 // If OFDM is enabled, the carrier_freq represents the redundant periods of the lowest frequency
-pub const REDUNDANT_PERIODS: usize = 7;
+pub const REDUNDANT_PERIODS: usize = 3;
 
 pub struct Modulator {
     carrier_freq: Vec<u32>,
@@ -112,8 +112,9 @@ impl Modulator {
                 }
                 println!("push in payload data: {:?}", payload);
                 println!("frame len: {}", phy_frame::MAX_FRAME_DATA_LENGTH);
-                let frame = phy_frame::PHYFrame::new(phy_frame::MAX_FRAME_DATA_LENGTH, payload);
-                let frame_bits = frame.get_whole_frame_bits();
+                let frame =
+                    phy_frame::PHYFrame::new_no_encoding(phy_frame::MAX_FRAME_DATA_LENGTH, payload);
+                let frame_bits = frame.1;
                 let decompressed_data = utils::read_compressed_u8_2_data(frame_bits);
                 println!(
                     "[bits_2_wave] decompressed_data.len(): {}",
@@ -148,8 +149,8 @@ impl Modulator {
             }
             println!("push in payload data: {:?}", payload);
             println!("frame len: {}", len);
-            let frame = phy_frame::PHYFrame::new(len as usize, payload);
-            let frame_bits = frame.get_whole_frame_bits();
+            let frame = phy_frame::PHYFrame::new_no_encoding(len as usize, payload);
+            let frame_bits = frame.1;
             let decompressed_data = utils::read_compressed_u8_2_data(frame_bits);
             println!(
                 "[bits_2_wave] decompressed_data.len(): {}",

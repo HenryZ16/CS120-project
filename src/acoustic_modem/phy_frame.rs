@@ -26,6 +26,16 @@ impl PHYFrame {
         PHYFrame { length, payload }
     }
 
+    // Just merge length and data into payload: Vec<Byte>, no encoding, no hexbit
+    pub fn new_no_encoding(length: usize, data: Vec<Byte>) -> (usize, Vec<Byte>) {
+        let mut payload: Vec<Byte> = Vec::new();
+        payload.push((length >> 8) as u8);
+        payload.push((length & 0xff) as u8);
+        payload.extend(data);
+
+        (length, payload)
+    }
+
     pub fn get_whole_frame_bits(&self) -> Vec<Bit> {
         // No PSK preamble. Just tranverse Vec<Hexbit> into Vec<u8>
         return utils::code_rs_hexbit_2_u8(self.payload.clone());

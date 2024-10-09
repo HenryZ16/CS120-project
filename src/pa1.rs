@@ -14,7 +14,7 @@ use std::fs::File;
 use std::io::Read;
 use std::vec;
 
-const CARRIER_LOW: u32 = 3000;
+const CARRIER_LOW: u32 = 4000;
 const CARRIER_INTERVAL: u32 = 1000;
 const CARRIER_CNT: u32 = 4;
 const SAMPLE_RATE: u32 = 48000;
@@ -42,7 +42,7 @@ pub async fn obj_3_send() -> Result<u32> {
     let mut modulator = Modulator::new(
         vec![CARRIER_LOW, CARRIER_INTERVAL, CARRIER_CNT],
         sample_rate,
-        true,
+        false,
     );
 
     // send
