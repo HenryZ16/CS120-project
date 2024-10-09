@@ -152,13 +152,21 @@ impl Demodulation2 {
 
         for i in 0..carrier_freq.len() {
             let carrier = carrier_freq.get(i).unwrap();
-            let ref_sin = (0..ref_len)
-                .map(|t| {
-                    (2.0 * std::f32::consts::PI * *carrier as f32 * (t as f32 / sample_rate as f32))
-                        .sin()
-                })
-                .collect::<Vec<f32>>();
-            ref_signal.push(ref_sin);
+            // let ref_sin = (0..ref_len)
+            //     .map(|t| {
+            //         (2.0 * std::f32::consts::PI * *carrier as f32 * (t as f32 / sample_rate as f32))
+            //             .sin()
+            //     })
+            //     .collect::<Vec<f32>>();
+            // ref_signal.push(ref_sin);
+
+            let single_len = sample_rate / carrier_freq[0];
+            let ref_line = (0..single_len).map(|item| 1.0 - 2.0 * (item as f32) / single_len as f32);
+            let mut ref_total = Vec::with_capacity(ref_len);
+            for _ in 0..redundent_times{
+                ref_total.extend(ref_line.clone());
+            }
+            ref_signal.push(ref_total);
         }
 
         let demodulation_config =
