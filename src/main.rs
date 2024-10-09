@@ -2,7 +2,6 @@ mod acoustic_modem;
 mod asio_stream;
 mod pa0;
 mod pa1;
-mod symrs;
 mod tests;
 mod utils;
 
