@@ -17,7 +17,7 @@ use hound::{WavSpec, WavWriter};
 const SAMPLE_RATE: u32 = 48000;
 
 // If OFDM is enabled, the carrier_freq represents the redundant periods of the lowest frequency
-pub const REDUNDANT_PERIODS: usize = 6;
+pub const REDUNDANT_PERIODS: usize = 4;
 
 pub struct Modulator {
     carrier_freq: Vec<u32>,
@@ -35,7 +35,7 @@ impl Modulator {
             for i in 0..carrier_freq_config[2] {
                 carrier_freq.push(carrier_freq_config[0] + i * carrier_freq_config[1]);
             }
-            carrier_freq.push(6000);
+            // carrier_freq.push(6000);
         } else {
             carrier_freq.push(carrier_freq_config[0]);
         }

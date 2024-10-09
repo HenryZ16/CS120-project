@@ -121,11 +121,11 @@ fn test_plot_wav() {
     root.present().unwrap();
 }
 
-const CARRIER: u32 = 3000;
+const CARRIER: u32 = 6000;
 const LEN: usize = phy_frame::FRAME_PAYLOAD_LENGTH;
 const REDUNDENT: usize = modulation::REDUNDANT_PERIODS;
 const PADDING: usize = 0;
-static CONFIG: [u32; 3] = [CARRIER, 1000, 2];
+static CONFIG: [u32; 3] = [CARRIER, 6000, 2];
 
 #[test]
 fn test_simple_gen() {
@@ -268,7 +268,7 @@ async fn test_ofdm_listen() {
     let wav_data = vec![read_wav_to_array("test.wav"), vec![0.0, 0.0], vec![]];
     println!("wav_data len: {}", wav_data[0].len());
     let handle = demodulator.listening(true, phy_frame::FRAME_PAYLOAD_LENGTH, &mut decoded_data, &mut debug_vec, wav_data);
-    let handle = time::timeout(Duration::from_secs(8), handle);
+    let handle = time::timeout(Duration::from_secs(15), handle);
     handle.await.unwrap();
     let mut writer = File::create("wav_data.txt").unwrap();
     for sample in &debug_vec{

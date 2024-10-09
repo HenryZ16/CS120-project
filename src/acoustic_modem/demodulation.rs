@@ -143,7 +143,7 @@ impl Demodulation2 {
         for i in 0..carrier_config[2]{
             carrier_freq.push(carrier_config[0] + i * carrier_config[1]);
         }
-        carrier_freq.push(6000);
+        // carrier_freq.push(6000);
         println!("carrier freq: {:?}", carrier_freq);
 
         let mut ref_signal = Vec::new();
@@ -152,22 +152,22 @@ impl Demodulation2 {
 
         for i in 0..carrier_freq.len() {
             let carrier = carrier_freq.get(i).unwrap();
-            // let ref_sin = (0..ref_len)
-            //     .map(|t| {
-            //         (2.0 * std::f32::consts::PI * *carrier as f32 * (t as f32 / sample_rate as f32))
-            //             .sin()
-            //     })
-            //     .collect::<Vec<f32>>();
-            // ref_signal.push(ref_sin);
+            let ref_sin = (0..ref_len)
+                .map(|t| {
+                    (2.0 * std::f32::consts::PI * *carrier as f32 * (t as f32 / sample_rate as f32))
+                        .sin()
+                })
+                .collect::<Vec<f32>>();
+            ref_signal.push(ref_sin);
 
-            let single_len = sample_rate / carrier_freq[i];
-            let ref_line: Vec<f32> = (0..single_len).map(|item| 1.0 - 2.0 * (item as f32) / single_len as f32).collect();
-            let mut ref_total = Vec::with_capacity(ref_len);
-            for j in 0..ref_len{
-                let ref_index = j % single_len as usize;
-                ref_total.push(ref_line[ref_index]);
-            }
-            ref_signal.push(ref_total);
+            // let single_len = sample_rate / carrier_freq[i];
+            // let ref_line: Vec<f32> = (0..single_len).map(|item| 1.0 - 2.0 * (item as f32) / single_len as f32).collect();
+            // let mut ref_total = Vec::with_capacity(ref_len);
+            // for j in 0..ref_len{
+            //     let ref_index = j % single_len as usize;
+            //     ref_total.push(ref_line[ref_index]);
+            // }
+            // ref_signal.push(ref_total);
         }
 
         let demodulation_config =
@@ -386,7 +386,7 @@ impl Demodulation2 {
 
                     if dot_product > local_max && dot_product > power_lim_preamble {
                         local_max = dot_product;
-                        println!("detected, local max: {}", local_max);
+                        // println!("detected, local max: {}", local_max);
                         start_index = i + 1;
                         debug_vec.clear();
                         debug_vec.extend(window);
@@ -496,15 +496,29 @@ impl Demodulation2 {
 }
 
 fn decode(input_data: Vec<Bit>) -> Result<(Vec<Byte>, usize), Error> {
-    println!(
-        "input data: {:?}, data length: {}",
-        input_data,
-        input_data.len()
-    );
+    // println!(
+    //     "input data: {:?}, data length: {}",
+    //     input_data,
+    //     input_data.len()
+    // );
+    let compressed = read_data_2_compressed_u8(input_data.clone());
     let hexbits = u8_2_code_rs_hexbit(read_data_2_compressed_u8(input_data));
 
-    println!("hexbits: {:?}, hexbit length: {}", hexbits, hexbits.len());
-    PHYFrame::payload_2_data(hexbits)
+    // println!("hexbits: {:?}, hexbit length: {}", hexbits, hexbits.len());
+    let decoded = PHYFrame::payload_2_data(hexbits.clone());
+
+    let decoded_data = decoded.unwrap().0;
+
+    let mut correct_num = 0;
+    for i in 0..decoded_data.len(){
+        if compressed[i] != decoded_data[i]{
+            correct_num += 1;
+        }
+    }
+
+    println!("correct num: {}", correct_num);
+
+    PHYFrame::payload_2_data(hexbits)    
 }
 
 fn move_data_into_buffer(
