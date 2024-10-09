@@ -32,10 +32,11 @@ impl Modulator {
     pub fn new(carrier_freq_config: Vec<u32>, sample_rate: u32, enable_ofdm: bool) -> Self {
         let mut carrier_freq = vec![];
         if enable_ofdm {
-            for i in 0..carrier_freq_config[2] {
-                carrier_freq.push(carrier_freq_config[0] + i * carrier_freq_config[1]);
-            }
-            // carrier_freq.push(6000);
+            // for i in 0..carrier_freq_config[2] {
+            //     carrier_freq.push(carrier_freq_config[0] + i * carrier_freq_config[1]);
+            // }
+            carrier_freq.push(6000);
+            carrier_freq.push(12000);
         } else {
             carrier_freq.push(carrier_freq_config[0]);
         }
@@ -250,7 +251,11 @@ impl Modulator {
             let mut last_single_frames_cnt = 0;
             for i in 0..carrier_cnt {
                 let mut payload = vec![];
-                let bit_len = if len > phy_frame::MAX_FRAME_DATA_LENGTH as isize {phy_frame::MAX_FRAME_DATA_LENGTH} else {len as usize};
+                let bit_len = if len > phy_frame::MAX_FRAME_DATA_LENGTH as isize {
+                    phy_frame::MAX_FRAME_DATA_LENGTH
+                } else {
+                    len as usize
+                };
                 let frame_len = (bit_len + 7) / 8;
                 if len > 0 {
                     for j in 0..frame_len {

@@ -64,7 +64,7 @@ impl PHYFrame {
 
         // RS encoding
         let mut array_data: [Hexbit; 24] = data.try_into().unwrap();
-        reed_solomon::medium::encode(&mut array_data);
+        reed_solomon::short::encode(&mut array_data);
         let payload = array_data.to_vec();
 
         println!(
@@ -80,7 +80,7 @@ impl PHYFrame {
     pub fn payload_2_data(payload: Vec<Hexbit>) -> Result<(Vec<Byte>, usize), Error> {
         // RS decoding
         let mut array_payload: [Hexbit; 24] = payload.try_into().unwrap();
-        reed_solomon::medium::decode(&mut array_payload);
+        reed_solomon::short::decode(&mut array_payload);
         let payload = array_payload.to_vec();
 
         // println!(
@@ -154,7 +154,9 @@ impl SimpleFrame {
         if redundent_times > 1 {
             redundent = redundent_times;
         }
-        let mut res: Vec<f32> = (0..1000).map(|x| (2.0 * std::f32::consts::PI * x as f32 / 48000.0 * 10000 as f32).sin()).collect();
+        let mut res: Vec<f32> = (0..1000)
+            .map(|x| (2.0 * std::f32::consts::PI * x as f32 / 48000.0 * 10000 as f32).sin())
+            .collect();
         res.extend(gen_preamble(self.sample_rate).iter());
         let padding = vec![0.0; padding_len];
         res.extend(padding.iter());
