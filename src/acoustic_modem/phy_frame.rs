@@ -8,6 +8,7 @@ use code_rs::coding::reed_solomon;
 pub const MAX_FRAME_DATA_LENGTH: usize = 72;
 pub const FRAME_PAYLOAD_LENGTH: usize = 144;
 pub const FRAME_LENGTH_LENGTH: usize = 12;
+pub const FRAME_LENGTH_LENGTH_NO_ENCODING: usize = 16;
 
 pub struct PHYFrame {
     length: usize,
@@ -32,6 +33,9 @@ impl PHYFrame {
         payload.push((length >> 8) as u8);
         payload.push((length & 0xff) as u8);
         payload.extend(data);
+        while payload.len() < (MAX_FRAME_DATA_LENGTH + FRAME_LENGTH_LENGTH_NO_ENCODING) / 8 {
+            payload.push(0);
+        }
 
         (length, payload)
     }
