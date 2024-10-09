@@ -160,11 +160,12 @@ impl Demodulation2 {
             //     .collect::<Vec<f32>>();
             // ref_signal.push(ref_sin);
 
-            let single_len = sample_rate / carrier_freq[0];
-            let ref_line = (0..single_len).map(|item| 1.0 - 2.0 * (item as f32) / single_len as f32);
+            let single_len = sample_rate / carrier_freq[i];
+            let ref_line: Vec<f32> = (0..single_len).map(|item| 1.0 - 2.0 * (item as f32) / single_len as f32).collect();
             let mut ref_total = Vec::with_capacity(ref_len);
-            for _ in 0..redundent_times{
-                ref_total.extend(ref_line.clone());
+            for j in 0..ref_len{
+                let ref_index = j % single_len as usize;
+                ref_total.push(ref_line[ref_index]);
             }
             ref_signal.push(ref_total);
         }

@@ -212,7 +212,7 @@ async fn test_frame_gen() {
 #[tokio::test]
 async fn test_seconds_listening() {
     let mut demodulator = Demodulation2::new(
-        vec![CARRIER],
+        CONFIG.into(),
         48000,
         "output.txt",
         modulation::REDUNDANT_PERIODS,
