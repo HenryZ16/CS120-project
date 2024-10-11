@@ -14,7 +14,7 @@ use std::fs::File;
 use std::io::Read;
 use std::vec;
 
-const CARRIER_LOW: u32 = 4000;
+const CARRIER_LOW: u32 = 1200;
 const CARRIER_INTERVAL: u32 = 1000;
 const CARRIER_CNT: u32 = 4;
 const SAMPLE_RATE: u32 = 48000;
