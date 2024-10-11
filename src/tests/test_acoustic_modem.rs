@@ -121,11 +121,11 @@ fn test_plot_wav() {
     root.present().unwrap();
 }
 
-const CARRIER: u32 = 6000;
+const CARRIER: u32 = 4000;
 const LEN: usize = phy_frame::FRAME_PAYLOAD_LENGTH;
 const REDUNDENT: usize = modulation::REDUNDANT_PERIODS;
 const PADDING: usize = 0;
-static CONFIG: [u32; 3] = [CARRIER, 6000, 2];
+static CONFIG: [u32; 3] = [CARRIER, 6000, 1];
 
 #[test]
 fn test_simple_gen() {
@@ -220,8 +220,8 @@ async fn test_seconds_listening() {
 
     let mut decoded_data = vec![];
     let mut debug_vec = vec![];
-    let handle = demodulator.listening(true, phy_frame::FRAME_PAYLOAD_LENGTH, &mut decoded_data, &mut debug_vec, vec![]);
-    let handle = time::timeout(Duration::from_secs(5), handle);
+    let handle = demodulator.listening(true, phy_frame::FRAME_LENGTH_LENGTH + phy_frame::MAX_FRAME_DATA_LENGTH, &mut decoded_data, &mut debug_vec, vec![]);
+    let handle = time::timeout(Duration::from_secs(20), handle);
     handle.await.unwrap();
     plot(debug_vec, "recv_wav.svg").unwrap();
 

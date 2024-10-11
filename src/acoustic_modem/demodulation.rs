@@ -356,7 +356,7 @@ impl Demodulation2 {
 
         let carrier_num = demodulate_config.carrier_freq.len();
         // let mut tmp_bits_data = vec![vec![0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 1, 0, 0, 1, 1, 1, 0, 0, 1, 0, 1, 0, 1, 1, 0, 1, 1, 1, 0, 0, 1, 1, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1], vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1]];
-        let mut tmp_bits_data = vec![Vec::with_capacity(data_len); carrier_num];
+        let mut tmp_bits_data: Vec<Vec<u8>> = vec![Vec::with_capacity(data_len); carrier_num];
         let mut is_reboot = false;
 
         let channels = self.input_config.config.channels() as usize;
@@ -386,7 +386,7 @@ impl Demodulation2 {
 
                     if dot_product > local_max && dot_product > power_lim_preamble {
                         local_max = dot_product;
-                        // println!("detected, local max: {}", local_max);
+                        println!("detected, local max: {}", local_max);
                         start_index = i + 1;
                         debug_vec.clear();
                         debug_vec.extend(window);
@@ -440,35 +440,55 @@ impl Demodulation2 {
                 demodulate_state = demodulate_state.next();
                 // demodulate_state = DemodulationState::Stop;
 
-                for i in 0..carrier_num{                    
-                    let result = decode(tmp_bits_data[i].clone());
-                    tmp_bits_data[i].clear();
-                    match result {
-                        Ok((vec, length)) => {
-                            println!("length: {}", length);
-                            if length > phy_frame::MAX_FRAME_DATA_LENGTH {
-                                println!("freq {}, wrong data length", demodulate_config.carrier_freq[i]);
-                            } else {
-                                let decompressed = read_compressed_u8_2_data(vec)[0..length].to_vec();
+                for i in 0..carrier_num{
+                    let mut length = 0;
+                    for j in 0..phy_frame::FRAME_LENGTH_LENGTH{
+                        length <<= 1;
+                        length += tmp_bits_data[i][j] as usize;
+                    }
+                    if length > phy_frame::MAX_FRAME_DATA_LENGTH{
+                        println!("wrong length {}", length);
+                        continue;
+                    }
+                    println!("received length {}", length);
+                    decoded_data.extend_from_slice(&tmp_bits_data[i][phy_frame::FRAME_LENGTH_LENGTH..phy_frame::FRAME_LENGTH_LENGTH + length]);
+                    if write_to_file{
+                        let to_write =  &tmp_bits_data[i]
+                                                        .clone()
+                                                        .iter()
+                                                        .map(|x| *x + b'0')
+                                                        .collect::<Vec<u8>>();
+                        self.writer.write_all(to_write).unwrap();
+                    }
 
-                                if write_to_file {
-                                    let to_write = &decompressed
-                                        .clone()
-                                        .iter()
-                                        .map(|x| *x + b'0')
-                                        .collect::<Vec<u8>>();
-                                    // println!("to write: {:?}", to_write);
-                                    self.writer.write_all(to_write).unwrap();
-                                }
-                                decoded_data.extend_from_slice(&decompressed[0..length]);
-                                println!("freq {}, received", demodulate_config.carrier_freq[i]);
-                            }
-                        }
+                    // let result = decode(tmp_bits_data[i].clone());
+                    // tmp_bits_data[i].clear();
+                    // match result {
+                    //     Ok((vec, length)) => {
+                    //         println!("length: {}", length);
+                    //         if length > phy_frame::MAX_FRAME_DATA_LENGTH {
+                    //             println!("freq {}, wrong data length", demodulate_config.carrier_freq[i]);
+                    //         } else {
+                    //             let decompressed = read_compressed_u8_2_data(vec)[0..length].to_vec();
 
-                        Err(_) => {
-                            println!("Error: received invalid data");
-                        }
-                    };
+                    //             if write_to_file {
+                    //                 let to_write = &decompressed
+                    //                     .clone()
+                    //                     .iter()
+                    //                     .map(|x| *x + b'0')
+                    //                     .collect::<Vec<u8>>();
+                    //                 // println!("to write: {:?}", to_write);
+                    //                 self.writer.write_all(to_write).unwrap();
+                    //             }
+                    //             decoded_data.extend_from_slice(&decompressed[0..length]);
+                    //             println!("freq {}, received", demodulate_config.carrier_freq[i]);
+                    //         }
+                    //     }
+
+                    //     Err(_) => {
+                    //         println!("Error: received invalid data");
+                    //     }
+                    // };
                 }
             }
 
