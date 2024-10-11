@@ -439,8 +439,8 @@ impl Demodulation2 {
                 is_reboot = true;
                 demodulate_state = demodulate_state.next();
                 // demodulate_state = DemodulationState::Stop;
-
                 for i in 0..carrier_num{
+                    println!("freq{}, received: {:?}", demodulate_config.carrier_freq[i], tmp_bits_data[i]);
                     let mut length = 0;
                     for j in 0..phy_frame::FRAME_LENGTH_LENGTH{
                         length <<= 1;

@@ -32,11 +32,11 @@ impl Modulator {
     pub fn new(carrier_freq_config: Vec<u32>, sample_rate: u32, enable_ofdm: bool) -> Self {
         let mut carrier_freq = vec![];
         if enable_ofdm {
-            // for i in 0..carrier_freq_config[2] {
-            //     carrier_freq.push(carrier_freq_config[0] + i * carrier_freq_config[1]);
-            // }
-            carrier_freq.push(6000);
-            carrier_freq.push(12000);
+            for i in 0..carrier_freq_config[2] {
+                carrier_freq.push(carrier_freq_config[0] + i * carrier_freq_config[1]);
+            }
+            // carrier_freq.push(6000);
+            // carrier_freq.push(12000);
         } else {
             carrier_freq.push(carrier_freq_config[0]);
         }

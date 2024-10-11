@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from scipy.io import wavfile
 
 # 读取 WAV 文件
-sample_rate, data = wavfile.read('test.wav')
+sample_rate, data = wavfile.read('recorded.wav')
 
 # 如果是立体声，选择一个通道
 if len(data.shape) > 1:

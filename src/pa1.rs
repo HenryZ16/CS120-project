@@ -100,7 +100,7 @@ pub async fn obj_3_send_file() -> Result<u32> {
 
 pub async fn obj_3_recv_file() -> Result<u32> {
     let mut demodulator = Demodulation2::new(
-        vec![CARRIER_LOW, CARRIER_INTERVAL, CARRIER_CNT],
+        vec![CARRIER_LOW, CARRIER_INTERVAL, 1],
         SAMPLE_RATE,
         "output.txt",
         modulation::REDUNDANT_PERIODS,
@@ -110,7 +110,7 @@ pub async fn obj_3_recv_file() -> Result<u32> {
     let mut debug_vec = vec![];
     let handle = demodulator.listening(
         true,
-        phy_frame::FRAME_PAYLOAD_LENGTH,
+        phy_frame::MAX_FRAME_DATA_LENGTH + phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING , 
         &mut decoded_data,
         &mut debug_vec,
         vec![],
