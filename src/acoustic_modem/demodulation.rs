@@ -4,6 +4,7 @@ use crate::utils::{
     read_compressed_u8_2_data, read_data_2_compressed_u8, u8_2_code_rs_hexbit, Bit, Byte,
 };
 use anyhow::Error;
+use std::result::Result::Ok;
 use biquad::{Biquad, Coefficients, DirectForm1, ToHertz, Type::BandPass};
 use cpal::traits::{DeviceTrait, HostTrait};
 use cpal::{Device, SampleRate, SupportedStreamConfig};
@@ -118,7 +119,7 @@ impl Demodulation2 {
         output_file: &str,
         redundent_times: usize,
     ) -> Self {
-        // let host = cpal::host_from_id(cpal::HostId::Asio).expect("failed to initialise ASIO host");
+        let host = cpal::host_from_id(cpal::HostId::Asio).expect("failed to initialise ASIO host");
         let host = cpal::default_host();
         let device = host.input_devices().expect("failed to find input device");
         let device = device
@@ -345,7 +346,7 @@ impl Demodulation2 {
 
         let mut demodulate_state = DemodulationState::DetectPreamble;
 
-        let power_lim_preamble = 5.0;
+        let power_lim_preamble = 80.0;
 
         let mut tmp_buffer: VecDeque<f32> = VecDeque::with_capacity(
             5 * demodulate_config
@@ -384,7 +385,7 @@ impl Demodulation2 {
                     // let window = tmp_buffer.range(i..i+demodulate_config.preamble_len);
                     let window = &tmp_buffer.as_slices().0[i..i + demodulate_config.preamble_len];
                     let dot_product = dot_product(window, &demodulate_config.preamble);
-
+                    // println!("preamble dot product: {}", dot_product);
                     if dot_product > local_max && dot_product > power_lim_preamble {
                         // println!("detected");
                         local_max = dot_product;
@@ -395,11 +396,11 @@ impl Demodulation2 {
                         && i - start_index > demodulate_config.preamble_len
                         && local_max > power_lim_preamble
                     {
-                        local_max = 0.0;
                         start_index += demodulate_config.preamble_len - 1;
                         demodulate_state = demodulate_state.next();
                         // println!("detected preamble");
-                        // println!("start index: {}, tmp buffer len: {}", start_index, tmp_buffer_len);
+                        // println!("start index: {}, tmp buffer len: {}, max: {}", start_index, tmp_buffer_len, local_max);
+                        local_max = 0.0;
                         break;
                     }
                 }
@@ -446,11 +447,11 @@ impl Demodulation2 {
 
                 match result {
                     Ok((vec, length)) => {
-                        // println!("length: {}", length);
                         if length > phy_frame::MAX_FRAME_DATA_LENGTH {
-                            println!("wrong data length");
+                            println!("wrong data length: {}", length);
                         } else {
                             let decompressed = read_compressed_u8_2_data(vec)[0..length].to_vec();
+                            println!("length: {}", length);
 
                             if write_to_file {
                                 let to_write = &decompressed
@@ -469,6 +470,7 @@ impl Demodulation2 {
                         println!("Error: received invalid data");
                     }
                 };
+                // println!("tmp bit len: {}", tmp_bits_data.len());
             }
 
             let pop_times = if start_index == usize::MAX {
@@ -483,6 +485,7 @@ impl Demodulation2 {
 
             start_index = if start_index == usize::MAX || is_reboot {
                 is_reboot = false;
+                // println!("reboot");
                 usize::MAX
             } else {
                 0
@@ -500,10 +503,18 @@ fn decode(input_data: Vec<Bit>) -> Result<(Vec<Byte>, usize), Error> {
     //     input_data,
     //     input_data.len()
     // );
-    let hexbits = u8_2_code_rs_hexbit(read_data_2_compressed_u8(input_data));
+    // let hexbits = u8_2_code_rs_hexbit(read_data_2_compressed_u8(input_data));
 
-    // println!("hexbits: {:?}, hexbit length: {}", hexbits, hexbits.len());
-    PHYFrame::payload_2_data(hexbits)
+    // // println!("hexbits: {:?}, hexbit length: {}", hexbits, hexbits.len());
+    // PHYFrame::payload_2_data(hexbits)
+    let mut length = 0;
+    for i in 0..phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING{
+        length <<= 1;
+        length += input_data[i] as usize;
+    }
+
+    let data = read_data_2_compressed_u8(input_data[phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING..input_data.len()].to_vec());
+    Ok((data, length))
 }
 
 fn move_data_into_buffer(

@@ -218,8 +218,8 @@ async fn test_seconds_listening() {
 
     let mut decoded_data = vec![];
     let mut debug_vec = vec![];
-    let handle = demodulator.listening(true, phy_frame::FRAME_PAYLOAD_LENGTH, &mut decoded_data, &mut debug_vec);
-    let handle = time::timeout(Duration::from_secs(5), handle);
+    let handle = demodulator.listening(true, phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING + phy_frame::MAX_FRAME_DATA_LENGTH, &mut decoded_data, &mut debug_vec);
+    let handle = time::timeout(Duration::from_secs(25), handle);
     handle.await.unwrap();
     plot(debug_vec, "recv_wav.svg").unwrap();
 

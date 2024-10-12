@@ -14,7 +14,7 @@ use std::fs::File;
 use std::io::Read;
 use std::vec;
 
-const CARRIER: u32 = 4000;
+const CARRIER: u32 = 1000;
 const SAMPLE_RATE: u32 = 48000;
 
 pub async fn obj_2() -> Result<u32> {
@@ -102,11 +102,11 @@ pub async fn obj_3_recv_file() -> Result<u32> {
     let mut debug_vec = vec![];
     let handle = demodulator.listening(
         true,
-        phy_frame::FRAME_PAYLOAD_LENGTH,
+        phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING + phy_frame::MAX_FRAME_DATA_LENGTH,
         &mut decoded_data,
         &mut debug_vec,
     );
-    let handle = time::timeout(Duration::from_secs(25), handle);
+    let handle = time::timeout(Duration::from_secs(18), handle);
     println!("[pa1-obj3-receive] Start");
     handle.await.unwrap_err();
     println!("[pa1-obj3-recrive] Stop");

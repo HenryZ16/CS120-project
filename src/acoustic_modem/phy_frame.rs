@@ -5,9 +5,10 @@ use anyhow::{Error, Result};
 use code_rs::bits::Hexbit;
 use code_rs::coding::reed_solomon;
 
-pub const MAX_FRAME_DATA_LENGTH: usize = 72;
+pub const MAX_FRAME_DATA_LENGTH: usize = 128;
 pub const FRAME_PAYLOAD_LENGTH: usize = 144;
 pub const FRAME_LENGTH_LENGTH: usize = 12;
+pub const FRAME_LENGTH_LENGTH_NO_ENCODING: usize = 16;
 
 pub struct PHYFrame {
     length: usize,
@@ -24,6 +25,19 @@ impl PHYFrame {
     pub fn new(length: usize, data: Vec<Byte>) -> Self {
         let payload = PHYFrame::data_2_payload(data, length).unwrap();
         PHYFrame { length, payload }
+    }
+
+    pub fn new_no_encoding(length: usize, data: Vec<Byte>) -> (usize, Vec<Byte>) {
+        let mut payload: Vec<Byte> = Vec::new();
+        println!("length: {}", length);
+        payload.push((length >> 8) as u8);
+        payload.push((length & 0xff) as u8);
+        payload.extend(data);
+        while payload.len() < (MAX_FRAME_DATA_LENGTH + FRAME_LENGTH_LENGTH_NO_ENCODING) / 8 {
+            payload.push(0);
+        }
+
+        (length, payload)
     }
 
     pub fn get_whole_frame_bits(&self) -> Vec<Bit> {
@@ -177,9 +191,9 @@ impl SimpleFrame {
 }
 
 pub fn gen_preamble(sample_rate: u32) -> Vec<f32> {
-    let start = 1e3;
-    let end = 9e3;
-    let half_length = 340;
+    let start = 8e2;
+    let end = 2000.0;
+    let half_length = 280;
     let dx: f64 = 1.0 / sample_rate as f64;
     let step = (end - start) as f64 / half_length as f64;
     let mut fp: Vec<f64> = (0..half_length).map(|i| start + i as f64 * step).collect();
