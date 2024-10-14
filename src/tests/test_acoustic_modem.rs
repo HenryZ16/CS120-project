@@ -150,38 +150,6 @@ fn test_simple_gen() {
 }
 
 #[tokio::test]
-async fn test_simple_listen() {
-    let mut demodulator = Demodulation2::new(vec![CARRIER], 48000, "text.txt", REDUNDENT);
-
-    let mut debug_vec = vec![];
-
-    use std::fs::File;
-    use std::io::BufReader;
-
-    let reader = File::open("ref_signal.txt").unwrap();
-    let reader = BufReader::new(reader);
-    let mut ref_data = vec![];
-    for data in reader.bytes() {
-        ref_data.push(data.unwrap() - b'0');
-    }
-
-    // println!("ref: {:?}", ref_data);
-    loop {
-        let res = demodulator.simple_listen(true, &mut debug_vec, LEN, PADDING).await;
-        let mut diff_num = 0;
-        for i in 0..ref_data.len() {
-            if ref_data[i] != res[i] {
-                diff_num += 1;
-            }
-        }
-
-        // println!("debug vec: {:?}", debug_vec);
-        // plot(debug_vec, "recv_wav.svg").unwrap();
-        println!("error percent: {}", diff_num as f32 / ref_data.len() as f32);
-    }
-}
-
-#[tokio::test]
 async fn test_frame_gen() {
     let sample_rate = 48000;
     let carrier = CARRIER;
@@ -214,6 +182,7 @@ async fn test_seconds_listening() {
         48000,
         "output.txt",
         modulation::REDUNDANT_PERIODS,
+        false,
     );
 
     let mut decoded_data = vec![];

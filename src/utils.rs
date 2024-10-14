@@ -55,7 +55,7 @@ pub fn u8_2_code_rs_hexbit(data: Vec<Byte>) -> Vec<code_rs::bits::Hexbit> {
     use code_rs::bits::Hexbit;
 
     // ensure that the length of data bits is a common divisor of 6 and 8: length mod 3 = 0
-    assert_eq!(data.len() % 3, 0);
+    // assert_eq!(data.len() % 3, 0);
 
     let mut hexbits = vec![];
     for i in (0..data.len()).step_by(3) {

@@ -16,7 +16,7 @@ use std::vec;
 use crate::asio_stream::read_wav_and_play;
 const CARRIER: u32 = 4000;
 const SAMPLE_RATE: u32 = 48000;
-
+const OFDM: bool = true;
 pub async fn obj_2() -> Result<u32> {
     let mut modulator_1 = Modulator::new(vec![1000, 10000], 48000, false);
     modulator_1.test_carrier_wave().await;
@@ -38,7 +38,7 @@ pub async fn obj_3_send() -> Result<u32> {
     // modulator
     let sample_rate = 48000;
     let carrier_freq = CARRIER;
-    let mut modulator = Modulator::new(vec![carrier_freq], sample_rate, false);
+    let mut modulator = Modulator::new(vec![carrier_freq], sample_rate, OFDM);
 
     // send
     modulator
@@ -71,7 +71,7 @@ pub async fn obj_3_send_file() -> Result<u32> {
     // modulator
     let sample_rate = 48000;
     let carrier_freq = CARRIER;
-    let mut modulator = Modulator::new(vec![carrier_freq], sample_rate, false);
+    let mut modulator = Modulator::new(vec![carrier_freq, carrier_freq * 2], sample_rate, OFDM);
 
     let file = "testset/send.wav";
     // send
@@ -95,10 +95,11 @@ pub async fn obj_3_send_file() -> Result<u32> {
 
 pub async fn obj_3_recv_file() -> Result<u32> {
     let mut demodulator = Demodulation2::new(
-        vec![CARRIER],
+        vec![CARRIER, CARRIER * 2],
         SAMPLE_RATE,
         "other.txt",
         modulation::REDUNDANT_PERIODS,
+        OFDM,
     );
 
     let mut decoded_data = vec![];

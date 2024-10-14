@@ -24,3 +24,4 @@ rustflags = ["-Awarnings"]
 
 [profile.release]
 opt-level = 2
+lto = false
