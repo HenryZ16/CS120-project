@@ -120,7 +120,7 @@ impl Demodulation2 {
         redundent_times: usize,
     ) -> Self {
         let host = cpal::host_from_id(cpal::HostId::Asio).expect("failed to initialise ASIO host");
-        let host = cpal::default_host();
+        // let host = cpal::default_host();
         let device = host.input_devices().expect("failed to find input device");
         let device = device
             .into_iter()
@@ -130,8 +130,8 @@ impl Demodulation2 {
 
         let default_config = device.default_input_config().unwrap();
         let config = SupportedStreamConfig::new(
-            default_config.channels(),
-            // 1,                   // mono
+            // default_config.channels(),
+            1,                   // mono
             SampleRate(sample_rate), // sample rate
             default_config.buffer_size().clone(),
             default_config.sample_format(),
@@ -341,7 +341,7 @@ impl Demodulation2 {
 
         let mut input_stream = self.input_config.create_input_stream();
         let demodulate_config = &self.demodulate_config;
-        let alpha_check = 0.31;
+        let alpha_check = 1.0;
         let mut prev = 0.0;
 
         let mut demodulate_state = DemodulationState::DetectPreamble;
@@ -451,7 +451,7 @@ impl Demodulation2 {
                             println!("wrong data length: {}", length);
                         } else {
                             let decompressed = read_compressed_u8_2_data(vec)[0..length].to_vec();
-                            println!("length: {}", length);
+                            // println!("length: {}", length);
 
                             if write_to_file {
                                 let to_write = &decompressed

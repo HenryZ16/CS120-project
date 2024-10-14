@@ -23,6 +23,4 @@ biquad = "0.3"
 rustflags = ["-Awarnings"]
 
 [profile.release]
-lto = "fat"
-panic = "abort"
-opt-level = 0
+opt-level = 2

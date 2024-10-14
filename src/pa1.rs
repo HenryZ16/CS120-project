@@ -11,10 +11,10 @@ use tokio::time::{self, Duration};
 //     Device, Host, HostId, SampleRate, SupportedStreamConfig,
 // };
 use std::fs::File;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::vec;
-
-const CARRIER: u32 = 1000;
+use crate::asio_stream::read_wav_and_play;
+const CARRIER: u32 = 4000;
 const SAMPLE_RATE: u32 = 48000;
 
 pub async fn obj_2() -> Result<u32> {
@@ -73,14 +73,17 @@ pub async fn obj_3_send_file() -> Result<u32> {
     let carrier_freq = CARRIER;
     let mut modulator = Modulator::new(vec![carrier_freq], sample_rate, false);
 
+    let file = "testset/send.wav";
     // send
     modulator
         .send_bits_2_file(
             utils::read_data_2_compressed_u8(data.clone()),
             data.len() as isize,
-            "testset/send.wav",
+            &file,
         )
         .await;
+    
+    read_wav_and_play(&file).await;
 
     println!(
         "[pa1-obj3-send] Total elapsed time: {:?}",
@@ -94,21 +97,30 @@ pub async fn obj_3_recv_file() -> Result<u32> {
     let mut demodulator = Demodulation2::new(
         vec![CARRIER],
         SAMPLE_RATE,
-        "output.txt",
+        "other.txt",
         modulation::REDUNDANT_PERIODS,
     );
 
     let mut decoded_data = vec![];
     let mut debug_vec = vec![];
     let handle = demodulator.listening(
-        true,
+        false,
         phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING + phy_frame::MAX_FRAME_DATA_LENGTH,
         &mut decoded_data,
         &mut debug_vec,
     );
-    let handle = time::timeout(Duration::from_secs(18), handle);
+    let handle = time::timeout(Duration::from_secs(15), handle);
     println!("[pa1-obj3-receive] Start");
     handle.await.unwrap_err();
+    let mut file = File::create("output.txt").unwrap();
+    // file.write_all(&decoded_data).unwrap();
+    file.write_all(
+            &decoded_data
+                .iter()
+                .map(|x| x + b'0')
+                .collect::<Vec<u8>>(),
+        )
+        .unwrap();
     println!("[pa1-obj3-recrive] Stop");
 
     return Ok(0);
