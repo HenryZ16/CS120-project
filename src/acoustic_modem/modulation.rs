@@ -17,7 +17,7 @@ use hound::{WavSpec, WavWriter};
 const SAMPLE_RATE: u32 = 48000;
 
 // If OFDM is enabled, the carrier_freq represents the redundant periods of the lowest frequency
-pub const REDUNDANT_PERIODS: usize = 1;
+pub const REDUNDANT_PERIODS: usize = 2;
 
 pub struct Modulator {
     carrier_freq: Vec<u32>,
@@ -95,8 +95,8 @@ impl Modulator {
         println!("[send_bits] send bits: {:?}", len);
 
         // warm up
-        let mut modulated_signal: Vec<f32> = (0..0)
-            .map(|x| (2.0 * std::f32::consts::PI * x as f32 / 48000.0 * 5000 as f32).sin())
+        let mut modulated_signal: Vec<f32> = (0..16000)
+            .map(|x| (2.0 * std::f32::consts::PI * x as f32 / 48000.0 * 6000 as f32).sin())
             .collect();
 
         let mut len = len;

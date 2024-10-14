@@ -14,7 +14,7 @@ use std::fs::File;
 use std::io::Read;
 use std::vec;
 
-const CARRIER_LOW: u32 = 1200;
+const CARRIER_LOW: u32 = 2400;
 const CARRIER_INTERVAL: u32 = 1000;
 const CARRIER_CNT: u32 = 4;
 const SAMPLE_RATE: u32 = 48000;
@@ -110,7 +110,7 @@ pub async fn obj_3_recv_file() -> Result<u32> {
     let mut debug_vec = vec![];
     let handle = demodulator.listening(
         true,
-        phy_frame::MAX_FRAME_DATA_LENGTH + phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING , 
+        phy_frame::MAX_FRAME_DATA_LENGTH + phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING,
         &mut decoded_data,
         &mut debug_vec,
         vec![],
