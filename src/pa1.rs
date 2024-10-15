@@ -118,7 +118,7 @@ pub async fn obj_3_recv_file() -> Result<u32> {
     let handle = time::timeout(Duration::from_secs(15), handle);
     println!("[pa1-obj3-receive] Start");
     handle.await.unwrap_err();
-    let mut file = File::create("output.txt").unwrap();
+    let mut file = File::create("testset/output.txt").unwrap();
     // file.write_all(&decoded_data).unwrap();
     file.write_all(&decoded_data.iter().map(|x| x + b'0').collect::<Vec<u8>>())
         .unwrap();

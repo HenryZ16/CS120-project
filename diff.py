@@ -5,7 +5,7 @@ def compare_files(file1_path, file2_path):
 
     # 确保两个文件的长度相同
     if len(content1) != len(content2):
-        raise ValueError("Files have different lengths")
+        raise ValueError("Files have different lengths:", abs(len(content1) - len(content2)))
 
     # 统计不同字符的数量
     diff_count = sum(1 for a, b in zip(content1, content2) if a != b)
@@ -13,7 +13,7 @@ def compare_files(file1_path, file2_path):
     return diff_count
 
 def main():
-    file1_path = 'output.txt'
+    file1_path = 'testset/output.txt'
     file2_path = 'testset/data.txt'
     try:
         diff_count = compare_files(file1_path, file2_path)
