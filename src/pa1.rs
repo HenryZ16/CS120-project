@@ -104,7 +104,7 @@ pub async fn obj_3_recv_file() -> Result<u32> {
         OFDM,
     );
 
-    let data_len = if ENABLE_ECC {phy_frame::FRAME_LENGTH_LENGTH + phy_frame::MAX_FRAME_DATA_LENGTH} 
+    let data_len = if ENABLE_ECC {phy_frame::FRAME_PAYLOAD_LENGTH} 
                             else {phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING + phy_frame::MAX_FRAME_DATA_LENGTH};
 
     let mut decoded_data = vec![];
