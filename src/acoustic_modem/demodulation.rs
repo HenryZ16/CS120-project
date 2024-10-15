@@ -4,7 +4,6 @@ use crate::utils::{
     read_compressed_u8_2_data, read_data_2_compressed_u8, u8_2_code_rs_hexbit, Bit, Byte,
 };
 use anyhow::Error;
-use std::result::Result::Ok;
 use biquad::{Biquad, Coefficients, DirectForm1, ToHertz, Type::BandPass};
 use cpal::traits::{DeviceTrait, HostTrait};
 use cpal::{Device, SampleRate, SupportedStreamConfig};
@@ -13,6 +12,7 @@ use std::collections::VecDeque;
 use std::fs::File;
 use std::io::Write;
 use std::ops::{Add, Mul};
+use std::result::Result::Ok;
 
 struct InputStreamConfig {
     config: SupportedStreamConfig,
@@ -118,10 +118,10 @@ impl Demodulation2 {
         sample_rate: u32,
         output_file: &str,
         redundent_times: usize,
-        enable_ofdm: bool
+        enable_ofdm: bool,
     ) -> Self {
-        let host = cpal::host_from_id(cpal::HostId::Asio).expect("failed to initialise ASIO host");
-        // let host = cpal::default_host();
+        // let host = cpal::host_from_id(cpal::HostId::Asio).expect("failed to initialise ASIO host");
+        let host = cpal::default_host();
         let device = host.input_devices().expect("failed to find input device");
         let device = device
             .into_iter()
@@ -131,8 +131,8 @@ impl Demodulation2 {
 
         let default_config = device.default_input_config().unwrap();
         let config = SupportedStreamConfig::new(
-            // default_config.channels(),
-            1,                   // mono
+            default_config.channels(),
+            // 1,                       // mono
             SampleRate(sample_rate), // sample rate
             default_config.buffer_size().clone(),
             default_config.sample_format(),
@@ -161,7 +161,7 @@ impl Demodulation2 {
                 .collect::<Vec<f32>>();
             ref_signal.push(ref_sin);
         }
-        if !enable_ofdm{
+        if !enable_ofdm {
             ref_signal = vec![ref_signal[0].clone()];
             ref_signal_len = vec![ref_signal_len[0].clone()];
         }
@@ -254,7 +254,10 @@ impl Demodulation2 {
                         start_index += demodulate_config.preamble_len - 1;
                         demodulate_state = demodulate_state.next();
                         // println!("detected preamble");
-                        println!("start index: {}, tmp buffer len: {}, max: {}", start_index, tmp_buffer_len, local_max);
+                        println!(
+                            "start index: {}, tmp buffer len: {}, max: {}",
+                            start_index, tmp_buffer_len, local_max
+                        );
                         local_max = 0.0;
                         break;
                     }
@@ -276,19 +279,15 @@ impl Demodulation2 {
                     && tmp_bits_data[0].len() < data_len
                 {
                     let window = &tmp_buffer.as_slices().0
-                                [start_index..start_index + demodulate_config.ref_signal_len[0]];
-                    for k in 0..carrier_num{
-
-                        let dot_product = dot_product(
-                            window,
-                            &self.demodulate_config.ref_signal[k],
-                        );
+                        [start_index..start_index + demodulate_config.ref_signal_len[0]];
+                    for k in 0..carrier_num {
+                        let dot_product =
+                            dot_product(window, &self.demodulate_config.ref_signal[k]);
                         // debug_vec.extend(
                         //     &tmp_buffer.as_slices().0
                         //         [start_index..start_index + demodulate_config.ref_signal_len[k]],
                         // );
-    
-                        
+
                         tmp_bits_data[k].push(if dot_product >= 0.0 { 0 } else { 1 });
                     }
                     start_index += demodulate_config.ref_signal_len[0];
@@ -301,20 +300,20 @@ impl Demodulation2 {
                 demodulate_state = demodulate_state.next();
                 // demodulate_state = DemodulationState::Stop;
                 last_frame_index = 0;
-                for k in 0..carrier_num{
-    
+                for k in 0..carrier_num {
                     let result = decode(&tmp_bits_data[k]);
                     // println!("data: {:?}", tmp_bits_data[k]);
                     tmp_bits_data[k].clear();
-    
+
                     match result {
                         Ok((vec, length)) => {
                             if length > phy_frame::MAX_FRAME_DATA_LENGTH {
                                 println!("wrong data length: {}", length);
                             } else {
-                                let decompressed = read_compressed_u8_2_data(vec)[0..length].to_vec();
+                                let decompressed =
+                                    read_compressed_u8_2_data(vec)[0..length].to_vec();
                                 // println!("length: {}", length);
-    
+
                                 if write_to_file {
                                     let to_write = &decompressed
                                         .clone()
@@ -327,13 +326,12 @@ impl Demodulation2 {
                                 decoded_data.extend_from_slice(&decompressed[0..length]);
                             }
                         }
-    
+
                         Err(_) => {
                             println!("Error: received invalid data");
                         }
-
                     }
-                };
+                }
                 // println!("tmp bit len: {}", tmp_bits_data.len());
             }
 
@@ -342,7 +340,7 @@ impl Demodulation2 {
             } else {
                 start_index
             };
-            if !is_reboot{
+            if !is_reboot {
                 last_frame_index += pop_times;
             }
             for _ in 0..pop_times {
@@ -374,12 +372,14 @@ fn decode(input_data: &Vec<Bit>) -> Result<(Vec<Byte>, usize), Error> {
     // // println!("hexbits: {:?}, hexbit length: {}", hexbits, hexbits.len());
     // PHYFrame::payload_2_data(hexbits)
     let mut length = 0;
-    for i in 0..phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING{
+    for i in 0..phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING {
         length <<= 1;
         length += input_data[i] as usize;
     }
 
-    let data = read_data_2_compressed_u8(input_data[phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING..input_data.len()].to_vec());
+    let data = read_data_2_compressed_u8(
+        input_data[phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING..input_data.len()].to_vec(),
+    );
     Ok((data, length))
 }
 

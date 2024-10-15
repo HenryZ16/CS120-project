@@ -5,7 +5,7 @@ use anyhow::{Error, Result};
 use code_rs::bits::Hexbit;
 use code_rs::coding::reed_solomon;
 
-pub const MAX_FRAME_DATA_LENGTH: usize = 128;
+pub const MAX_FRAME_DATA_LENGTH: usize = 72;
 pub const FRAME_PAYLOAD_LENGTH: usize = 144;
 pub const FRAME_LENGTH_LENGTH: usize = 12;
 pub const FRAME_LENGTH_LENGTH_NO_ENCODING: usize = 16;

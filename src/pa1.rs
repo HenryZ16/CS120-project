@@ -10,13 +10,14 @@ use tokio::time::{self, Duration};
 //     traits::{DeviceTrait, HostTrait},
 //     Device, Host, HostId, SampleRate, SupportedStreamConfig,
 // };
+use crate::asio_stream::read_wav_and_play;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::vec;
-use crate::asio_stream::read_wav_and_play;
 const CARRIER: u32 = 4000;
 const SAMPLE_RATE: u32 = 48000;
 const OFDM: bool = true;
+
 pub async fn obj_2() -> Result<u32> {
     let mut modulator_1 = Modulator::new(vec![1000, 10000], 48000, false);
     modulator_1.test_carrier_wave().await;
@@ -38,7 +39,7 @@ pub async fn obj_3_send() -> Result<u32> {
     // modulator
     let sample_rate = 48000;
     let carrier_freq = CARRIER;
-    let mut modulator = Modulator::new(vec![carrier_freq], sample_rate, OFDM);
+    let mut modulator = Modulator::new(vec![carrier_freq, carrier_freq * 2], sample_rate, OFDM);
 
     // send
     modulator
@@ -82,7 +83,7 @@ pub async fn obj_3_send_file() -> Result<u32> {
             &file,
         )
         .await;
-    
+
     read_wav_and_play(&file).await;
 
     println!(
@@ -115,12 +116,7 @@ pub async fn obj_3_recv_file() -> Result<u32> {
     handle.await.unwrap_err();
     let mut file = File::create("output.txt").unwrap();
     // file.write_all(&decoded_data).unwrap();
-    file.write_all(
-            &decoded_data
-                .iter()
-                .map(|x| x + b'0')
-                .collect::<Vec<u8>>(),
-        )
+    file.write_all(&decoded_data.iter().map(|x| x + b'0').collect::<Vec<u8>>())
         .unwrap();
     println!("[pa1-obj3-recrive] Stop");
 
