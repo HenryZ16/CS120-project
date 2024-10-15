@@ -1,5 +1,6 @@
 use crate::acoustic_modem::phy_frame::{self, PHYFrame};
 use crate::asio_stream::InputAudioStream;
+use crate::acoustic_modem::modulation::ENABLE_ECC;
 use crate::utils::{
     read_compressed_u8_2_data, read_data_2_compressed_u8, u8_2_code_rs_hexbit, Bit, Byte,
 };
@@ -362,25 +363,29 @@ impl Demodulation2 {
 }
 
 fn decode(input_data: &Vec<Bit>) -> Result<(Vec<Byte>, usize), Error> {
-    // println!(
-    //     "input data: {:?}, data length: {}",
-    //     input_data,
-    //     input_data.len()
-    // );
-    // let hexbits = u8_2_code_rs_hexbit(read_data_2_compressed_u8(input_data));
-
-    // // println!("hexbits: {:?}, hexbit length: {}", hexbits, hexbits.len());
-    // PHYFrame::payload_2_data(hexbits)
-    let mut length = 0;
-    for i in 0..phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING {
-        length <<= 1;
-        length += input_data[i] as usize;
+    if ENABLE_ECC {
+        // println!(
+        //     "input data: {:?}, data length: {}",
+        //     input_data,
+        //     input_data.len()
+        // );
+        let hexbits = u8_2_code_rs_hexbit(read_data_2_compressed_u8(input_data.clone()));
+    
+        // println!("hexbits: {:?}, hexbit length: {}", hexbits, hexbits.len());
+        PHYFrame::payload_2_data(hexbits)
     }
-
-    let data = read_data_2_compressed_u8(
-        input_data[phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING..input_data.len()].to_vec(),
-    );
-    Ok((data, length))
+    else {        
+        let mut length = 0;
+        for i in 0..phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING {
+            length <<= 1;
+            length += input_data[i] as usize;
+        }
+    
+        let data = read_data_2_compressed_u8(
+            input_data[phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING..input_data.len()].to_vec(),
+        );
+        Ok((data, length))
+    }
 }
 
 fn move_data_into_buffer(
