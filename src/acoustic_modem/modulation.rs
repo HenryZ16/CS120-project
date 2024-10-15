@@ -15,6 +15,7 @@ use futures::SinkExt;
 use hound::{WavSpec, WavWriter};
 
 const SAMPLE_RATE: u32 = 48000;
+const OFDM_FRAME_DISTANCE: usize = 50;
 pub const REDUNDANT_PERIODS: usize = 4;
 pub const ENABLE_ECC: bool = true;
 
@@ -245,7 +246,7 @@ impl Modulator {
 
                 // wait for a while
                 // tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
-                modulated_signal.extend(vec![0.0; 5]);
+                modulated_signal.extend(vec![0.0; OFDM_FRAME_DISTANCE]);
             }
 
             // send the last frame
