@@ -11,7 +11,6 @@ pub const FRAME_LENGTH_LENGTH: usize = 12;
 pub const FRAME_LENGTH_LENGTH_NO_ENCODING: usize = 16;
 
 pub struct PHYFrame {
-    length: usize,
     payload: Vec<Hexbit>,
 }
 
@@ -24,7 +23,7 @@ impl PHYFrame {
     // Payload Total: <24 Hexbits>
     pub fn new(length: usize, data: Vec<Byte>) -> Self {
         let payload = PHYFrame::data_2_payload(data, length).unwrap();
-        PHYFrame { length, payload }
+        PHYFrame { payload }
     }
 
     pub fn new_no_encoding(length: usize, data: Vec<Byte>) -> (usize, Vec<Byte>) {
@@ -168,7 +167,9 @@ impl SimpleFrame {
         if redundent_times > 1 {
             redundent = redundent_times;
         }
-        let mut res: Vec<f32> = (0..1000).map(|x| (2.0 * std::f32::consts::PI * x as f32 / 48000.0 * 10000 as f32).sin()).collect();
+        let mut res: Vec<f32> = (0..1000)
+            .map(|x| (2.0 * std::f32::consts::PI * x as f32 / 48000.0 * 10000 as f32).sin())
+            .collect();
         res.extend(gen_preamble(self.sample_rate).iter());
         let padding = vec![0.0; padding_len];
         res.extend(padding.iter());

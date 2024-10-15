@@ -24,7 +24,6 @@ pub struct Modulator {
     enable_ofdm: bool,
     output_stream: OutputAudioStream<std::vec::IntoIter<f32>>,
     config: SupportedStreamConfig,
-    device: cpal::Device,
 }
 
 impl Modulator {
@@ -32,10 +31,6 @@ impl Modulator {
         // let host = cpal::host_from_id(HostId::Asio).expect("failed to initialise ASIO host");
         let host = cpal::default_host();
         let device = host.output_devices().expect("failed to find output device");
-        let device = device
-            .into_iter()
-            .next()
-            .expect("no output device available");
         let device = host.default_output_device().unwrap();
         println!("[Modulator] Output device: {:?}", device.name().unwrap());
 
@@ -56,7 +51,6 @@ impl Modulator {
             enable_ofdm,
             output_stream,
             config,
-            device,
         }
     }
 
@@ -180,10 +174,12 @@ impl Modulator {
                     }
                     println!("push in payload data: {:?}", payload);
                     println!("frame len: {}", phy_frame::MAX_FRAME_DATA_LENGTH);
-                let frame =
-                    phy_frame::PHYFrame::new_no_encoding(phy_frame::MAX_FRAME_DATA_LENGTH, payload);
-                let frame_bits = frame.1;
-                let decompressed_data = utils::read_compressed_u8_2_data(frame_bits);
+                    let frame = phy_frame::PHYFrame::new_no_encoding(
+                        phy_frame::MAX_FRAME_DATA_LENGTH,
+                        payload,
+                    );
+                    let frame_bits = frame.1;
+                    let decompressed_data = utils::read_compressed_u8_2_data(frame_bits);
                     println!(
                         "[bits_2_wave ofdm] decompressed_data.len(): {}",
                         decompressed_data.len()
@@ -265,8 +261,7 @@ impl Modulator {
                 }
                 println!("push in payload data: {:?}", payload);
                 println!("frame len: {}", bit_len);
-                let frame =
-                    phy_frame::PHYFrame::new_no_encoding(bit_len, payload);
+                let frame = phy_frame::PHYFrame::new_no_encoding(bit_len, payload);
                 let frame_bits = frame.1;
                 let decompressed_data = utils::read_compressed_u8_2_data(frame_bits);
                 println!(
@@ -327,7 +322,6 @@ impl Modulator {
         }
 
         return modulated_signal;
-
     }
 
     // [Preamble : 8][Payload : 36 x 6 = 216]
