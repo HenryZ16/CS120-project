@@ -1,6 +1,6 @@
 target*
 testset*
-output*
+output.txt
 .vscode
 .svg
 .txt
