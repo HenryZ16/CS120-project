@@ -1,6 +1,7 @@
 use crate::acoustic_modem::demodulation::Demodulation2;
 use crate::acoustic_modem::modulation;
 use crate::acoustic_modem::modulation::Modulator;
+use crate::acoustic_modem::modulation::ENABLE_ECC;
 use crate::acoustic_modem::phy_frame;
 use crate::pa0;
 use crate::utils;
@@ -103,11 +104,14 @@ pub async fn obj_3_recv_file() -> Result<u32> {
         OFDM,
     );
 
+    let data_len = if ENABLE_ECC {phy_frame::FRAME_LENGTH_LENGTH + phy_frame::MAX_FRAME_DATA_LENGTH} 
+                            else {phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING + phy_frame::MAX_FRAME_DATA_LENGTH};
+
     let mut decoded_data = vec![];
     let mut debug_vec = vec![];
     let handle = demodulator.listening(
         false,
-        phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING + phy_frame::MAX_FRAME_DATA_LENGTH,
+        data_len,
         &mut decoded_data,
         &mut debug_vec,
     );
