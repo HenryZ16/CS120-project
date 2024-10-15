@@ -274,9 +274,19 @@ impl Modulator {
                 }
                 println!("push in payload data: {:?}", payload);
                 println!("frame len: {}", bit_len);
-                let frame = phy_frame::PHYFrame::new_no_encoding(bit_len, payload);
-                let frame_bits = frame.1;
-                let decompressed_data = utils::read_compressed_u8_2_data(frame_bits);
+
+                let mut decompressed_data = vec![];
+
+                if !ENABLE_ECC {
+                    let frame = phy_frame::PHYFrame::new_no_encoding(bit_len, payload);
+                    let frame_bits = frame.1;
+                    decompressed_data = utils::read_compressed_u8_2_data(frame_bits);
+                } else {
+                    let frame = phy_frame::PHYFrame::new(bit_len, payload);
+                    let frame_bits = phy_frame::PHYFrame::get_whole_frame_bits(&frame);
+                    decompressed_data = utils::read_compressed_u8_2_data(frame_bits);
+                }
+
                 println!(
                     "[bits_2_wave ofdm] decompressed_data.len(): {}",
                     decompressed_data.len()
