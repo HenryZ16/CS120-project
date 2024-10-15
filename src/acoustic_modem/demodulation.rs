@@ -15,6 +15,8 @@ use std::io::Write;
 use std::ops::{Add, Mul};
 use std::result::Result::Ok;
 
+const LOWEST_POWER_LIMIT: f32 = 10.0;
+
 struct InputStreamConfig {
     config: SupportedStreamConfig,
     device: Device,
@@ -196,7 +198,7 @@ impl Demodulation2 {
 
         let mut demodulate_state = DemodulationState::DetectPreamble;
 
-        let power_lim_preamble = 30.0;
+        let power_lim_preamble = LOWEST_POWER_LIMIT;
 
         let mut tmp_buffer: VecDeque<f32> = VecDeque::with_capacity(
             5 * demodulate_config
@@ -313,7 +315,7 @@ impl Demodulation2 {
                             } else {
                                 let decompressed =
                                     read_compressed_u8_2_data(vec)[0..length].to_vec();
-                                println!("length: {}", length);
+                                // println!("length: {}", length);
 
                                 if write_to_file {
                                     let to_write = &decompressed
@@ -364,11 +366,11 @@ impl Demodulation2 {
 
 fn decode(input_data: &Vec<Bit>) -> Result<(Vec<Byte>, usize), Error> {
     if ENABLE_ECC {
-        println!(
-            "input data: {:?}, data length: {}",
-            input_data,
-            input_data.len()
-        );
+        // println!(
+        //     "input data: {:?}, data length: {}",
+        //     input_data,
+        //     input_data.len()
+        // );
         let hexbits = u8_2_code_rs_hexbit(read_data_2_compressed_u8(input_data.clone()));
 
         // println!("hexbits: {:?}, hexbit length: {}", hexbits, hexbits.len());
