@@ -332,6 +332,28 @@ impl Modulator {
                 loop_cnt + 1,
                 loop_cnt * carrier_cnt + last_single_frames_cnt
             );
+
+            // send a protection frame, its length is zero
+            println!("[bits_2_wave ofdm] send a protection frame");
+            let mut payload = vec![];
+            let frame = phy_frame::PHYFrame::new_no_encoding(0, payload);
+            let frame_bits = frame.1;
+            let decompressed_data = utils::read_compressed_u8_2_data(frame_bits);
+            println!(
+                "[bits_2_wave ofdm] decompressed_data.len(): {}",
+                decompressed_data.len()
+            );
+            let modulated_psk_signal = self.modulate(&decompressed_data, 0);
+
+            // add FSK preamble
+            let preamble = phy_frame::gen_preamble(self.sample_rate);
+            modulated_signal.extend(preamble.clone());
+            modulated_signal.extend(modulated_psk_signal.clone());
+
+            println!(
+                "[bits_2_wave ofdm] modulated_signal.len(): {}",
+                modulated_signal.len()
+            );
         }
 
         return modulated_signal;
