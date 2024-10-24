@@ -77,7 +77,7 @@ impl PHYFrame {
 
         // RS encoding
         let mut array_data: [Hexbit; 24] = data.try_into().unwrap();
-        reed_solomon::medium::encode(&mut array_data);
+        utils::code_rs_encode(&mut array_data);
         let payload = array_data.to_vec();
 
         println!(
@@ -93,7 +93,7 @@ impl PHYFrame {
     pub fn payload_2_data(payload: Vec<Hexbit>) -> Result<(Vec<Byte>, usize), Error> {
         // RS decoding
         let mut array_payload: [Hexbit; 24] = payload.try_into().unwrap();
-        reed_solomon::medium::decode(&mut array_payload);
+        utils::code_rs_decode(&mut array_payload);
         let payload = array_payload.to_vec();
 
         // println!(

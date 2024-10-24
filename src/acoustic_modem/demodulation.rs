@@ -15,7 +15,8 @@ use std::io::Write;
 use std::ops::{Add, Mul};
 use std::result::Result::Ok;
 
-const LOWEST_POWER_LIMIT: f32 = 10.0;
+// 4.0 2m; 50.0 0.3m
+const LOWEST_POWER_LIMIT: f32 = 30.0;
 
 struct InputStreamConfig {
     config: SupportedStreamConfig,

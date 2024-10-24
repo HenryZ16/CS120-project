@@ -1,3 +1,4 @@
+use code_rs;
 use rand::Rng;
 use std::fs::File;
 use std::io::Write;
@@ -84,4 +85,12 @@ pub fn code_rs_hexbit_2_u8(data: Vec<code_rs::bits::Hexbit>) -> Vec<Byte> {
     }
 
     return u8s;
+}
+
+pub fn code_rs_encode(data: &mut [code_rs::bits::Hexbit; 24]) {
+    code_rs::coding::reed_solomon::medium::encode(data);
+}
+
+pub fn code_rs_decode(data: &mut [code_rs::bits::Hexbit; 24]) {
+    code_rs::coding::reed_solomon::medium::decode(data);
 }
