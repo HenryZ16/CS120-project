@@ -112,6 +112,7 @@ pub fn code_rs_decode(data: &mut [code_rs::bits::Hexbit; 24]) {
 
         data[i] = code_rs::bits::Hexbit::new(((decode_data >> 6) as u8) & 0b111111);
         data[i + 1] = code_rs::bits::Hexbit::new((decode_data as u8) & 0b111111);
+        data[i / 2 + 16] = code_rs::bits::Hexbit::new(0);
     }
 }
 
