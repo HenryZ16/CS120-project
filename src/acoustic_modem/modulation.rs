@@ -15,8 +15,8 @@ use futures::SinkExt;
 use hound::{WavSpec, WavWriter};
 
 const SAMPLE_RATE: u32 = 48000;
-const OFDM_FRAME_DISTANCE: usize = 50;
-pub const REDUNDANT_PERIODS: usize = 4;
+const OFDM_FRAME_DISTANCE: usize = 0;
+pub const REDUNDANT_PERIODS: usize = 2;
 pub const ENABLE_ECC: bool = true;
 
 pub struct Modulator {
@@ -30,8 +30,8 @@ pub struct Modulator {
 
 impl Modulator {
     pub fn new(carrier_freq: Vec<u32>, sample_rate: u32, enable_ofdm: bool) -> Self {
-        // let host = cpal::host_from_id(HostId::Asio).expect("failed to initialise ASIO host");
-        let host = cpal::default_host();
+        let host = cpal::host_from_id(cpal::HostId::Asio).expect("failed to initialise ASIO host");
+        // let host = cpal::default_host();
         let device = host.output_devices().expect("failed to find output device");
         let device = host.default_output_device().unwrap();
         println!("[Modulator] Output device: {:?}", device.name().unwrap());
@@ -82,7 +82,7 @@ impl Modulator {
     }
 
     pub async fn bits_2_wave(&mut self, data: Vec<Byte>, len: isize) -> Vec<f32> {
-        println!("[send_bits] send bits: {:?}", len);
+        // println!("[send_bits] send bits: {:?}", len);
 
         // warm up
         let mut modulated_signal: Vec<f32> = (0..3000)
@@ -100,16 +100,16 @@ impl Modulator {
                 for i in 0..(phy_frame::MAX_FRAME_DATA_LENGTH / 8) {
                     payload.push(data[i + loop_cnt * (phy_frame::MAX_FRAME_DATA_LENGTH / 8)]);
                 }
-                println!("push in payload data: {:?}", payload);
-                println!("frame len: {}", phy_frame::MAX_FRAME_DATA_LENGTH);
+                // println!("push in payload data: {:?}", payload);
+                // println!("frame len: {}", phy_frame::MAX_FRAME_DATA_LENGTH);
                 let frame =
                     phy_frame::PHYFrame::new_no_encoding(phy_frame::MAX_FRAME_DATA_LENGTH, payload);
                 let frame_bits = frame.1;
                 let decompressed_data = utils::read_compressed_u8_2_data(frame_bits);
-                println!(
-                    "[bits_2_wave] decompressed_data.len(): {}",
-                    decompressed_data.len()
-                );
+                // println!(
+                //     "[bits_2_wave] decompressed_data.len(): {}",
+                //     decompressed_data.len()
+                // );
                 let modulated_psk_signal = self.modulate(&decompressed_data, 0);
 
                 // add FSK preamble
@@ -117,10 +117,10 @@ impl Modulator {
                 modulated_signal.extend(preamble.clone());
                 modulated_signal.extend(modulated_psk_signal.clone());
 
-                println!(
-                    "[bits_2_wave] modulated_signal.len(): {}",
-                    modulated_signal.len()
-                );
+                // println!(
+                //     "[bits_2_wave] modulated_signal.len(): {}",
+                //     modulated_signal.len()
+                // );
 
                 len -= phy_frame::MAX_FRAME_DATA_LENGTH as isize;
                 loop_cnt += 1;
@@ -132,20 +132,20 @@ impl Modulator {
 
             // send the last frame
             len += phy_frame::MAX_FRAME_DATA_LENGTH as isize;
-            println!("[bits_2_wave] remaining len: {:?}", len);
+            // println!("[bits_2_wave] remaining len: {:?}", len);
             let mut payload = vec![];
             for i in 0..((len + 7) / 8) {
                 payload.push(data[i as usize + loop_cnt * (phy_frame::MAX_FRAME_DATA_LENGTH / 8)]);
             }
-            println!("push in payload data: {:?}", payload);
-            println!("frame len: {}", len);
+            // println!("push in payload data: {:?}", payload);
+            // println!("frame len: {}", len);
             let frame = phy_frame::PHYFrame::new_no_encoding(len as usize, payload);
             let frame_bits = frame.1;
             let decompressed_data = utils::read_compressed_u8_2_data(frame_bits);
-            println!(
-                "[bits_2_wave] decompressed_data.len(): {}",
-                decompressed_data.len()
-            );
+            // println!(
+            //     "[bits_2_wave] decompressed_data.len(): {}",
+            //     decompressed_data.len()
+            // );
             let modulated_psk_signal = self.modulate(&decompressed_data, 0);
 
             // add FSK preamble
@@ -153,11 +153,11 @@ impl Modulator {
             modulated_signal.extend(preamble.clone());
             modulated_signal.extend(modulated_psk_signal.clone());
 
-            println!(
-                "[bits_2_wave] modulated_signal.len(): {}",
-                modulated_signal.len()
-            );
-            println!("[bits_2_wave] send {} frames", loop_cnt + 1);
+            // println!(
+            //     "[bits_2_wave] modulated_signal.len(): {}",
+            //     modulated_signal.len()
+            // );
+            // println!("[bits_2_wave] send {} frames", loop_cnt + 1);
         } else {
             // OFDM
             let carrier_cnt = self.carrier_freq.len();
@@ -174,8 +174,8 @@ impl Modulator {
                                     * (phy_frame::MAX_FRAME_DATA_LENGTH / 8)],
                         );
                     }
-                    println!("push in payload data: {:?}", payload);
-                    println!("frame len: {}", phy_frame::MAX_FRAME_DATA_LENGTH);
+                    // println!("push in payload data: {:?}", payload);
+                    // println!("frame len: {}", phy_frame::MAX_FRAME_DATA_LENGTH);
 
                     let mut decompressed_data = vec![];
 
@@ -193,10 +193,10 @@ impl Modulator {
                         decompressed_data = utils::read_compressed_u8_2_data(frame_bits);
                     }
 
-                    println!(
-                        "[bits_2_wave ofdm] decompressed_data.len(): {}",
-                        decompressed_data.len()
-                    );
+                    // println!(
+                    //     "[bits_2_wave ofdm] decompressed_data.len(): {}",
+                    //     decompressed_data.len()
+                    // );
                     let modulated_psk_signal_i = self.modulate(&decompressed_data, i);
 
                     // nomalization - make the power of each carrier equal
@@ -235,11 +235,11 @@ impl Modulator {
                 modulated_signal.extend(preamble.clone());
                 modulated_signal.extend(modulated_psk_signal.clone());
 
-                println!("[bits_2_wave ofdm] finish 1 ofdm frame");
-                println!(
-                    "[bits_2_wave ofdm] modulated_signal.len(): {}",
-                    modulated_signal.len()
-                );
+                // println!("[bits_2_wave ofdm] finish 1 ofdm frame");
+                // println!(
+                //     "[bits_2_wave ofdm] modulated_signal.len(): {}",
+                //     modulated_signal.len()
+                // );
 
                 len -= (phy_frame::MAX_FRAME_DATA_LENGTH * carrier_cnt) as isize;
                 loop_cnt += 1;
@@ -251,7 +251,7 @@ impl Modulator {
 
             // send the last frame
             len += (phy_frame::MAX_FRAME_DATA_LENGTH * carrier_cnt) as isize;
-            println!("[bits_2_wave ofdm] remaining len: {:?}", len);
+            // println!("[bits_2_wave ofdm] remaining len: {:?}", len);
             let mut modulated_psk_signal: Vec<f32> = vec![];
             let mut last_single_frames_cnt = 0;
             for i in 0..carrier_cnt {
@@ -272,8 +272,8 @@ impl Modulator {
                     }
                     last_single_frames_cnt += 1;
                 }
-                println!("push in payload data: {:?}", payload);
-                println!("frame len: {}", bit_len);
+                // println!("push in payload data: {:?}", payload);
+                // println!("frame len: {}", bit_len);
 
                 let mut decompressed_data = vec![];
 
@@ -287,10 +287,10 @@ impl Modulator {
                     decompressed_data = utils::read_compressed_u8_2_data(frame_bits);
                 }
 
-                println!(
-                    "[bits_2_wave ofdm] decompressed_data.len(): {}",
-                    decompressed_data.len()
-                );
+                // println!(
+                //     "[bits_2_wave ofdm] decompressed_data.len(): {}",
+                //     decompressed_data.len()
+                // );
                 let modulated_psk_signal_i = self.modulate(&decompressed_data, i);
 
                 // nomalization - make the power of each carrier equal
@@ -333,37 +333,20 @@ impl Modulator {
             modulated_signal.extend(preamble.clone());
             modulated_signal.extend(modulated_psk_signal.clone());
 
-            println!(
-                "[bits_2_wave ofdm] modulated_signal.len(): {}",
-                modulated_signal.len()
-            );
-            println!(
-                "[bits_2_wave ofdm] send {} ofdm frames, which equals to {} single frames",
-                loop_cnt + 1,
-                loop_cnt * carrier_cnt + last_single_frames_cnt
-            );
-
-            // send a protection frame, its length is zero
-            println!("[bits_2_wave ofdm] send a protection frame");
-            let mut payload = vec![];
-            let frame = phy_frame::PHYFrame::new_no_encoding(0, payload);
-            let frame_bits = frame.1;
-            let decompressed_data = utils::read_compressed_u8_2_data(frame_bits);
-            println!(
-                "[bits_2_wave ofdm] decompressed_data.len(): {}",
-                decompressed_data.len()
-            );
-            let modulated_psk_signal = self.modulate(&decompressed_data, 0);
-
-            // add FSK preamble
-            let preamble = phy_frame::gen_preamble(self.sample_rate);
-            modulated_signal.extend(preamble.clone());
-            modulated_signal.extend(modulated_psk_signal.clone());
-
-            println!(
-                "[bits_2_wave ofdm] modulated_signal.len(): {}",
-                modulated_signal.len()
-            );
+            // println!(
+            //     "[bits_2_wave ofdm] modulated_signal.len(): {}",
+            //     modulated_signal.len()
+            // );
+            // println!(
+            //     "[bits_2_wave ofdm] send {} ofdm frames, which equals to {} single frames",
+            //     loop_cnt + 1,
+            //     loop_cnt * carrier_cnt + last_single_frames_cnt
+            // );
+            // protection
+            let tail: Vec<f32> = (0..3000)
+                .map(|x| (2.0 * std::f32::consts::PI * x as f32 / 48000.0 * 5000 as f32).sin())
+                .collect();
+            modulated_signal.extend(tail);
         }
 
         return modulated_signal;
@@ -433,7 +416,7 @@ impl Modulator {
 
     // translate the bits into modulated signal
     pub fn modulate(&self, bits: &Vec<u8>, carrrier_freq_id: usize) -> Vec<f32> {
-        println!("output: {:?}, length: {}", bits, bits.len());
+        // println!("output: {:?}, length: {}", bits, bits.len());
 
         // TODO: PSK
         let mut modulated_signal = vec![];

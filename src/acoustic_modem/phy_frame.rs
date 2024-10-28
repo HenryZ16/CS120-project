@@ -80,11 +80,11 @@ impl PHYFrame {
         utils::code_rs_encode(&mut array_data);
         let payload = array_data.to_vec();
 
-        println!(
-            "[data_2_payload] payload: {:?}, length: {}",
-            payload,
-            payload.len()
-        );
+        // println!(
+        //     "[data_2_payload] payload: {:?}, length: {}",
+        //     payload,
+        //     payload.len()
+        // );
 
         return Ok(payload);
     }

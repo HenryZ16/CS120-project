@@ -16,7 +16,7 @@ use std::ops::{Add, Mul};
 use std::result::Result::Ok;
 
 // 4.0 2m; 50.0 0.3m
-const LOWEST_POWER_LIMIT: f32 = 30.0;
+const LOWEST_POWER_LIMIT: f32 = 10.0;
 
 struct InputStreamConfig {
     config: SupportedStreamConfig,
@@ -124,8 +124,8 @@ impl Demodulation2 {
         redundent_times: usize,
         enable_ofdm: bool,
     ) -> Self {
-        // let host = cpal::host_from_id(cpal::HostId::Asio).expect("failed to initialise ASIO host");
-        let host = cpal::default_host();
+        let host = cpal::host_from_id(cpal::HostId::Asio).expect("failed to initialise ASIO host");
+        // let host = cpal::default_host();
         let device = host.input_devices().expect("failed to find input device");
         let device = device
             .into_iter()
@@ -135,8 +135,8 @@ impl Demodulation2 {
 
         let default_config = device.default_input_config().unwrap();
         let config = SupportedStreamConfig::new(
-            default_config.channels(),
-            // 1,                       // mono
+            // default_config.channels(),
+            1,                       // mono
             SampleRate(sample_rate), // sample rate
             default_config.buffer_size().clone(),
             default_config.sample_format(),
@@ -316,7 +316,7 @@ impl Demodulation2 {
                             } else {
                                 let decompressed =
                                     read_compressed_u8_2_data(vec)[0..length].to_vec();
-                                // println!("length: {}", length);
+                                println!("length: {}", length);
 
                                 if write_to_file {
                                     let to_write = &decompressed
