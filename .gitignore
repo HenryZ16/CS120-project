@@ -2,6 +2,6 @@ target*
 testset*
 output.txt
 .vscode
-.svg
-.txt
-.wav
+*.svg
+*.txt
+*.wav

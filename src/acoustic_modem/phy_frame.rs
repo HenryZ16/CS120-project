@@ -80,11 +80,11 @@ impl PHYFrame {
         reed_solomon::medium::encode(&mut array_data);
         let payload = array_data.to_vec();
 
-        println!(
-            "[data_2_payload] payload: {:?}, length: {}",
-            payload,
-            payload.len()
-        );
+        // println!(
+        //     "[data_2_payload] payload: {:?}, length: {}",
+        //     payload,
+        //     payload.len()
+        // );
 
         return Ok(payload);
     }
@@ -194,7 +194,7 @@ impl SimpleFrame {
 pub fn gen_preamble(sample_rate: u32) -> Vec<f32> {
     let start = 1e3;
     let end = 1e4;
-    let half_length = 200;
+    let half_length = 80;
     let dx: f64 = 1.0 / sample_rate as f64;
     let step = (end - start) as f64 / half_length as f64;
     let mut fp: Vec<f64> = (0..half_length).map(|i| start + i as f64 * step).collect();

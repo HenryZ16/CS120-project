@@ -15,7 +15,7 @@ use std::io::Write;
 use std::ops::{Add, Mul};
 use std::result::Result::Ok;
 
-const LOWEST_POWER_LIMIT: f32 = 10.0;
+const LOWEST_POWER_LIMIT: f32 = 70.0;
 
 struct InputStreamConfig {
     config: SupportedStreamConfig,
@@ -123,8 +123,8 @@ impl Demodulation2 {
         redundent_times: usize,
         enable_ofdm: bool,
     ) -> Self {
-        // let host = cpal::host_from_id(cpal::HostId::Asio).expect("failed to initialise ASIO host");
-        let host = cpal::default_host();
+        let host = cpal::host_from_id(cpal::HostId::Asio).expect("failed to initialise ASIO host");
+        // let host = cpal::default_host();
         let device = host.input_devices().expect("failed to find input device");
         let device = device
             .into_iter()
