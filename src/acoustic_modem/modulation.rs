@@ -16,7 +16,7 @@ use hound::{WavSpec, WavWriter};
 
 const SAMPLE_RATE: u32 = 48000;
 const OFDM_FRAME_DISTANCE: usize = 0;
-pub const REDUNDANT_PERIODS: usize = 2;
+pub const REDUNDANT_PERIODS: usize = 1;
 pub const ENABLE_ECC: bool = true;
 
 pub struct Modulator {

@@ -5,7 +5,6 @@ use crate::utils::{
     read_compressed_u8_2_data, read_data_2_compressed_u8, u8_2_code_rs_hexbit, Bit, Byte,
 };
 use anyhow::Error;
-use biquad::{Biquad, Coefficients, DirectForm1, ToHertz, Type::BandPass};
 use cpal::traits::{DeviceTrait, HostTrait};
 use cpal::{Device, SampleRate, SupportedStreamConfig};
 use futures::StreamExt;
@@ -16,7 +15,7 @@ use std::ops::{Add, Mul};
 use std::result::Result::Ok;
 
 // 4.0 2m; 50.0 0.3m
-const LOWEST_POWER_LIMIT: f32 = 10.0;
+const LOWEST_POWER_LIMIT: f32 = 50.0;
 
 struct InputStreamConfig {
     config: SupportedStreamConfig,

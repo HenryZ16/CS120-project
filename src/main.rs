@@ -2,6 +2,7 @@ mod acoustic_modem;
 mod asio_stream;
 mod pa0;
 mod pa1;
+mod pa2;
 mod symrs;
 mod tests;
 mod utils;
@@ -97,6 +98,15 @@ async fn main() {
         Some((1, n, additional_type)) => {
             println!("PA 1 selected with objective {}.", n);
             match pa1::pa1(n, &additional_type).await {
+                Ok(_) => {}
+                Err(e) => {
+                    println!("Error: {}", e);
+                }
+            }
+        }
+        Some((2, n, additional_type)) => {
+            println!("PA 2 selected with objective {}.", n);
+            match pa2::pa2(n, &additional_type).await{
                 Ok(_) => {}
                 Err(e) => {
                     println!("Error: {}", e);
