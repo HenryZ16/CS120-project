@@ -6,7 +6,7 @@ Input data
 -> Modulation
 -> Output Signal
 */
-use super::phy_frame;
+use super::phy_frame::{self, PHYFrame};
 use crate::asio_stream::{AudioTrack, OutputAudioStream};
 use crate::utils::{self, Byte};
 use cpal::traits::{DeviceTrait, HostTrait};
@@ -196,7 +196,7 @@ impl Modulator {
                             phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING,
                             payload,
                         );
-                        let frame_bits = frame.1;
+                        let frame_bits = PHYFrame::add_crc(frame.1);
                         decompressed_data = utils::read_compressed_u8_2_data(frame_bits);
                     } else {
                         let frame =
