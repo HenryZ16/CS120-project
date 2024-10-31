@@ -82,12 +82,7 @@ impl Modulator {
     }
 
     pub async fn bits_2_wave(&mut self, data: Vec<Byte>, len: isize) -> Vec<f32> {
-        // println!("[send_bits] send bits: {:?}", len);
-
-        // warm up
-        let mut modulated_signal: Vec<f32> = (0..3000)
-            .map(|x| (2.0 * std::f32::consts::PI * x as f32 / 48000.0 * 5000 as f32).sin())
-            .collect();
+        let mut modulated_signal: Vec<f32> = vec![];
 
         let mut len = len;
         let mut loop_cnt = 0;
@@ -308,18 +303,13 @@ impl Modulator {
 
                 if !ENABLE_ECC {
                     let frame = phy_frame::PHYFrame::new_no_encoding(bit_len, payload);
-                    let frame_bits = frame.1;
+                    let frame_bits = PHYFrame::add_crc(frame.1);
                     decompressed_data = utils::read_compressed_u8_2_data(frame_bits);
                 } else {
                     let frame = phy_frame::PHYFrame::new(bit_len, payload);
                     let frame_bits = phy_frame::PHYFrame::get_whole_frame_bits(&frame);
                     decompressed_data = utils::read_compressed_u8_2_data(frame_bits);
                 }
-
-                // println!(
-                //     "[bits_2_wave ofdm] decompressed_data.len(): {}",
-                //     decompressed_data.len()
-                // );
                 let modulated_psk_signal_i = self.modulate(&decompressed_data, i);
 
                 // nomalization - make the power of each carrier equal
@@ -365,39 +355,13 @@ impl Modulator {
             let preamble = phy_frame::gen_preamble(self.sample_rate);
             modulated_signal.extend(preamble.clone());
             modulated_signal.extend(modulated_psk_signal.clone());
-
-            // println!(
-            //     "[bits_2_wave ofdm] modulated_signal.len(): {}",
-            //     modulated_signal.len()
-            // );
-            // println!(
-            //     "[bits_2_wave ofdm] send {} ofdm frames, which equals to {} single frames",
-            //     loop_cnt + 1,
-            //     loop_cnt * carrier_cnt + last_single_frames_cnt
-            // );
-
-            // send a protection frame, its length is zero
-            // println!("[bits_2_wave ofdm] send a protection frame");
-            // let mut payload = vec![];
-            // let frame = phy_frame::PHYFrame::new_no_encoding(0, payload);
-            // let frame_bits = frame.1;
-            // let decompressed_data = utils::read_compressed_u8_2_data(frame_bits);
-            // println!(
-            //     "[bits_2_wave ofdm] decompressed_data.len(): {}",
-            //     decompressed_data.len()
-            // );
-            // let modulated_psk_signal = self.modulate(&decompressed_data, 0);
-
-            // // add FSK preamble
-            // let preamble = phy_frame::gen_preamble(self.sample_rate);
-            // modulated_signal.extend(preamble.clone());
-            // modulated_signal.extend(modulated_psk_signal.clone());
-
-            // println!(
-            //     "[bits_2_wave ofdm] modulated_signal.len(): {}",
-            //     modulated_signal.len()
-            // );
         }
+
+        // cool down
+        // let cool_down_vec: Vec<f32> = (0..3000)
+        //     .map(|x| (2.0 * std::f32::consts::PI * x as f32 / 48000.0 * 5000 as f32).sin())
+        //     .collect();
+        // modulated_signal.extend(cool_down_vec);
 
         return modulated_signal;
     }
