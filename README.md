@@ -29,3 +29,9 @@ The length of our PHY Frame is 1064, where each part is:
     Since we use Reed-Solomon to encode the payload, `Length` here stores the original (before encoding) length of the data.
 
 - `Payload`: as mentioned in `Length`, we use Reed-Solomon to encode the data, to ensure the accuracy. In each payload, we use 64 bits to correct 32 symbolic errors. So the maximum length of the data in payload is 960 bits.
+
+## Thanks
+
+We appreciate the guides and public repositories below:
+- [Rust ASIO Guide](https://acm.shanghaitech.edu.cn/rust-asio/00_introduction.html)
+- all of the dependencies in `Carro.toml`
