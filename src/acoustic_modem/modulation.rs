@@ -17,7 +17,7 @@ use hound::{WavSpec, WavWriter};
 const SAMPLE_RATE: u32 = 48000;
 const OFDM_FRAME_DISTANCE: usize = 50;
 pub const REDUNDANT_PERIODS: usize = 1;
-pub const ENABLE_ECC: bool = true;
+pub const ENABLE_ECC: bool = false;
 
 pub struct Modulator {
     carrier_freq: Vec<u32>,
@@ -161,27 +161,39 @@ impl Modulator {
         } else {
             // OFDM
             let carrier_cnt = self.carrier_freq.len();
-            len -= (phy_frame::MAX_FRAME_DATA_LENGTH * carrier_cnt) as isize;
+            if !ENABLE_ECC {
+                len -= (phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING * carrier_cnt) as isize;
+            } else {
+                len -= (phy_frame::MAX_FRAME_DATA_LENGTH * carrier_cnt) as isize;
+            }
             while len > 0 {
                 let mut modulated_psk_signal: Vec<f32> = vec![];
 
                 for i in 0..carrier_cnt {
                     let mut payload = vec![];
-                    for j in 0..(phy_frame::MAX_FRAME_DATA_LENGTH / 8) {
-                        payload.push(
-                            data[j
-                                + (loop_cnt * carrier_cnt + i)
-                                    * (phy_frame::MAX_FRAME_DATA_LENGTH / 8)],
-                        );
+                    if !ENABLE_ECC {
+                        for j in 0..(phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING / 8) {
+                            payload.push(
+                                data[j
+                                    + (loop_cnt * carrier_cnt + i)
+                                        * (phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING / 8)],
+                            );
+                        }
+                    } else {
+                        for j in 0..(phy_frame::MAX_FRAME_DATA_LENGTH / 8) {
+                            payload.push(
+                                data[j
+                                    + (loop_cnt * carrier_cnt + i)
+                                        * (phy_frame::MAX_FRAME_DATA_LENGTH / 8)],
+                            );
+                        }
                     }
-                    // println!("push in payload data: {:?}", payload);
-                    // println!("frame len: {}", phy_frame::MAX_FRAME_DATA_LENGTH);
 
                     let mut decompressed_data = vec![];
 
                     if !ENABLE_ECC {
                         let frame = phy_frame::PHYFrame::new_no_encoding(
-                            phy_frame::MAX_FRAME_DATA_LENGTH,
+                            phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING,
                             payload,
                         );
                         let frame_bits = frame.1;
@@ -235,46 +247,63 @@ impl Modulator {
                 modulated_signal.extend(preamble.clone());
                 modulated_signal.extend(modulated_psk_signal.clone());
 
-                // println!("[bits_2_wave ofdm] finish 1 ofdm frame");
-                // println!(
-                //     "[bits_2_wave ofdm] modulated_signal.len(): {}",
-                //     modulated_signal.len()
-                // );
-
-                len -= (phy_frame::MAX_FRAME_DATA_LENGTH * carrier_cnt) as isize;
+                if !ENABLE_ECC {
+                    len -= (phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING * carrier_cnt) as isize;
+                } else {
+                    len -= (phy_frame::MAX_FRAME_DATA_LENGTH * carrier_cnt) as isize;
+                }
                 loop_cnt += 1;
 
                 // wait for a while
-                // tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
                 modulated_signal.extend(vec![0.0; OFDM_FRAME_DISTANCE]);
             }
 
             // send the last frame
-            len += (phy_frame::MAX_FRAME_DATA_LENGTH * carrier_cnt) as isize;
-            // println!("[bits_2_wave ofdm] remaining len: {:?}", len);
+            if !ENABLE_ECC {
+                len += (phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING * carrier_cnt) as isize;
+            } else {
+                len += (phy_frame::MAX_FRAME_DATA_LENGTH * carrier_cnt) as isize;
+            }
             let mut modulated_psk_signal: Vec<f32> = vec![];
             let mut last_single_frames_cnt = 0;
             for i in 0..carrier_cnt {
                 let mut payload = vec![];
-                let bit_len = if len > phy_frame::MAX_FRAME_DATA_LENGTH as isize {
-                    phy_frame::MAX_FRAME_DATA_LENGTH
-                } else {
-                    len as usize
-                };
-                let frame_len = (bit_len + 7) / 8;
-                if len > 0 {
-                    for j in 0..frame_len {
-                        payload.push(
-                            data[j as usize
-                                + (loop_cnt * carrier_cnt + i)
-                                    * (phy_frame::MAX_FRAME_DATA_LENGTH / 8)],
-                        );
+                let mut bit_len = 0;
+                if !ENABLE_ECC {
+                    bit_len = if len > phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING as isize {
+                        phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING
+                    } else {
+                        len as usize
+                    };
+                    let frame_len = (bit_len + 7) / 8;
+                    if len > 0 {
+                        for j in 0..frame_len {
+                            payload.push(
+                                data[j as usize
+                                    + (loop_cnt * carrier_cnt + i)
+                                        * (phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING / 8)],
+                            );
+                        }
+                        last_single_frames_cnt += 1;
                     }
-                    last_single_frames_cnt += 1;
+                } else {
+                    bit_len = if len > phy_frame::MAX_FRAME_DATA_LENGTH as isize {
+                        phy_frame::MAX_FRAME_DATA_LENGTH
+                    } else {
+                        len as usize
+                    };
+                    let frame_len = (bit_len + 7) / 8;
+                    if len > 0 {
+                        for j in 0..frame_len {
+                            payload.push(
+                                data[j as usize
+                                    + (loop_cnt * carrier_cnt + i)
+                                        * (phy_frame::MAX_FRAME_DATA_LENGTH / 8)],
+                            );
+                        }
+                        last_single_frames_cnt += 1;
+                    }
                 }
-                // println!("push in payload data: {:?}", payload);
-                // println!("frame len: {}", bit_len);
-
                 let mut decompressed_data = vec![];
 
                 if !ENABLE_ECC {
@@ -311,7 +340,11 @@ impl Modulator {
                         .map(|(a, b)| a + b)
                         .collect();
                 }
-                len -= phy_frame::MAX_FRAME_DATA_LENGTH as isize;
+                if !ENABLE_ECC {
+                    len -= (phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING * carrier_cnt) as isize;
+                } else {
+                    len -= (phy_frame::MAX_FRAME_DATA_LENGTH * carrier_cnt) as isize;
+                }
                 if len < 0 {
                     len = 0;
                 }

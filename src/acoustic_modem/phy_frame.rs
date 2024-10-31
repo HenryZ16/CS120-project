@@ -8,6 +8,7 @@ use code_rs::coding::reed_solomon;
 pub const MAX_FRAME_DATA_LENGTH: usize = 72;
 pub const FRAME_PAYLOAD_LENGTH: usize = 144;
 pub const FRAME_LENGTH_LENGTH: usize = 12;
+pub const MAX_FRAME_DATA_LENGTH_NO_ENCODING: usize = 192;
 pub const FRAME_LENGTH_LENGTH_NO_ENCODING: usize = 16;
 
 pub struct PHYFrame {
@@ -28,11 +29,13 @@ impl PHYFrame {
 
     pub fn new_no_encoding(length: usize, data: Vec<Byte>) -> (usize, Vec<Byte>) {
         let mut payload: Vec<Byte> = Vec::new();
-        println!("length: {}", length);
+        // println!("length: {}", length);
         payload.push((length >> 8) as u8);
         payload.push((length & 0xff) as u8);
         payload.extend(data);
-        while payload.len() < (MAX_FRAME_DATA_LENGTH + FRAME_LENGTH_LENGTH_NO_ENCODING) / 8 {
+        while payload.len()
+            < (MAX_FRAME_DATA_LENGTH_NO_ENCODING + FRAME_LENGTH_LENGTH_NO_ENCODING) / 8
+        {
             payload.push(0);
         }
 
@@ -194,7 +197,7 @@ impl SimpleFrame {
 pub fn gen_preamble(sample_rate: u32) -> Vec<f32> {
     let start = 1e3;
     let end = 1e4;
-    let half_length = 80;
+    let half_length = 100;
     let dx: f64 = 1.0 / sample_rate as f64;
     let step = (end - start) as f64 / half_length as f64;
     let mut fp: Vec<f64> = (0..half_length).map(|i| start + i as f64 * step).collect();

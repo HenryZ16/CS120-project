@@ -3,14 +3,14 @@ use crate::acoustic_modem::modulation;
 use crate::acoustic_modem::modulation::Modulator;
 use crate::acoustic_modem::modulation::ENABLE_ECC;
 use crate::acoustic_modem::phy_frame;
+use crate::asio_stream::read_wav_and_play;
 use crate::utils;
 use anyhow::{Error, Result};
-use tokio::time::{self, Duration};
-use crate::asio_stream::read_wav_and_play;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::vec;
-const CARRIER: u32 = 12000;
+use tokio::time::{self, Duration};
+const CARRIER: u32 = 6000;
 const SAMPLE_RATE: u32 = 48000;
 const OFDM: bool = true;
 
@@ -93,17 +93,15 @@ pub async fn obj_1_recv_file() -> Result<u32> {
         OFDM,
     );
 
-    let data_len = if ENABLE_ECC {phy_frame::FRAME_PAYLOAD_LENGTH} 
-                            else {phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING + phy_frame::MAX_FRAME_DATA_LENGTH};
+    let data_len = if ENABLE_ECC {
+        phy_frame::FRAME_PAYLOAD_LENGTH
+    } else {
+        phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING + phy_frame::MAX_FRAME_DATA_LENGTH
+    };
 
     let mut decoded_data = vec![];
     let mut debug_vec = vec![];
-    let handle = demodulator.listening(
-        false,
-        data_len,
-        &mut decoded_data,
-        &mut debug_vec,
-    );
+    let handle = demodulator.listening(false, data_len, &mut decoded_data, &mut debug_vec);
     let handle = time::timeout(Duration::from_secs(10), handle);
     println!("[pa1-obj3-receive] Start");
     handle.await.unwrap_err();
