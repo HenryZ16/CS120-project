@@ -1,4 +1,4 @@
-use crate::acoustic_modem::modulation::ENABLE_ECC;
+use crate::acoustic_modem::modulation::{self, ENABLE_ECC};
 use crate::acoustic_modem::phy_frame::{self, PHYFrame};
 use crate::asio_stream::InputAudioStream;
 use crate::utils::{
@@ -6,6 +6,7 @@ use crate::utils::{
 };
 use anyhow::Error;
 use biquad::{Biquad, Coefficients, DirectForm1, ToHertz, Type::BandPass};
+use code_rs::bits;
 use cpal::traits::{DeviceTrait, HostTrait};
 use cpal::{Device, SampleRate, SupportedStreamConfig};
 use futures::StreamExt;
@@ -15,7 +16,7 @@ use std::io::Write;
 use std::ops::{Add, Mul};
 use std::result::Result::Ok;
 
-const LOWEST_POWER_LIMIT: f32 = 70.0;
+const LOWEST_POWER_LIMIT: f32 = 50.0;
 
 struct InputStreamConfig {
     config: SupportedStreamConfig,
@@ -134,8 +135,8 @@ impl Demodulation2 {
 
         let default_config = device.default_input_config().unwrap();
         let config = SupportedStreamConfig::new(
-            default_config.channels(),
-            // 1,                       // mono
+            // default_config.channels(),
+            1,                       // mono
             SampleRate(sample_rate), // sample rate
             default_config.buffer_size().clone(),
             default_config.sample_format(),
@@ -189,7 +190,13 @@ impl Demodulation2 {
         decoded_data: &mut Vec<u8>,
         debug_vec: &mut Vec<f32>,
     ) {
-        let data_len = data_len;
+        let payload_len = data_len;
+        println!("data len: {}", payload_len);
+        let bits_len = if ENABLE_ECC{
+            phy_frame::MAX_FRAME_DATA_LENGTH
+        }
+        else { phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING};
+
 
         let mut input_stream = self.input_config.create_input_stream();
         let demodulate_config = &self.demodulate_config;
@@ -212,14 +219,14 @@ impl Demodulation2 {
 
         let carrier_num = demodulate_config.ref_signal.len();
         println!("carrier num: {}", carrier_num);
-        let mut tmp_bits_data = vec![Vec::with_capacity(data_len); carrier_num];
+        let mut tmp_bits_data = vec![Vec::with_capacity(payload_len); carrier_num];
 
         let mut is_reboot = false;
 
         let channels = self.input_config.config.channels() as usize;
 
         let mut last_frame_index = 0;
-        let mut cur_frame_index = 0;
+
 
         while let Some(data) = input_stream.next().await {
             if demodulate_state == DemodulationState::Stop {
@@ -227,22 +234,14 @@ impl Demodulation2 {
             }
             tmp_buffer_len += data.len() / channels;
             move_data_into_buffer(data, &mut tmp_buffer, alpha_check, channels, &mut prev);
-
-            // tmp_buffer.extend(data.iter());
-
             if demodulate_state == DemodulationState::DetectPreamble {
                 if tmp_buffer_len <= demodulate_config.preamble_len {
-                    // println!("buffer is smaller than preamble");
                     continue;
                 }
-                // println!("start detect preamble");
-                // println!("for end: {}", tmp_buffer_len - self.demodulate_config.preamble_len-1);
                 tmp_buffer.make_contiguous();
                 for i in 0..tmp_buffer_len - demodulate_config.preamble_len - 1 {
-                    // let window = tmp_buffer.range(i..i+demodulate_config.preamble_len);
                     let window = &tmp_buffer.as_slices().0[i..i + demodulate_config.preamble_len];
                     let dot_product = dot_product(window, &demodulate_config.preamble);
-                    // println!("preamble dot product: {}", dot_product);
                     if dot_product > local_max && dot_product > power_lim_preamble {
                         // println!("detected");
                         local_max = dot_product;
@@ -253,14 +252,16 @@ impl Demodulation2 {
                         && i - start_index > demodulate_config.preamble_len
                         && local_max > power_lim_preamble
                     {
-                        println!("last frame distance: {}", last_frame_index + start_index);
+                        if  ((last_frame_index + start_index) as isize - modulation::OFDM_FRAME_DISTANCE as isize).abs() > 10{
+                            println!("last frame distance: {}", last_frame_index + start_index);
+                        }
                         start_index += demodulate_config.preamble_len - 1;
                         demodulate_state = demodulate_state.next();
                         // println!("detected preamble");
-                        println!(
-                            "start index: {}, tmp buffer len: {}, max: {}",
-                            start_index, tmp_buffer_len, local_max
-                        );
+                        // println!(
+                        //     "start index: {}, tmp buffer len: {}, max: {}",
+                        //     start_index, tmp_buffer_len, local_max
+                        // );
                         local_max = 0.0;
                         break;
                     }
@@ -279,7 +280,7 @@ impl Demodulation2 {
                 // println!("start index: {}, tmp_buffer_len: {}", start_index, tmp_buffer_len);
 
                 while tmp_buffer_len - start_index >= demodulate_config.ref_signal_len[0]
-                    && tmp_bits_data[0].len() < data_len
+                    && tmp_bits_data[0].len() < payload_len
                 {
                     let window = &tmp_buffer.as_slices().0
                         [start_index..start_index + demodulate_config.ref_signal_len[0]];
@@ -297,20 +298,19 @@ impl Demodulation2 {
                 }
             }
 
-            if tmp_bits_data[0].len() >= data_len {
-                // demodulate_state = demodulate_state.return_detect_preamble();
+            if tmp_bits_data[0].len() >= payload_len {
                 is_reboot = true;
                 demodulate_state = demodulate_state.next();
-                // demodulate_state = DemodulationState::Stop;
                 last_frame_index = 0;
                 for k in 0..carrier_num {
+                    
                     let result = decode(&tmp_bits_data[k]);
                     // println!("data: {:?}", tmp_bits_data[k]);
                     tmp_bits_data[k].clear();
 
                     match result {
                         Ok((vec, length)) => {
-                            if length > phy_frame::MAX_FRAME_DATA_LENGTH {
+                            if length > bits_len {
                                 println!("wrong data length: {}", length);
                             } else {
                                 let decompressed =
@@ -376,16 +376,17 @@ fn decode(input_data: &Vec<Bit>) -> Result<(Vec<Byte>, usize), Error> {
         // println!("hexbits: {:?}, hexbit length: {}", hexbits, hexbits.len());
         PHYFrame::payload_2_data(hexbits)
     } else {
-        let mut length = 0;
-        for i in 0..phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING {
-            length <<= 1;
-            length += input_data[i] as usize;
+        let compressed_data = read_data_2_compressed_u8(input_data.to_vec());
+        if !PHYFrame::check_crc(&compressed_data) {
+            return Err(Error::msg("CRC wrong"));
         }
 
-        let data = read_data_2_compressed_u8(
-            input_data[phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING..input_data.len()].to_vec(),
-        );
-        Ok((data, length))
+        let mut length = 0;
+        for i in 0..phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING/8 {
+            length <<= 8;
+            length += compressed_data[i] as usize;
+        }
+        Ok((compressed_data[phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING/8..(phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING + phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING)/8].to_vec(), length))
     }
 }
 

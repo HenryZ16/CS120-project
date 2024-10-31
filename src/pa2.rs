@@ -96,7 +96,7 @@ pub async fn obj_1_recv_file() -> Result<u32> {
     let data_len = if ENABLE_ECC {
         phy_frame::FRAME_PAYLOAD_LENGTH
     } else {
-        phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING + phy_frame::MAX_FRAME_DATA_LENGTH
+        phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING + phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING + phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
     };
 
     let mut decoded_data = vec![];

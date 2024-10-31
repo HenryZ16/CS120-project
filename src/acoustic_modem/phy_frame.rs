@@ -58,10 +58,10 @@ impl PHYFrame {
     }
 
     // make sure that there's crc in the data
-    pub fn check_crc(data: Vec<Byte>) -> bool {
+    pub fn check_crc(data: &Vec<Byte>) -> bool {
         assert_eq!(FRAME_CRC_LENGTH_NO_ENCODING, 8);
         let mut crc = 0;
-        for &byte in &data {
+        for &byte in data {
             crc ^= byte;
         }
 
