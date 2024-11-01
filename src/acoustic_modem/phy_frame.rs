@@ -180,7 +180,7 @@ impl SimpleFrame {
         println!("org data: {:?}", data);
         let mut writer = File::create("ref_signal.txt").unwrap();
         for &num in &data {
-            let ch = (num as u8 + b'0');
+            let ch = num as u8 + b'0';
             writer.write_all(&[ch]).unwrap();
         }
 

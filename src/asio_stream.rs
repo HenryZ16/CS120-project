@@ -1,6 +1,6 @@
 use anyhow::{Error, Result};
 use cpal::{
-    traits::{DeviceTrait, HostTrait, StreamTrait}, Device, FromSample, Host, Sample, SampleFormat, SizedSample
+    traits::{DeviceTrait, HostTrait, StreamTrait}, Device, FromSample, Sample, SampleFormat, SizedSample
 };
 use futures::{FutureExt, Sink, SinkExt, Stream};
 use rodio::{OutputStream, Source, SupportedStreamConfig};
@@ -380,10 +380,7 @@ pub async fn read_wav(filename: &str) -> (AudioTrack<std::vec::IntoIter<f32>>, u
 }
 
 pub async fn read_wav_and_play(filename: &str) {
-    use cpal::{
-        traits::{DeviceTrait, HostTrait},
-        HostId,
-    };
+    use cpal::traits::{DeviceTrait, HostTrait};
     use cpal::{SampleRate, SupportedStreamConfig};
     let (track, sample_rate) = read_wav(filename).await;
 

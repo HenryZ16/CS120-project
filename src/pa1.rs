@@ -96,26 +96,31 @@ pub async fn obj_3_send_file() -> Result<u32> {
 }
 
 pub async fn obj_3_recv_file() -> Result<u32> {
+    let data_len = if ENABLE_ECC {
+        phy_frame::FRAME_PAYLOAD_LENGTH
+    } else {
+        phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING
+            + phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING
+            + phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
+    };
+    let bits_len = if ENABLE_ECC {
+        phy_frame::MAX_FRAME_DATA_LENGTH
+    } else {
+        phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING
+    };
     let mut demodulator = Demodulation2::new(
         vec![CARRIER, CARRIER * 2],
         SAMPLE_RATE,
         "other.txt",
         modulation::REDUNDANT_PERIODS,
         OFDM,
+        data_len,
+        bits_len,
     );
-
-    let data_len = if ENABLE_ECC {phy_frame::FRAME_PAYLOAD_LENGTH} 
-                            else {phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING + phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING + phy_frame::FRAME_CRC_LENGTH_NO_ENCODING};
 
     let mut decoded_data = vec![];
-    let mut debug_vec = vec![];
-    let handle = demodulator.listening(
-        false,
-        data_len,
-        &mut decoded_data,
-        &mut debug_vec,
-    );
-    let handle = time::timeout(Duration::from_secs(15), handle);
+    let handle = demodulator.listening(false, &mut decoded_data);
+    let handle = time::timeout(Duration::from_secs(10), handle);
     println!("[pa1-obj3-receive] Start");
     handle.await.unwrap_err();
     let mut file = File::create("testset/output.txt").unwrap();

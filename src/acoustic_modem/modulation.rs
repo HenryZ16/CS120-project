@@ -15,7 +15,7 @@ use futures::SinkExt;
 use hound::{WavSpec, WavWriter};
 
 const SAMPLE_RATE: u32 = 48000;
-pub const OFDM_FRAME_DISTANCE: usize = 50;
+pub const OFDM_FRAME_DISTANCE: usize = 20;
 pub const REDUNDANT_PERIODS: usize = 1;
 pub const ENABLE_ECC: bool = false;
 
@@ -32,7 +32,6 @@ impl Modulator {
     pub fn new(carrier_freq: Vec<u32>, sample_rate: u32, enable_ofdm: bool) -> Self {
         let host = cpal::host_from_id(cpal::HostId::Asio).expect("failed to initialise ASIO host");
         // let host = cpal::default_host();
-        let device = host.output_devices().expect("failed to find output device");
         let device = host.default_output_device().unwrap();
         println!("[Modulator] Output device: {:?}", device.name().unwrap());
 

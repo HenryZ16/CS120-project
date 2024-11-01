@@ -5,17 +5,16 @@ use crate::utils::{
     read_compressed_u8_2_data, read_data_2_compressed_u8, u8_2_code_rs_hexbit, Bit, Byte,
 };
 use anyhow::Error;
-use biquad::{Biquad, Coefficients, DirectForm1, ToHertz, Type::BandPass};
-use code_rs::bits;
 use cpal::traits::{DeviceTrait, HostTrait};
 use cpal::{Device, SampleRate, SupportedStreamConfig};
 use futures::StreamExt;
+use plotters::data;
 use std::collections::VecDeque;
 use std::fs::File;
 use std::io::Write;
+use std::mem;
 use std::ops::{Add, Mul};
 use std::result::Result::Ok;
-use std::mem;
 const LOWEST_POWER_LIMIT: f32 = 10.0;
 
 struct InputStreamConfig {
@@ -38,12 +37,12 @@ impl InputStreamConfig {
 }
 
 struct DemodulationConfig {
-    carrier_freq: Vec<u32>,
-    sample_rate: u32,
     ref_signal: Vec<Vec<f32>>,
     ref_signal_len: Vec<usize>,
     preamble_len: usize,
     preamble: Vec<f32>,
+    payload_bits_length: usize,
+    data_bits_length: usize,
 }
 
 unsafe impl Send for DemodulationConfig {}
@@ -51,20 +50,21 @@ unsafe impl Sync for DemodulationConfig {}
 
 impl DemodulationConfig {
     fn new(
-        carrier_freq: Vec<u32>,
         sample_rate: u32,
         ref_signal: Vec<Vec<f32>>,
         ref_signal_len: Vec<usize>,
+        payload_bits_length: usize,
+        data_bits_length: usize,
     ) -> Self {
         let preamble = phy_frame::gen_preamble(sample_rate);
         // println!("preamble len: {}", preamble.len());
         DemodulationConfig {
-            carrier_freq,
-            sample_rate,
             ref_signal,
             ref_signal_len,
             preamble_len: preamble.len(),
             preamble,
+            payload_bits_length,
+            data_bits_length,
         }
     }
 }
@@ -123,6 +123,8 @@ impl Demodulation2 {
         output_file: &str,
         redundent_times: usize,
         enable_ofdm: bool,
+        payload_bits_length: usize,
+        data_bits_length: usize,
     ) -> Self {
         let host = cpal::host_from_id(cpal::HostId::Asio).expect("failed to initialise ASIO host");
         // let host = cpal::default_host();
@@ -170,8 +172,13 @@ impl Demodulation2 {
             ref_signal_len = vec![ref_signal_len[0].clone()];
         }
 
-        let demodulation_config =
-            DemodulationConfig::new(carrier_freq, sample_rate, ref_signal, ref_signal_len);
+        let demodulation_config = DemodulationConfig::new(
+            sample_rate,
+            ref_signal,
+            ref_signal_len,
+            payload_bits_length,
+            data_bits_length,
+        );
 
         let writer = File::create(output_file).unwrap();
 
@@ -183,23 +190,17 @@ impl Demodulation2 {
         }
     }
 
-    pub async fn listening(
-        &mut self,
-        write_to_file: bool,
-        data_len: usize,
-        decoded_data: &mut Vec<u8>,
-        debug_vec: &mut Vec<f32>,
-    ) {
-        let payload_len = data_len;
-        println!("data len: {}", payload_len);
-        let bits_len = if ENABLE_ECC{
+    pub async fn listening(&mut self, write_to_file: bool, decoded_data: &mut Vec<u8>) {
+        let demodulate_config = &self.demodulate_config;
+        let payload_len = demodulate_config.payload_bits_length;
+        let bits_len = demodulate_config.data_bits_length;
+        let bits_len = if ENABLE_ECC {
             phy_frame::MAX_FRAME_DATA_LENGTH
-        }
-        else { phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING};
-
+        } else {
+            phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING
+        };
 
         let mut input_stream = self.input_config.create_input_stream();
-        let demodulate_config = &self.demodulate_config;
         let alpha_check = 1.0;
         let mut prev = 0.0;
 
@@ -227,7 +228,6 @@ impl Demodulation2 {
 
         let mut last_frame_index = 0;
 
-
         while let Some(data) = input_stream.next().await {
             if demodulate_state == DemodulationState::Stop {
                 break;
@@ -252,7 +252,11 @@ impl Demodulation2 {
                         && i - start_index > demodulate_config.preamble_len
                         && local_max > power_lim_preamble
                     {
-                        if  ((last_frame_index + start_index) as isize - modulation::OFDM_FRAME_DISTANCE as isize).abs() > 10{
+                        if ((last_frame_index + start_index) as isize
+                            - modulation::OFDM_FRAME_DISTANCE as isize)
+                            .abs()
+                            > 10
+                        {
                             println!("last frame distance: {}", last_frame_index + start_index);
                         }
                         start_index += demodulate_config.preamble_len - 1;
@@ -303,8 +307,10 @@ impl Demodulation2 {
                 demodulate_state = demodulate_state.next();
                 last_frame_index = 0;
                 for k in 0..carrier_num {
-                    
-                    let result = decode(mem::replace(&mut tmp_bits_data[k], Vec::with_capacity(payload_len)));
+                    let result = decode(mem::replace(
+                        &mut tmp_bits_data[k],
+                        Vec::with_capacity(payload_len),
+                    ));
                     // println!("data: {:?}", tmp_bits_data[k]);
                     // tmp_bits_data[k].clear();
 
@@ -382,11 +388,18 @@ fn decode(input_data: Vec<Bit>) -> Result<(Vec<Byte>, usize), Error> {
         }
 
         let mut length = 0;
-        for i in 0..phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING/8 {
+        for i in 0..phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING / 8 {
             length <<= 8;
             length += compressed_data[i] as usize;
         }
-        Ok((compressed_data[phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING/8..(phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING + phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING)/8].to_vec(), length))
+        Ok((
+            compressed_data[phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING / 8
+                ..(phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING
+                    + phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING)
+                    / 8]
+                .to_vec(),
+            length,
+        ))
     }
 }
 

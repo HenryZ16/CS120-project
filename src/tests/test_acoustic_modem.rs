@@ -175,22 +175,22 @@ async fn test_frame_gen() {
     file_plot("test.wav", "output_wav.svg");
 }
 
-#[tokio::test]
-async fn test_seconds_listening() {
-    let mut demodulator = Demodulation2::new(
-        vec![CARRIER],
-        48000,
-        "output.txt",
-        modulation::REDUNDANT_PERIODS,
-        false,
-    );
+// #[tokio::test]
+// async fn test_seconds_listening() {
+//     let mut demodulator = Demodulation2::new(
+//         vec![CARRIER],
+//         48000,
+//         "output.txt",
+//         modulation::REDUNDANT_PERIODS,
+//         false,
+//     );
 
-    let mut decoded_data = vec![];
-    let mut debug_vec = vec![];
-    let handle = demodulator.listening(true, phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING + phy_frame::MAX_FRAME_DATA_LENGTH, &mut decoded_data, &mut debug_vec);
-    let handle = time::timeout(Duration::from_secs(25), handle);
-    handle.await.unwrap();
-    plot(debug_vec, "recv_wav.svg").unwrap();
+//     let mut decoded_data = vec![];
+//     let mut debug_vec = vec![];
+//     let handle = demodulator.listening(true, phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING + phy_frame::MAX_FRAME_DATA_LENGTH, &mut decoded_data, &mut debug_vec);
+//     let handle = time::timeout(Duration::from_secs(25), handle);
+//     handle.await.unwrap();
+//     plot(debug_vec, "recv_wav.svg").unwrap();
 
-    // println!("received data: {:?}", decoded_data);
-}
+//     // println!("received data: {:?}", decoded_data);
+// }

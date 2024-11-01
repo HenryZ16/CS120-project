@@ -7,3 +7,6 @@ pub mod test_symrs;
 
 #[cfg(test)]
 pub mod test_acoustic_modem;
+
+#[cfg(test)]
+pub mod test_config;
