@@ -15,8 +15,8 @@ use std::fs::File;
 use std::io::Write;
 use std::ops::{Add, Mul};
 use std::result::Result::Ok;
-
-const LOWEST_POWER_LIMIT: f32 = 50.0;
+use std::mem;
+const LOWEST_POWER_LIMIT: f32 = 10.0;
 
 struct InputStreamConfig {
     config: SupportedStreamConfig,
@@ -218,7 +218,7 @@ impl Demodulation2 {
         let mut start_index = usize::MAX;
 
         let carrier_num = demodulate_config.ref_signal.len();
-        println!("carrier num: {}", carrier_num);
+        // println!("carrier num: {}", carrier_num);
         let mut tmp_bits_data = vec![Vec::with_capacity(payload_len); carrier_num];
 
         let mut is_reboot = false;
@@ -304,9 +304,9 @@ impl Demodulation2 {
                 last_frame_index = 0;
                 for k in 0..carrier_num {
                     
-                    let result = decode(&tmp_bits_data[k]);
+                    let result = decode(mem::replace(&mut tmp_bits_data[k], Vec::with_capacity(payload_len)));
                     // println!("data: {:?}", tmp_bits_data[k]);
-                    tmp_bits_data[k].clear();
+                    // tmp_bits_data[k].clear();
 
                     match result {
                         Ok((vec, length)) => {
@@ -364,19 +364,19 @@ impl Demodulation2 {
     }
 }
 
-fn decode(input_data: &Vec<Bit>) -> Result<(Vec<Byte>, usize), Error> {
+fn decode(input_data: Vec<Bit>) -> Result<(Vec<Byte>, usize), Error> {
     if ENABLE_ECC {
         // println!(
         //     "input data: {:?}, data length: {}",
         //     input_data,
         //     input_data.len()
         // );
-        let hexbits = u8_2_code_rs_hexbit(read_data_2_compressed_u8(input_data.clone()));
+        let hexbits = u8_2_code_rs_hexbit(read_data_2_compressed_u8(input_data));
 
         // println!("hexbits: {:?}, hexbit length: {}", hexbits, hexbits.len());
         PHYFrame::payload_2_data(hexbits)
     } else {
-        let compressed_data = read_data_2_compressed_u8(input_data.to_vec());
+        let compressed_data = read_data_2_compressed_u8(input_data);
         if !PHYFrame::check_crc(&compressed_data) {
             return Err(Error::msg("CRC wrong"));
         }
