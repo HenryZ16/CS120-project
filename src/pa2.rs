@@ -17,14 +17,10 @@ const OFDM: bool = true;
 pub async fn obj_1_send() -> Result<u32> {
     let t_start = std::time::Instant::now();
 
-    // read data from testset/data.txt
-    let mut file = File::open("testset/data.txt")?;
-    let mut data = String::new();
-    file.read_to_string(&mut data)?;
-    let data = data
-        .chars()
-        .map(|c| c.to_digit(10).unwrap() as u8)
-        .collect::<Vec<u8>>();
+    // read data from testset/data.bin
+    let mut file = File::open("testset/data.bin")?;
+    let mut data: Vec<u8> = vec![];
+    file.read_to_end(&mut data)?;
 
     // modulator
     let sample_rate = 48000;
@@ -32,12 +28,7 @@ pub async fn obj_1_send() -> Result<u32> {
     let mut modulator = Modulator::new(vec![carrier_freq, carrier_freq * 2], sample_rate, OFDM);
 
     // send
-    modulator
-        .send_bits(
-            utils::read_data_2_compressed_u8(data.clone()),
-            data.len() as isize,
-        )
-        .await;
+    modulator.send_bits(data.clone(), data.len() as isize).await;
 
     println!(
         "[pa1-obj3-send] Total elapsed time: {:?}",
@@ -50,14 +41,10 @@ pub async fn obj_1_send() -> Result<u32> {
 pub async fn obj_1_send_file() -> Result<u32> {
     let t_start = std::time::Instant::now();
 
-    // read data from testset/data.txt
-    let mut file = File::open("testset/data.txt")?;
-    let mut data = String::new();
-    file.read_to_string(&mut data)?;
-    let data = data
-        .chars()
-        .map(|c| c.to_digit(10).unwrap() as u8)
-        .collect::<Vec<u8>>();
+    // read data from testset/data.bin
+    let mut file = File::open("testset/data.bin")?;
+    let mut data: Vec<u8> = vec![];
+    file.read_to_end(&mut data)?;
 
     // modulator
     let sample_rate = 48000;
@@ -67,11 +54,7 @@ pub async fn obj_1_send_file() -> Result<u32> {
     let file = "testset/send.wav";
     // send
     modulator
-        .send_bits_2_file(
-            utils::read_data_2_compressed_u8(data.clone()),
-            data.len() as isize,
-            &file,
-        )
+        .send_bits_2_file(data.clone(), data.len() as isize, &file)
         .await;
 
     read_wav_and_play(&file).await;
