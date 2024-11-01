@@ -31,7 +31,6 @@ pub struct Modulator {
 impl Modulator {
     pub fn new(carrier_freq: Vec<u32>, sample_rate: u32, enable_ofdm: bool) -> Self {
         let host = cpal::host_from_id(cpal::HostId::Asio).expect("failed to initialise ASIO host");
-        // let host = cpal::default_host();
         let device = host.default_output_device().unwrap();
         println!("[Modulator] Output device: {:?}", device.name().unwrap());
 
@@ -356,12 +355,10 @@ impl Modulator {
             modulated_signal.extend(modulated_psk_signal.clone());
         }
 
-        // cool down
-        // let cool_down_vec: Vec<f32> = (0..3000)
-        //     .map(|x| (2.0 * std::f32::consts::PI * x as f32 / 48000.0 * 5000 as f32).sin())
-        //     .collect();
-        // modulated_signal.extend(cool_down_vec);
-
+        println!(
+            "[bits_2_wave] modulated_signal.len(): {}",
+            modulated_signal.len()
+        );
         return modulated_signal;
     }
 

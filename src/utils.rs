@@ -21,6 +21,11 @@ pub fn gen_random_data_file(len: usize) {
         file.write_all(data[i].to_string().as_bytes()).unwrap();
     }
 }
+pub fn gen_random_bin_file(len: usize) {
+    let data = gen_random_data(len);
+    let mut file = File::create("testset/data.bin").unwrap();
+    file.write_all(&data).unwrap();
+}
 
 pub fn read_data_2_compressed_u8(data: Vec<Bit>) -> Vec<Byte> {
     let mut compressed_data = vec![];

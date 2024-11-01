@@ -16,6 +16,7 @@ fn help() {
     println!("  -t=<str>, --type=<str>: Additional type for the selected PA: send, send_file");
     println!("  -d, -device: Show available ASIO devices");
     println!("  -g[=N], --generate[=N]: Generate a random data file with N (default 10000) bits");
+    println!("  -gb[=N], --generate-binary[=N]: Generate a random binary file with N (default 10000) bits");
 }
 
 fn arg_parser(args: Vec<String>) -> Option<(i32, i32, String)> {
@@ -52,6 +53,16 @@ fn arg_parser(args: Vec<String>) -> Option<(i32, i32, String)> {
             };
         } else if arg == "-d" || arg == "--device" {
             asio_stream::show_devices();
+            return None;
+        } else if arg.starts_with("-gb") || arg.starts_with("--generate-binary") {
+            let len = match arg.split("=").collect::<Vec<&str>>().get(1) {
+                Some(n) => match n.parse::<usize>() {
+                    Ok(n) => n,
+                    Err(_) => 50000,
+                },
+                None => 50000,
+            };
+            utils::gen_random_bin_file(len);
             return None;
         } else if arg.starts_with("-g") || arg.starts_with("--generate") {
             let len = match arg.split("=").collect::<Vec<&str>>().get(1) {
@@ -106,7 +117,7 @@ async fn main() {
         }
         Some((2, n, additional_type)) => {
             println!("PA 2 selected with objective {}.", n);
-            match pa2::pa2(n, &additional_type).await{
+            match pa2::pa2(n, &additional_type).await {
                 Ok(_) => {}
                 Err(e) => {
                     println!("Error: {}", e);
