@@ -1,18 +1,14 @@
-use crate::acoustic_modem::demodulation::Demodulation2;
-use crate::acoustic_modem::modulation;
-use crate::acoustic_modem::modulation::Modulator;
-use crate::acoustic_modem::modulation::ENABLE_ECC;
-use crate::acoustic_modem::phy_frame;
+use crate::acoustic_modem::generator::PhyLayerGenerator;
 use crate::asio_stream::read_wav_and_play;
-use crate::utils;
 use anyhow::{Error, Result};
 use std::fs::File;
 use std::io::Read;
+use std::io::Write;
 use std::vec;
+use tokio::join;
 use tokio::time::{self, Duration};
-const CARRIER: u32 = 6000;
-const SAMPLE_RATE: u32 = 48000;
-const OFDM: bool = true;
+
+const CONFIG_FILE: &str = "configuration/pa2.yml";
 
 pub async fn obj_1_send() -> Result<u32> {
     let t_start = std::time::Instant::now();
@@ -22,13 +18,18 @@ pub async fn obj_1_send() -> Result<u32> {
     let mut data: Vec<u8> = vec![];
     file.read_to_end(&mut data)?;
 
+    let config = PhyLayerGenerator::new_from_yaml(CONFIG_FILE);
+    let mut modulator = config.gen_modulator();
+
     // modulator
-    let sample_rate = 48000;
-    let carrier_freq = CARRIER;
-    let mut modulator = Modulator::new(vec![carrier_freq, carrier_freq * 2], sample_rate, OFDM);
+    // let sample_rate = 48000;
+    // let carrier_freq = CARRIER;
+    // let mut modulator = Modulator::new(vec![carrier_freq, carrier_freq * 2], sample_rate, OFDM);
 
     // send
-    modulator.send_bits(data.clone(), data.len() as isize).await;
+    modulator
+        .send_bits(data.clone(), data.len() as isize * 8)
+        .await;
 
     println!(
         "[pa1-obj3-send] Total elapsed time: {:?}",
@@ -46,15 +47,19 @@ pub async fn obj_1_send_file() -> Result<u32> {
     let mut data: Vec<u8> = vec![];
     file.read_to_end(&mut data)?;
 
+    // println!("data: {:?}", data);
+    let config = PhyLayerGenerator::new_from_yaml(CONFIG_FILE);
+    let mut modulator = config.gen_modulator();
+
     // modulator
-    let sample_rate = 48000;
-    let carrier_freq = CARRIER;
-    let mut modulator = Modulator::new(vec![carrier_freq, carrier_freq * 2], sample_rate, OFDM);
+    // let sample_rate = 48000;
+    // let carrier_freq = CARRIER;
+    // let mut modulator = Modulator::new(vec![carrier_freq, carrier_freq * 2], sample_rate, OFDM);
 
     let file = "testset/send.wav";
     // send
     modulator
-        .send_bits_2_file(data.clone(), data.len() as isize, &file)
+        .send_bits_2_file(data.clone(), data.len() as isize * 8, &file)
         .await;
 
     read_wav_and_play(&file).await;
@@ -68,37 +73,17 @@ pub async fn obj_1_send_file() -> Result<u32> {
 }
 
 pub async fn obj_1_recv_file() -> Result<u32> {
-    let data_len = if ENABLE_ECC {
-        phy_frame::FRAME_PAYLOAD_LENGTH
-    } else {
-        phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING
-            + phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING
-            + phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
-    };
-    let bits_len = if ENABLE_ECC {
-        phy_frame::MAX_FRAME_DATA_LENGTH
-    } else {
-        phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING
-    };
-    let mut demodulator = Demodulation2::new(
-        vec![CARRIER, CARRIER * 2],
-        SAMPLE_RATE,
-        "other.txt",
-        modulation::REDUNDANT_PERIODS,
-        OFDM,
-        data_len,
-        bits_len,
-    );
+    let config = PhyLayerGenerator::new_from_yaml(CONFIG_FILE);
+    let mut demodulator = config.gen_demodulation();
 
     let mut decoded_data = vec![];
-    let handle = demodulator.listening(false, &mut decoded_data);
+    let handle = demodulator.listening(&mut decoded_data);
     let handle = time::timeout(Duration::from_secs(10), handle);
     println!("[pa1-obj3-receive] Start");
-    handle.await.unwrap_err();
-    // let mut file = File::create("testset/output.txt").unwrap();
-    // // file.write_all(&decoded_data).unwrap();
-    // file.write_all(&decoded_data.iter().map(|x| x + b'0').collect::<Vec<u8>>())
-    //     .unwrap();
+    handle.await;
+    let mut file = File::create("testset/output.txt").unwrap();
+    // file.write_all(&decoded_data).unwrap();
+    file.write_all(&mut decoded_data).unwrap();
     println!("[pa1-obj3-recrive] Stop");
 
     return Ok(0);
@@ -142,6 +127,12 @@ pub async fn pa2(sel: i32, additional_type: &str) -> Result<u32> {
                         println!("Objective 1 failed");
                     }
                 }
+            }
+            "test" => {
+                let handle_recv = obj_1_recv_file();
+                let handle_send = obj_1_send_file();
+
+                join!(handle_recv, handle_send);
             }
             _ => {
                 println!("Unsupported function.");

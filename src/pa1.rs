@@ -111,7 +111,6 @@ pub async fn obj_3_recv_file() -> Result<u32> {
     let mut demodulator = Demodulation2::new(
         vec![CARRIER, CARRIER * 2],
         SAMPLE_RATE,
-        "other.txt",
         modulation::REDUNDANT_PERIODS,
         OFDM,
         data_len,
@@ -119,7 +118,7 @@ pub async fn obj_3_recv_file() -> Result<u32> {
     );
 
     let mut decoded_data = vec![];
-    let handle = demodulator.listening(false, &mut decoded_data);
+    let handle = demodulator.listening(&mut decoded_data);
     let handle = time::timeout(Duration::from_secs(10), handle);
     println!("[pa1-obj3-receive] Start");
     handle.await.unwrap_err();

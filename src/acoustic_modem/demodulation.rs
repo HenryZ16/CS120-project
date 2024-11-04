@@ -8,14 +8,13 @@ use anyhow::Error;
 use cpal::traits::{DeviceTrait, HostTrait};
 use cpal::{Device, SampleRate, SupportedStreamConfig};
 use futures::StreamExt;
-use plotters::data;
 use std::collections::VecDeque;
 use std::fs::File;
 use std::io::Write;
 use std::mem;
 use std::ops::{Add, Mul};
 use std::result::Result::Ok;
-const LOWEST_POWER_LIMIT: f32 = 10.0;
+const LOWEST_POWER_LIMIT: f32 = 5.0;
 
 struct InputStreamConfig {
     config: SupportedStreamConfig,
@@ -113,14 +112,12 @@ pub struct Demodulation2 {
     input_config: InputStreamConfig,
     // pub buffer: VecDeque<Vec<f32>>,
     demodulate_config: DemodulationConfig,
-    writer: File,
 }
 
 impl Demodulation2 {
     pub fn new(
         carrier_freq: Vec<u32>,
         sample_rate: u32,
-        output_file: &str,
         redundent_times: usize,
         enable_ofdm: bool,
         payload_bits_length: usize,
@@ -180,17 +177,14 @@ impl Demodulation2 {
             data_bits_length,
         );
 
-        let writer = File::create(output_file).unwrap();
-
         Demodulation2 {
             input_config: input_stream_config,
             // buffer: VecDeque::new(),
             demodulate_config: demodulation_config,
-            writer,
         }
     }
 
-    pub async fn listening(&mut self, write_to_file: bool, decoded_data: &mut Vec<u8>) {
+    pub async fn listening(&mut self, decoded_data: &mut Vec<u8>) {
         let demodulate_config = &self.demodulate_config;
         let payload_len = demodulate_config.payload_bits_length;
         let bits_len = demodulate_config.data_bits_length;
@@ -232,6 +226,7 @@ impl Demodulation2 {
             if demodulate_state == DemodulationState::Stop {
                 break;
             }
+            // println!("data len: {}", data.len());
             tmp_buffer_len += data.len() / channels;
             move_data_into_buffer(data, &mut tmp_buffer, alpha_check, channels, &mut prev);
             if demodulate_state == DemodulationState::DetectPreamble {
@@ -261,11 +256,11 @@ impl Demodulation2 {
                         }
                         start_index += demodulate_config.preamble_len - 1;
                         demodulate_state = demodulate_state.next();
-                        // println!("detected preamble");
-                        // println!(
-                        //     "start index: {}, tmp buffer len: {}, max: {}",
-                        //     start_index, tmp_buffer_len, local_max
-                        // );
+                        println!("detected preamble");
+                        println!(
+                            "start index: {}, tmp buffer len: {}, max: {}",
+                            start_index, tmp_buffer_len, local_max
+                        );
                         local_max = 0.0;
                         break;
                     }
@@ -307,32 +302,32 @@ impl Demodulation2 {
                 demodulate_state = demodulate_state.next();
                 last_frame_index = 0;
                 for k in 0..carrier_num {
+                    // println!("data: {:?}", tmp_bits_data[k]);
                     let result = decode(mem::replace(
                         &mut tmp_bits_data[k],
                         Vec::with_capacity(payload_len),
                     ));
-                    // println!("data: {:?}", tmp_bits_data[k]);
                     // tmp_bits_data[k].clear();
 
                     match result {
-                        Ok((vec, length)) => {
+                        Ok((mut vec, length)) => {
                             if length > bits_len {
                                 println!("wrong data length: {}", length);
                             } else {
-                                let decompressed =
-                                    read_compressed_u8_2_data(vec)[0..length].to_vec();
-                                // println!("length: {}", length);
-
-                                if write_to_file {
-                                    let to_write = &decompressed
-                                        .clone()
-                                        .iter()
-                                        .map(|x| *x + b'0')
-                                        .collect::<Vec<u8>>();
-                                    // println!("to write: {:?}", to_write);
-                                    self.writer.write_all(to_write).unwrap();
+                                // println!("length: {:?}", length);
+                                let remove_bit_length: usize = 8 - (length & 0b111);
+                                if remove_bit_length != 8 {
+                                    // println!("remove bit: {:?}", remove_bit_length);
+                                    let mut fix_mask = 0xFF;
+                                    fix_mask >>= remove_bit_length;
+                                    fix_mask <<= remove_bit_length;
+                                    let fix_byte = vec.get_mut(length / 8).unwrap();
+                                    *fix_byte &= fix_mask;
                                 }
-                                decoded_data.extend_from_slice(&decompressed[0..length]);
+                                // println!("vec: {:?}", vec);
+                                decoded_data.extend_from_slice(&vec[0..length / 8]);
+
+                                // decoded_data.extend_from_slice(&decompressed[0..length]);
                             }
                         }
 
@@ -367,6 +362,8 @@ impl Demodulation2 {
 
             // println!("buffer len: {}", tmp_buffer_len);
         }
+
+        println!("listen stoped");
     }
 }
 
@@ -384,6 +381,10 @@ fn decode(input_data: Vec<Bit>) -> Result<(Vec<Byte>, usize), Error> {
     } else {
         let compressed_data = read_data_2_compressed_u8(input_data);
         if !PHYFrame::check_crc(&compressed_data) {
+            // println!(
+            //     "receivecd: {:?}",
+            //     read_compressed_u8_2_data(compressed_data)
+            // );
             return Err(Error::msg("CRC wrong"));
         }
 

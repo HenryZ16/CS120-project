@@ -22,7 +22,8 @@ pub fn gen_random_data_file(len: usize) {
     }
 }
 pub fn gen_random_bin_file(len: usize) {
-    let data = gen_random_data(len);
+    let data = gen_random_data(len * 8);
+    let data = read_data_2_compressed_u8(data);
     let mut file = File::create("testset/data.bin").unwrap();
     file.write_all(&data).unwrap();
 }

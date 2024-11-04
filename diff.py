@@ -1,5 +1,5 @@
 def compare_files(file1_path, file2_path):
-    with open(file1_path, 'r') as file1, open(file2_path, 'r') as file2:
+    with open(file1_path, 'rb') as file1, open(file2_path, 'rb') as file2:
         content1 = file1.read()
         content2 = file2.read()
 
@@ -14,7 +14,7 @@ def compare_files(file1_path, file2_path):
 
 def main():
     file1_path = 'testset/output.txt'
-    file2_path = 'testset/data.txt'
+    file2_path = 'testset/data.bin'
     try:
         diff_count = compare_files(file1_path, file2_path)
         print(f"Number of different characters: {diff_count}")

@@ -1,13 +1,11 @@
 use anyhow::{Error, Result};
 use cpal::{
-    traits::{DeviceTrait, HostTrait, StreamTrait}, Device, FromSample, Sample, SampleFormat, SizedSample
+    traits::{DeviceTrait, HostTrait, StreamTrait},
+    Device, FromSample, Sample, SampleFormat, SizedSample,
 };
 use futures::{FutureExt, Sink, SinkExt, Stream};
 use rodio::{OutputStream, Source, SupportedStreamConfig};
-use std::{
-    iter::ExactSizeIterator,
-    time::Duration,
-};
+use std::{iter::ExactSizeIterator, time::Duration};
 use tokio::{
     sync::{
         mpsc::{self, UnboundedReceiver, UnboundedSender},
@@ -384,8 +382,8 @@ pub async fn read_wav_and_play(filename: &str) {
     use cpal::{SampleRate, SupportedStreamConfig};
     let (track, sample_rate) = read_wav(filename).await;
 
-    // let host = cpal::host_from_id(HostId::Asio).expect("failed to initialise ASIO host");
-    let host = cpal::default_host();
+    let host = cpal::host_from_id(cpal::HostId::Asio).expect("failed to initialise ASIO host");
+    // let host = cpal::default_host();
     let device = host
         .default_output_device()
         .expect("failed to find output device");

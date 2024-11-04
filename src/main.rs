@@ -16,7 +16,7 @@ fn help() {
     println!("  -t=<str>, --type=<str>: Additional type for the selected PA: send, send_file");
     println!("  -d, -device: Show available ASIO devices");
     println!("  -g[=N], --generate[=N]: Generate a random data file with N (default 10000) bits");
-    println!("  -gb[=N], --generate-binary[=N]: Generate a random binary file with N (default 10000) bits");
+    println!("  -gb[=N], --generate-binary[=N]: Generate a random binary file with N (default 10000) bytes");
 }
 
 fn arg_parser(args: Vec<String>) -> Option<(i32, i32, String)> {

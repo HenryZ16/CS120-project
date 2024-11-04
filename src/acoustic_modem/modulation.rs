@@ -15,7 +15,7 @@ use futures::SinkExt;
 use hound::{WavSpec, WavWriter};
 
 const SAMPLE_RATE: u32 = 48000;
-pub const OFDM_FRAME_DISTANCE: usize = 20;
+pub const OFDM_FRAME_DISTANCE: usize = 30;
 pub const REDUNDANT_PERIODS: usize = 1;
 pub const ENABLE_ECC: bool = false;
 
@@ -31,6 +31,7 @@ pub struct Modulator {
 impl Modulator {
     pub fn new(carrier_freq: Vec<u32>, sample_rate: u32, enable_ofdm: bool) -> Self {
         let host = cpal::host_from_id(cpal::HostId::Asio).expect("failed to initialise ASIO host");
+        // let host = cpal::default_host();
         let device = host.default_output_device().unwrap();
         println!("[Modulator] Output device: {:?}", device.name().unwrap());
 
@@ -81,7 +82,9 @@ impl Modulator {
 
     pub async fn bits_2_wave(&mut self, data: Vec<Byte>, len: isize) -> Vec<f32> {
         let mut modulated_signal: Vec<f32> = vec![];
-
+        // let mut modulated_signal: Vec<f32> = (0..3000)
+        //     .map(|x| (2.0 * std::f32::consts::PI * x as f32 / 48000.0 * 5000 as f32).sin())
+        //     .collect();
         let mut len = len;
         let mut loop_cnt = 0;
 
@@ -279,6 +282,7 @@ impl Modulator {
                         }
                         last_single_frames_cnt += 1;
                     }
+                    // println!("payload: {:?}, length: {}", payload, len);
                 } else {
                     bit_len = if len > phy_frame::MAX_FRAME_DATA_LENGTH as isize {
                         phy_frame::MAX_FRAME_DATA_LENGTH
@@ -311,13 +315,13 @@ impl Modulator {
                 let modulated_psk_signal_i = self.modulate(&decompressed_data, i);
 
                 // nomalization - make the power of each carrier equal
-                let modulated_psk_signal_i: Vec<f32> = modulated_psk_signal_i
-                    .iter()
-                    .map(|&x| {
-                        x / ((self.carrier_freq[i] as f32 / self.carrier_freq[0] as f32).powf(2.0))
-                            as f32
-                    })
-                    .collect();
+                let modulated_psk_signal_i: Vec<f32> = modulated_psk_signal_i;
+                // .iter()
+                // .map(|&x| {
+                //     x / ((self.carrier_freq[i] as f32 / self.carrier_freq[0] as f32).powf(2.0))
+                //         as f32
+                // })
+                // .collect();
 
                 if i == 0 {
                     modulated_psk_signal.extend(modulated_psk_signal_i.clone());
@@ -329,9 +333,9 @@ impl Modulator {
                         .collect();
                 }
                 if !ENABLE_ECC {
-                    len -= (phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING * carrier_cnt) as isize;
+                    len -= phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING as isize;
                 } else {
-                    len -= (phy_frame::MAX_FRAME_DATA_LENGTH * carrier_cnt) as isize;
+                    len -= phy_frame::MAX_FRAME_DATA_LENGTH as isize;
                 }
                 if len < 0 {
                     len = 0;
@@ -344,21 +348,20 @@ impl Modulator {
                     / ((self.carrier_freq[x - 1] as f32 / self.carrier_freq[0] as f32).powf(2.0))
                         as f32
             });
-            modulated_psk_signal = modulated_psk_signal
-                .iter()
-                .map(|&x| x / divisor as f32)
-                .collect();
+            modulated_psk_signal = modulated_psk_signal;
+            // .iter()
+            // .map(|&x| x / divisor as f32)
+            // .collect();
 
             // add FSK preamble
             let preamble = phy_frame::gen_preamble(self.sample_rate);
             modulated_signal.extend(preamble.clone());
             modulated_signal.extend(modulated_psk_signal.clone());
         }
+        // cool down
+        let cool_down_vec: Vec<f32> = vec![0.0; 30];
+        modulated_signal.extend(cool_down_vec);
 
-        println!(
-            "[bits_2_wave] modulated_signal.len(): {}",
-            modulated_signal.len()
-        );
         return modulated_signal;
     }
 
