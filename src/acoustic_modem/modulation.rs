@@ -314,15 +314,6 @@ impl Modulator {
                 }
                 let modulated_psk_signal_i = self.modulate(&decompressed_data, i);
 
-                // nomalization - make the power of each carrier equal
-                let modulated_psk_signal_i: Vec<f32> = modulated_psk_signal_i;
-                // .iter()
-                // .map(|&x| {
-                //     x / ((self.carrier_freq[i] as f32 / self.carrier_freq[0] as f32).powf(2.0))
-                //         as f32
-                // })
-                // .collect();
-
                 if i == 0 {
                     modulated_psk_signal.extend(modulated_psk_signal_i.clone());
                 } else {
@@ -342,17 +333,6 @@ impl Modulator {
                 }
             }
 
-            // nomalization - make the maximum of the sequence equal to 1
-            let divisor = (1..(carrier_cnt + 1)).fold(0.0, |acc, x| {
-                acc + 1.0
-                    / ((self.carrier_freq[x - 1] as f32 / self.carrier_freq[0] as f32).powf(2.0))
-                        as f32
-            });
-            modulated_psk_signal = modulated_psk_signal;
-            // .iter()
-            // .map(|&x| x / divisor as f32)
-            // .collect();
-
             // add FSK preamble
             let preamble = phy_frame::gen_preamble(self.sample_rate);
             modulated_signal.extend(preamble.clone());
@@ -362,6 +342,10 @@ impl Modulator {
         let cool_down_vec: Vec<f32> = vec![0.0; 30];
         modulated_signal.extend(cool_down_vec);
 
+        println!(
+            "[bits_2_wave] modulated_signal.len(): {}",
+            modulated_signal.len()
+        );
         return modulated_signal;
     }
 
