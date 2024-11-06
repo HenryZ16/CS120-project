@@ -42,6 +42,7 @@ impl Modulator {
             default_config.buffer_size().clone(),
             default_config.sample_format(),
         );
+        println!("[Modulator] Output config: {:?}", config);
 
         let output_stream = OutputAudioStream::new(&device, config.clone());
 
