@@ -1,3 +1,4 @@
+mod acoustic_mac;
 mod acoustic_modem;
 mod asio_stream;
 mod pa0;
