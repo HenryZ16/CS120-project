@@ -20,11 +20,7 @@ pub async fn obj_1_send() -> Result<u32> {
 
     let config = PhyLayerGenerator::new_from_yaml(CONFIG_FILE);
     let mut modulator = config.gen_modulator();
-
-    // modulator
-    // let sample_rate = 48000;
-    // let carrier_freq = CARRIER;
-    // let mut modulator = Modulator::new(vec![carrier_freq, carrier_freq * 2], sample_rate, OFDM);
+    println!("[pa1-obj3-send] Elapsed time: {:?}", t_start.elapsed());
 
     // send
     modulator
