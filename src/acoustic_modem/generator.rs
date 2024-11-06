@@ -56,6 +56,7 @@ impl PhyLayerGenerator {
             self.enable_ofdm,
             self.payload_bits_length,
             self.data_bits_length,
+            self.lowest_power_limit,
         )
     }
 

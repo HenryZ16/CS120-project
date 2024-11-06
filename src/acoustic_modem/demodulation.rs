@@ -14,7 +14,7 @@ use std::io::Write;
 use std::mem;
 use std::ops::{Add, Mul};
 use std::result::Result::Ok;
-const LOWEST_POWER_LIMIT: f32 = 5.0;
+const LOWEST_POWER_LIMIT: f32 = 6.0;
 
 struct InputStreamConfig {
     config: SupportedStreamConfig,
@@ -42,6 +42,7 @@ struct DemodulationConfig {
     preamble: Vec<f32>,
     payload_bits_length: usize,
     data_bits_length: usize,
+    lowest_power_limit: f32,
 }
 
 unsafe impl Send for DemodulationConfig {}
@@ -54,6 +55,7 @@ impl DemodulationConfig {
         ref_signal_len: Vec<usize>,
         payload_bits_length: usize,
         data_bits_length: usize,
+        lowest_power_limit: f32,
     ) -> Self {
         let preamble = phy_frame::gen_preamble(sample_rate);
         // println!("preamble len: {}", preamble.len());
@@ -64,6 +66,7 @@ impl DemodulationConfig {
             preamble,
             payload_bits_length,
             data_bits_length,
+            lowest_power_limit,
         }
     }
 }
@@ -122,6 +125,7 @@ impl Demodulation2 {
         enable_ofdm: bool,
         payload_bits_length: usize,
         data_bits_length: usize,
+        lowest_power_limit: f32,
     ) -> Self {
         let host = cpal::host_from_id(cpal::HostId::Asio).expect("failed to initialise ASIO host");
         // let host = cpal::default_host();
@@ -175,6 +179,7 @@ impl Demodulation2 {
             ref_signal_len,
             payload_bits_length,
             data_bits_length,
+            lowest_power_limit,
         );
 
         Demodulation2 {
@@ -187,7 +192,7 @@ impl Demodulation2 {
     pub async fn listening(&mut self, decoded_data: &mut Vec<u8>) {
         let demodulate_config = &self.demodulate_config;
         let payload_len = demodulate_config.payload_bits_length;
-        let bits_len = demodulate_config.data_bits_length;
+        // let bits_len = demodulate_config.data_bits_length;
         let bits_len = if ENABLE_ECC {
             phy_frame::MAX_FRAME_DATA_LENGTH
         } else {
@@ -200,7 +205,7 @@ impl Demodulation2 {
 
         let mut demodulate_state = DemodulationState::DetectPreamble;
 
-        let power_lim_preamble = LOWEST_POWER_LIMIT;
+        let power_lim_preamble = demodulate_config.lowest_power_limit;
 
         let mut tmp_buffer: VecDeque<f32> = VecDeque::with_capacity(
             5 * demodulate_config
@@ -256,11 +261,11 @@ impl Demodulation2 {
                         }
                         start_index += demodulate_config.preamble_len - 1;
                         demodulate_state = demodulate_state.next();
-                        println!("detected preamble");
-                        println!(
-                            "start index: {}, tmp buffer len: {}, max: {}",
-                            start_index, tmp_buffer_len, local_max
-                        );
+                        // println!("detected preamble");
+                        // println!(
+                        //     "start index: {}, tmp buffer len: {}, max: {}",
+                        //     start_index, tmp_buffer_len, local_max
+                        // );
                         local_max = 0.0;
                         break;
                     }
