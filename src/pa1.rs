@@ -1,9 +1,5 @@
-use crate::acoustic_modem::demodulation::Demodulation2;
 use crate::acoustic_modem::generator::PhyLayerGenerator;
-use crate::acoustic_modem::modulation;
 use crate::acoustic_modem::modulation::Modulator;
-use crate::acoustic_modem::modulation::ENABLE_ECC;
-use crate::acoustic_modem::phy_frame;
 use crate::pa0;
 use crate::utils;
 use anyhow::{Error, Result};
@@ -17,7 +13,6 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::vec;
 const CARRIER: u32 = 4000;
-const SAMPLE_RATE: u32 = 48000;
 const OFDM: bool = true;
 const CONFIG_FILE: &str = "configuration/pa1.yml";
 

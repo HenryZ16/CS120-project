@@ -126,9 +126,9 @@ pub async fn pa2(sel: i32, additional_type: &str) -> Result<u32> {
             }
             "test" => {
                 let handle_recv = obj_1_recv_file();
-                let handle_send = obj_1_send_file();
+                let handle_send = obj_1_send();
 
-                join!(handle_recv, handle_send);
+                let _ = join!(handle_recv, handle_send);
             }
             _ => {
                 println!("Unsupported function.");
