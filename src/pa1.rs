@@ -1,4 +1,5 @@
 use crate::acoustic_modem::demodulation::Demodulation2;
+use crate::acoustic_modem::generator::PhyLayerGenerator;
 use crate::acoustic_modem::modulation;
 use crate::acoustic_modem::modulation::Modulator;
 use crate::acoustic_modem::modulation::ENABLE_ECC;
@@ -18,6 +19,7 @@ use std::vec;
 const CARRIER: u32 = 4000;
 const SAMPLE_RATE: u32 = 48000;
 const OFDM: bool = true;
+const CONFIG_FILE: &str = "configuration/pa1.yml";
 
 pub async fn obj_2() -> Result<u32> {
     let mut modulator_1 = Modulator::new(vec![1000, 10000], 48000, false);
@@ -96,26 +98,29 @@ pub async fn obj_3_send_file() -> Result<u32> {
 }
 
 pub async fn obj_3_recv_file() -> Result<u32> {
-    let data_len = if ENABLE_ECC {
-        phy_frame::FRAME_PAYLOAD_LENGTH
-    } else {
-        phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING
-            + phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING
-            + phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
-    };
-    let bits_len = if ENABLE_ECC {
-        phy_frame::MAX_FRAME_DATA_LENGTH
-    } else {
-        phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING
-    };
-    let mut demodulator = Demodulation2::new(
-        vec![CARRIER, CARRIER * 2],
-        SAMPLE_RATE,
-        modulation::REDUNDANT_PERIODS,
-        OFDM,
-        data_len,
-        bits_len,
-    );
+    // let data_len = if ENABLE_ECC {
+    //     phy_frame::FRAME_PAYLOAD_LENGTH
+    // } else {
+    //     phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING
+    //         + phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING
+    //         + phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
+    // };
+    // let bits_len = if ENABLE_ECC {
+    //     phy_frame::MAX_FRAME_DATA_LENGTH
+    // } else {
+    //     phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING
+    // };
+    // let mut demodulator = Demodulation2::new(
+    //     vec![CARRIER, CARRIER * 2],
+    //     SAMPLE_RATE,
+    //     modulation::REDUNDANT_PERIODS,
+    //     OFDM,
+    //     data_len,
+    //     bits_len,
+    // );
+
+    let config = PhyLayerGenerator::new_from_yaml(CONFIG_FILE);
+    let mut demodulator = config.gen_demodulation();
 
     let mut decoded_data = vec![];
     let handle = demodulator.listening(&mut decoded_data);
