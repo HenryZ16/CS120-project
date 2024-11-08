@@ -506,6 +506,7 @@ impl Demodulation2 {
                 is_reboot = true;
                 demodulate_state = demodulate_state.next();
                 last_frame_index = 0;
+                let mut to_send: Vec<Byte> = vec![];
                 for k in 0..carrier_num {
                     // println!("data: {:?}", tmp_bits_data[k]);
                     let result = decode(mem::replace(
@@ -516,12 +517,17 @@ impl Demodulation2 {
 
                     match result {
                         Ok((meta_data, _)) => {
-                            output_tx.send(meta_data).unwrap();
+                            to_send.extend(meta_data.iter());
                         }
                         Err(msg) => {
                             println!("{}", msg);
+                            to_send.clear();
+                            break;
                         }
                     }
+                }
+                if to_send.len() > 0 {
+                    output_tx.send(to_send);
                 }
                 // println!("tmp bit len: {}", tmp_bits_data.len());
             }

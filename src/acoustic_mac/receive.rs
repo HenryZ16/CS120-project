@@ -1,6 +1,7 @@
 use std::vec;
 
 use crate::{
+    acoustic_mac::mac_frame::{MACFrame, MACType, MacAddress},
     acoustic_modem::{
         demodulation::{Demodulation2, DemodulationState},
         generator::PhyLayerGenerator,
@@ -22,7 +23,7 @@ impl MacReceiver {
         Self { demodulator }
     }
 
-    pub async fn receive_bytes(&mut self, byte_num: usize) -> Vec<Byte> {
+    pub async fn receive_bytes(&mut self, byte_num: usize, self_mac: MacAddress) -> Vec<Byte> {
         let (decoded_data_tx, mut decoded_data_rx) = unbounded_channel();
         let (status_tx, status_rx) = unbounded_channel();
         let listen_task = self.demodulator.listening_controlled(
@@ -35,7 +36,11 @@ impl MacReceiver {
             let mut recv_data: Vec<Byte> = vec![];
             while recv_data.len() < byte_num {
                 while let Some(data) = decoded_data_rx.recv().await {
-                    recv_data.extend(data.iter());
+                    if MACFrame::get_src(&data) == self_mac
+                        && MACFrame::get_type(&data) == MACType::Data
+                    {
+                        recv_data.extend(data.iter());
+                    }
                 }
             }
 

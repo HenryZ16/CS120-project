@@ -1,13 +1,14 @@
 use crate::acoustic_modem::phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING;
 use crate::utils::{Bit, Byte};
 use std::vec;
+pub type MacAddress = Byte;
 pub struct MACFrame {
-    dest: Byte,
-    src: Byte,
+    dest: MacAddress,
+    src: MacAddress,
     mac_type: Byte,
     payload: Vec<Byte>,
 }
-
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub enum MACType {
     Data,
     Ack,
@@ -48,5 +49,17 @@ impl MACFrame {
         res.extend(self.payload.clone());
 
         return res;
+    }
+
+    pub fn get_dst(data: &[Byte]) -> MacAddress {
+        data[0]
+    }
+
+    pub fn get_src(data: &[Byte]) -> MacAddress {
+        data[1]
+    }
+
+    pub fn get_type(data: &[Byte]) -> MACType {
+        u8_2_mactype(data[2])
     }
 }
