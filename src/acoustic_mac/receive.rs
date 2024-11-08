@@ -1,12 +1,14 @@
 use std::vec;
 
 use crate::{
-    acoustic_modem::{demodulation::Demodulation2, generator::PhyLayerGenerator},
+    acoustic_modem::{
+        demodulation::{Demodulation2, DemodulationState},
+        generator::PhyLayerGenerator,
+    },
     utils::Byte,
 };
 use core::result::Result::Ok;
 use tokio::sync::mpsc::unbounded_channel;
-use tokio::sync::oneshot::{channel, Receiver, Sender};
 
 pub struct MacReceiver {
     demodulator: Demodulation2,
@@ -22,7 +24,12 @@ impl MacReceiver {
 
     pub async fn receive_bytes(&mut self, byte_num: usize) -> Vec<Byte> {
         let (decoded_data_tx, mut decoded_data_rx) = unbounded_channel();
-        let listen_task = self.demodulator.listening_controlled(decoded_data_tx);
+        let (status_tx, status_rx) = unbounded_channel();
+        let listen_task = self.demodulator.listening_controlled(
+            decoded_data_tx,
+            status_rx,
+            DemodulationState::DetectPreamble,
+        );
 
         let recv_task = tokio::spawn(async move {
             let mut recv_data: Vec<Byte> = vec![];

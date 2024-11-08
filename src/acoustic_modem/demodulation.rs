@@ -10,8 +10,11 @@ use std::collections::VecDeque;
 use std::mem;
 use std::ops::{Add, Mul};
 use std::result::Result::Ok;
-use tokio::sync::mpsc::UnboundedSender;
+use tokio::signal;
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
+pub const SWITCH_SIGNAL: u8 = 1;
+pub type SwitchSignal = u8;
 struct InputStreamConfig {
     config: SupportedStreamConfig,
     device: Device,
@@ -68,7 +71,7 @@ impl DemodulationConfig {
 }
 
 #[derive(PartialEq, Debug)]
-enum DemodulationState {
+pub enum DemodulationState {
     DetectPreamble,
     RecvFrame,
     Stop,
@@ -91,6 +94,14 @@ impl DemodulationState {
 
     pub fn resume(&self) -> Self {
         DemodulationState::DetectPreamble
+    }
+
+    pub fn switch(&mut self) {
+        if *self == DemodulationState::Stop {
+            *self = DemodulationState::DetectPreamble;
+        } else {
+            *self = DemodulationState::Stop;
+        }
     }
 }
 
@@ -378,6 +389,8 @@ impl Demodulation2 {
     pub async fn listening_controlled(
         &mut self,
         output_tx: UnboundedSender<Vec<Byte>>,
+        mut state_rx: UnboundedReceiver<SwitchSignal>,
+        init_state: DemodulationState,
     ) -> Result<(), anyhow::Error> {
         let demodulate_config = &self.demodulate_config;
         let payload_len = demodulate_config.payload_bits_length;
@@ -386,7 +399,7 @@ impl Demodulation2 {
         let alpha_check = 1.0;
         let mut prev = 0.0;
 
-        let mut demodulate_state = DemodulationState::DetectPreamble;
+        let mut demodulate_state = init_state;
 
         let power_lim_preamble = demodulate_config.lowest_power_limit;
 
@@ -411,6 +424,10 @@ impl Demodulation2 {
         let mut last_frame_index = 0;
 
         while let Some(data) = input_stream.next().await {
+            if let Ok(_) = state_rx.try_recv() {
+                demodulate_state.switch();
+            }
+
             if demodulate_state == DemodulationState::Stop {
                 continue;
             }

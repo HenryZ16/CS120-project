@@ -48,9 +48,9 @@ impl PhyLayerGenerator {
         config
     }
 
-    pub fn gen_demodulation(self) -> Demodulation2 {
+    pub fn gen_demodulation(&self) -> Demodulation2 {
         Demodulation2::new(
-            self.carrier_freq,
+            self.carrier_freq.clone(),
             self.sample_rate,
             self.redundent_times,
             self.enable_ofdm,
@@ -60,7 +60,11 @@ impl PhyLayerGenerator {
         )
     }
 
-    pub fn gen_modulator(self) -> Modulator {
-        Modulator::new(self.carrier_freq, self.sample_rate, self.enable_ofdm)
+    pub fn gen_modulator(&self) -> Modulator {
+        Modulator::new(
+            self.carrier_freq.clone(),
+            self.sample_rate,
+            self.enable_ofdm,
+        )
     }
 }
