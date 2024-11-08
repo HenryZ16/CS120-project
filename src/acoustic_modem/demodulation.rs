@@ -1,20 +1,16 @@
 use crate::acoustic_modem::modulation::{self, ENABLE_ECC};
 use crate::acoustic_modem::phy_frame::{self, PHYFrame};
 use crate::asio_stream::InputAudioStream;
-use crate::utils::{
-    read_compressed_u8_2_data, read_data_2_compressed_u8, u8_2_code_rs_hexbit, Bit, Byte,
-};
+use crate::utils::{read_data_2_compressed_u8, u8_2_code_rs_hexbit, Bit, Byte};
 use anyhow::Error;
 use cpal::traits::{DeviceTrait, HostTrait};
 use cpal::{Device, SampleRate, SupportedStreamConfig};
 use futures::StreamExt;
 use std::collections::VecDeque;
-use std::fs::File;
-use std::io::Write;
 use std::mem;
 use std::ops::{Add, Mul};
 use std::result::Result::Ok;
-const LOWEST_POWER_LIMIT: f32 = 6.0;
+use tokio::sync::mpsc::UnboundedSender;
 
 struct InputStreamConfig {
     config: SupportedStreamConfig,
@@ -87,6 +83,14 @@ impl DemodulationState {
             DemodulationState::RecvFrame => DemodulationState::DetectPreamble,
             DemodulationState::Stop => DemodulationState::Stop,
         }
+    }
+
+    pub fn stop(&self) -> Self {
+        DemodulationState::Stop
+    }
+
+    pub fn resume(&self) -> Self {
+        DemodulationState::DetectPreamble
     }
 }
 
@@ -218,7 +222,7 @@ impl Demodulation2 {
         let mut start_index = usize::MAX;
 
         let carrier_num = demodulate_config.ref_signal.len();
-        // println!("carrier num: {}", carrier_num);
+        // println!("low bound {}", power_lim_preamble);
         let mut tmp_bits_data = vec![Vec::with_capacity(payload_len); carrier_num];
 
         let mut is_reboot = false;
@@ -229,7 +233,7 @@ impl Demodulation2 {
 
         while let Some(data) = input_stream.next().await {
             if demodulate_state == DemodulationState::Stop {
-                break;
+                continue;
             }
             // println!("data len: {}", data.len());
             tmp_buffer_len += data.len() / channels;
@@ -370,26 +374,177 @@ impl Demodulation2 {
 
         println!("listen stoped");
     }
+
+    pub async fn listening_controlled(
+        &mut self,
+        output_tx: UnboundedSender<Vec<Byte>>,
+    ) -> Result<(), anyhow::Error> {
+        let demodulate_config = &self.demodulate_config;
+        let payload_len = demodulate_config.payload_bits_length;
+
+        let mut input_stream = self.input_config.create_input_stream();
+        let alpha_check = 1.0;
+        let mut prev = 0.0;
+
+        let mut demodulate_state = DemodulationState::DetectPreamble;
+
+        let power_lim_preamble = demodulate_config.lowest_power_limit;
+
+        let mut tmp_buffer: VecDeque<f32> = VecDeque::with_capacity(
+            5 * demodulate_config
+                .preamble_len
+                .max(demodulate_config.ref_signal_len[0]),
+        );
+        let mut tmp_buffer_len = tmp_buffer.len();
+
+        let mut local_max = 0.0;
+        let mut start_index = usize::MAX;
+
+        let carrier_num = demodulate_config.ref_signal.len();
+        // println!("low bound {}", power_lim_preamble);
+        let mut tmp_bits_data = vec![Vec::with_capacity(payload_len); carrier_num];
+
+        let mut is_reboot = false;
+
+        let channels = self.input_config.config.channels() as usize;
+
+        let mut last_frame_index = 0;
+
+        while let Some(data) = input_stream.next().await {
+            if demodulate_state == DemodulationState::Stop {
+                continue;
+            }
+            // println!("data len: {}", data.len());
+            tmp_buffer_len += data.len() / channels;
+            move_data_into_buffer(data, &mut tmp_buffer, alpha_check, channels, &mut prev);
+            if demodulate_state == DemodulationState::DetectPreamble {
+                if tmp_buffer_len <= demodulate_config.preamble_len {
+                    continue;
+                }
+                tmp_buffer.make_contiguous();
+                for i in 0..tmp_buffer_len - demodulate_config.preamble_len - 1 {
+                    let window = &tmp_buffer.as_slices().0[i..i + demodulate_config.preamble_len];
+                    let dot_product = dot_product(window, &demodulate_config.preamble);
+                    if dot_product > local_max && dot_product > power_lim_preamble {
+                        // println!("detected");
+                        local_max = dot_product;
+                        start_index = i + 1;
+                        // debug_vec.clear();
+                        // debug_vec.extend(window);
+                    } else if start_index != usize::MAX
+                        && i - start_index > demodulate_config.preamble_len
+                        && local_max > power_lim_preamble
+                    {
+                        if ((last_frame_index + start_index) as isize
+                            - modulation::OFDM_FRAME_DISTANCE as isize)
+                            .abs()
+                            > 10
+                        {
+                            println!("last frame distance: {}", last_frame_index + start_index);
+                        }
+                        start_index += demodulate_config.preamble_len - 1;
+                        demodulate_state = demodulate_state.next();
+                        // println!("detected preamble");
+                        // println!(
+                        //     "start index: {}, tmp buffer len: {}, max: {}",
+                        //     start_index, tmp_buffer_len, local_max
+                        // );
+                        local_max = 0.0;
+                        break;
+                    }
+                }
+                // println!("start index: {}", start_index);
+            }
+
+            if demodulate_state == DemodulationState::RecvFrame {
+                if tmp_buffer_len < start_index
+                    || tmp_buffer_len - start_index <= demodulate_config.ref_signal_len[0]
+                {
+                    // println!("tmp buffer is not long enough");
+                    continue;
+                }
+                tmp_buffer.make_contiguous();
+                // println!("start index: {}, tmp_buffer_len: {}", start_index, tmp_buffer_len);
+
+                while tmp_buffer_len - start_index >= demodulate_config.ref_signal_len[0]
+                    && tmp_bits_data[0].len() < payload_len
+                {
+                    let window = &tmp_buffer.as_slices().0
+                        [start_index..start_index + demodulate_config.ref_signal_len[0]];
+                    for k in 0..carrier_num {
+                        let dot_product =
+                            dot_product(window, &self.demodulate_config.ref_signal[k]);
+                        // debug_vec.extend(
+                        //     &tmp_buffer.as_slices().0
+                        //         [start_index..start_index + demodulate_config.ref_signal_len[k]],
+                        // );
+
+                        tmp_bits_data[k].push(if dot_product >= 0.0 { 0 } else { 1 });
+                    }
+                    start_index += demodulate_config.ref_signal_len[0];
+                }
+            }
+
+            if tmp_bits_data[0].len() >= payload_len {
+                is_reboot = true;
+                demodulate_state = demodulate_state.next();
+                last_frame_index = 0;
+                for k in 0..carrier_num {
+                    // println!("data: {:?}", tmp_bits_data[k]);
+                    let result = decode(mem::replace(
+                        &mut tmp_bits_data[k],
+                        Vec::with_capacity(payload_len),
+                    ));
+                    // tmp_bits_data[k].clear();
+
+                    match result {
+                        Ok((meta_data, _)) => {
+                            output_tx.send(meta_data).unwrap();
+                        }
+                        Err(msg) => {
+                            println!("{}", msg);
+                        }
+                    }
+                }
+                // println!("tmp bit len: {}", tmp_bits_data.len());
+            }
+
+            let pop_times = if start_index == usize::MAX {
+                tmp_buffer_len - demodulate_config.preamble_len + 1
+            } else {
+                start_index
+            };
+            if !is_reboot {
+                last_frame_index += pop_times;
+            }
+            for _ in 0..pop_times {
+                tmp_buffer.pop_front();
+            }
+
+            start_index = if start_index == usize::MAX || is_reboot {
+                is_reboot = false;
+                // println!("reboot");
+                usize::MAX
+            } else {
+                0
+            };
+            tmp_buffer_len = tmp_buffer.len();
+
+            // println!("buffer len: {}", tmp_buffer_len);
+        }
+
+        // println!("listen stoped");
+        Ok(())
+    }
 }
 
 fn decode(input_data: Vec<Bit>) -> Result<(Vec<Byte>, usize), Error> {
     if ENABLE_ECC {
-        // println!(
-        //     "input data: {:?}, data length: {}",
-        //     input_data,
-        //     input_data.len()
-        // );
         let hexbits = u8_2_code_rs_hexbit(read_data_2_compressed_u8(input_data));
-
-        // println!("hexbits: {:?}, hexbit length: {}", hexbits, hexbits.len());
         PHYFrame::payload_2_data(hexbits)
     } else {
         let compressed_data = read_data_2_compressed_u8(input_data);
         if !PHYFrame::check_crc(&compressed_data) {
-            // println!(
-            //     "receivecd: {:?}",
-            //     read_compressed_u8_2_data(compressed_data)
-            // );
             return Err(Error::msg("CRC wrong"));
         }
 
@@ -398,11 +553,19 @@ fn decode(input_data: Vec<Bit>) -> Result<(Vec<Byte>, usize), Error> {
             length <<= 8;
             length += compressed_data[i] as usize;
         }
+        if length
+            > if ENABLE_ECC {
+                phy_frame::MAX_FRAME_DATA_LENGTH
+            } else {
+                phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING
+            }
+        {
+            return Err(Error::msg("Length wrong"));
+        }
+
         Ok((
             compressed_data[phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING / 8
-                ..(phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING
-                    + phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING)
-                    / 8]
+                ..(phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING + length) / 8]
                 .to_vec(),
             length,
         ))

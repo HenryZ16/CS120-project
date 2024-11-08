@@ -323,7 +323,6 @@ impl Modulator {
                 len += (phy_frame::MAX_FRAME_DATA_LENGTH * carrier_cnt) as isize;
             }
             let mut modulated_psk_signal: Vec<f32> = vec![];
-            let mut last_single_frames_cnt = 0;
             for i in 0..carrier_cnt {
                 let mut payload = vec![];
                 let mut bit_len = 0;
@@ -342,7 +341,6 @@ impl Modulator {
                                         * (phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING / 8)],
                             );
                         }
-                        last_single_frames_cnt += 1;
                     }
                     // println!("payload: {:?}, length: {}", payload, len);
                 } else {
@@ -360,7 +358,6 @@ impl Modulator {
                                         * (phy_frame::MAX_FRAME_DATA_LENGTH / 8)],
                             );
                         }
-                        last_single_frames_cnt += 1;
                     }
                 }
                 let mut decompressed_data = vec![];
