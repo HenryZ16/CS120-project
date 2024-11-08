@@ -56,6 +56,10 @@ impl Modulator {
         }
     }
 
+    pub fn get_carrier_cnt(&self) -> usize {
+        self.carrier_freq.len()
+    }
+
     pub async fn test_carrier_wave(&mut self) {
         // use sin to generate a carrier wave
         let duration = 5.0; // seconds
@@ -69,7 +73,7 @@ impl Modulator {
                     / self.sample_rate as f64)
                     .sin();
             }
-            sample /= self.carrier_freq.len() as f64;
+            sample /= self.get_carrier_cnt() as f64;
             wave.push(sample as f32);
         }
 
@@ -85,9 +89,10 @@ impl Modulator {
     pub async fn bits_2_wave_single_ofdm_frame_no_ecc(
         &mut self,
         data: Vec<Byte>,
-        data_bits_len: usize,
+        data_bits_len: isize,
     ) -> Vec<f32> {
-        let carrier_cnt = self.carrier_freq.len();
+        let data_bits_len = data_bits_len as usize;
+        let carrier_cnt = self.get_carrier_cnt();
         assert!(data_bits_len <= carrier_cnt * phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING);
 
         // fill up the payload
@@ -222,7 +227,7 @@ impl Modulator {
             // println!("[bits_2_wave] send {} frames", loop_cnt + 1);
         } else {
             // OFDM
-            let carrier_cnt = self.carrier_freq.len();
+            let carrier_cnt = self.get_carrier_cnt();
             if !ENABLE_ECC {
                 len -= (phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING * carrier_cnt) as isize;
             } else {
@@ -406,6 +411,20 @@ impl Modulator {
             modulated_signal.len()
         );
         return modulated_signal;
+    }
+
+    pub async fn send_single_ofdm_frame(&mut self, data: Vec<Byte>, len: isize) {
+        let modulated_signal = self
+            .bits_2_wave_single_ofdm_frame_no_ecc(utils::read_data_2_compressed_u8(data), len)
+            .await;
+
+        self.output_stream
+            .send(AudioTrack::new(
+                modulated_signal.into_iter(),
+                self.config.clone(),
+            ))
+            .await
+            .unwrap();
     }
 
     // [Preamble : 8][Payload : 36 x 6 = 216]

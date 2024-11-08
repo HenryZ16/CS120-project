@@ -1,6 +1,7 @@
-use crate::acoustic_modem::phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING;
 use crate::utils::{Bit, Byte};
 use std::vec;
+
+// Frame:: [dest][src][type][payload]
 pub struct MACFrame {
     dest: Byte,
     src: Byte,
@@ -30,7 +31,6 @@ pub fn u8_2_mactype(byte: Byte) -> MACType {
 
 impl MACFrame {
     pub fn new(dest: Byte, src: Byte, mac_type: MACType, payload: Vec<Byte>) -> Self {
-        assert!(payload.len() <= MAX_FRAME_DATA_LENGTH_NO_ENCODING);
         MACFrame {
             dest,
             src,
