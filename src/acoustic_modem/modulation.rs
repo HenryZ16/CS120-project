@@ -81,11 +81,76 @@ impl Modulator {
             .unwrap();
     }
 
+    // data_bits_len: the total bits cnt of the data
+    pub async fn bits_2_wave_single_ofdm_frame_no_ecc(
+        &mut self,
+        data: Vec<Byte>,
+        data_bits_len: usize,
+    ) -> Vec<f32> {
+        let carrier_cnt = self.carrier_freq.len();
+        assert!(data_bits_len <= carrier_cnt * phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING);
+
+        // fill up the payload
+        let mut data = data;
+        while data.len() * 8 < phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING * carrier_cnt {
+            data.push(0);
+        }
+
+        // modulate the data for each carrier
+        let mut modulated_signal: Vec<f32> = vec![];
+        let mut modulated_psk_signal: Vec<f32> = vec![];
+        for i in 0..carrier_cnt {
+            let data_start = i * phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING / 8;
+            let data_end = (i + 1) * phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING / 8;
+            let payload = data[data_start..data_end].to_vec();
+            let phy_len = if data_bits_len > (i + 1) * phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING
+            {
+                phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING
+            } else {
+                data_bits_len % phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING
+            };
+
+            let frame = phy_frame::PHYFrame::new_no_encoding(phy_len, payload);
+            let frame_bits = PHYFrame::add_crc(frame.1);
+            let decompressed_data = utils::read_compressed_u8_2_data(frame_bits);
+            modulated_psk_signal = if i == 0 {
+                self.modulate(&decompressed_data, i)
+            } else {
+                let modulated_psk_signal_i = self.modulate(&decompressed_data, i);
+                let modulated_psk_signal_i: Vec<f32> = modulated_psk_signal_i
+                    .iter()
+                    .map(|&x| {
+                        x / ((self.carrier_freq[i] as f32 / self.carrier_freq[0] as f32).powf(2.0))
+                            as f32
+                    })
+                    .collect();
+                modulated_psk_signal
+                    .iter()
+                    .zip(modulated_psk_signal_i.iter())
+                    .map(|(a, b)| a + b)
+                    .collect()
+            }
+        }
+
+        let divisor = (1..(carrier_cnt + 1)).fold(0.0, |acc, x| {
+            acc + 1.0
+                / ((self.carrier_freq[x - 1] as f32 / self.carrier_freq[0] as f32).powf(2.0)) as f32
+        });
+        modulated_psk_signal = modulated_psk_signal
+            .iter()
+            .map(|&x| x / divisor as f32)
+            .collect();
+
+        // add FSK preamble
+        let preamble = phy_frame::gen_preamble(self.sample_rate);
+        modulated_signal.extend(preamble.clone());
+        modulated_signal.extend(modulated_psk_signal);
+
+        return modulated_signal;
+    }
+
     pub async fn bits_2_wave(&mut self, data: Vec<Byte>, len: isize) -> Vec<f32> {
         let mut modulated_signal: Vec<f32> = vec![];
-        // let mut modulated_signal: Vec<f32> = (0..3000)
-        //     .map(|x| (2.0 * std::f32::consts::PI * x as f32 / 48000.0 * 5000 as f32).sin())
-        //     .collect();
         let mut len = len;
         let mut loop_cnt = 0;
 
@@ -202,10 +267,6 @@ impl Modulator {
                         decompressed_data = utils::read_compressed_u8_2_data(frame_bits);
                     }
 
-                    // println!(
-                    //     "[bits_2_wave ofdm] decompressed_data.len(): {}",
-                    //     decompressed_data.len()
-                    // );
                     let modulated_psk_signal_i = self.modulate(&decompressed_data, i);
 
                     // nomalization - make the power of each carrier equal
@@ -441,4 +502,37 @@ impl Modulator {
         }
         return modulated_signal;
     }
+}
+
+#[tokio::test]
+async fn test_b2w_single_ofdm_frame() {
+    let data_len = 2 * phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING - 3;
+    let data: Vec<u8> = (0..data_len).map(|x| (x & 1) as u8).collect();
+
+    // modulator
+    let sample_rate = 48000;
+    let carrier_freq = 6000;
+    let mut modulator = Modulator::new(vec![carrier_freq, carrier_freq * 2], sample_rate, true);
+
+    // bits 2 wave single ofdm frame
+    let modulated_signal = modulator
+        .bits_2_wave_single_ofdm_frame_no_ecc(
+            utils::read_data_2_compressed_u8(data.clone()),
+            data_len,
+        )
+        .await;
+
+    // write to wav file
+    let filename = "testset/b2w_test.wav";
+    let spec = WavSpec {
+        channels: 1,
+        sample_rate: SAMPLE_RATE,
+        bits_per_sample: 32,
+        sample_format: hound::SampleFormat::Float,
+    };
+    let mut writer = WavWriter::create(filename, spec).unwrap();
+    for sample in modulated_signal {
+        writer.write_sample(sample).unwrap();
+    }
+    writer.finalize().unwrap();
 }
