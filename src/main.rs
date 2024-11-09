@@ -4,7 +4,6 @@ mod asio_stream;
 mod pa0;
 mod pa1;
 mod pa2;
-mod symrs;
 mod tests;
 mod utils;
 
@@ -14,7 +13,9 @@ fn help() {
     println!("  -h, --help: Show this help message");
     println!("  -p=N, --pa=N: Select PA N to demonstrate");
     println!("  -o, --objective=N: Select an objective N in a specified PA to demonstrate. If no PA specified, this will be ignored.");
-    println!("  -t=<str>, --type=<str>: Additional type for the selected PA: send, send_file");
+    println!(
+        "  -t=<str>, --type=<str>: Additional type for the selected PA: send, send_file, mac_send"
+    );
     println!("  -d, -device: Show available ASIO devices");
     println!("  -g[=N], --generate[=N]: Generate a random data file with N (default 10000) bits");
     println!("  -gb[=N], --generate-binary[=N]: Generate a random binary file with N (default 10000) bytes");

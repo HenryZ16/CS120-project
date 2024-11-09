@@ -10,6 +10,34 @@ use tokio::time::{self, Duration};
 
 const CONFIG_FILE: &str = "configuration/pa2.yml";
 
+pub async fn obj_1_mac_send() -> Result<u32> {
+    let t_start = std::time::Instant::now();
+
+    let dest: u8 = 0x01;
+    let mut sender = crate::acoustic_mac::send::MacSender::new(CONFIG_FILE);
+
+    // read data from testset/data.bin
+    let mut file = File::open("testset/data.bin")?;
+    let mut data: Vec<u8> = vec![];
+    file.read_to_end(&mut data)?;
+    println!("[pa1-obj3-send] Elapsed time: {:?}", t_start.elapsed());
+
+    // send
+    let frames = sender.generate_data_frames(data, dest).await;
+    for frame in &frames {
+        sender.send_frame(frame).await;
+        println!("\n");
+    }
+    //sender.send_frame(&frames[0]).await;
+
+    println!(
+        "[pa1-obj3-send] Total elapsed time: {:?}",
+        t_start.elapsed()
+    );
+
+    return Ok(0);
+}
+
 pub async fn obj_1_send() -> Result<u32> {
     let t_start = std::time::Instant::now();
 
@@ -93,6 +121,16 @@ pub async fn pa2(sel: i32, additional_type: &str) -> Result<u32> {
 
     if sel == 0 || sel == 1 {
         match additional_type {
+            "mac_send" => {
+                println!("Objective 1 start");
+                match obj_1_mac_send().await {
+                    Ok(_) => {}
+                    Err(e) => {
+                        println!("Error: {}", e);
+                    }
+                }
+                println!("Objective 1 end");
+            }
             "send" => {
                 println!("Objective 1 start");
                 match obj_1_send().await {

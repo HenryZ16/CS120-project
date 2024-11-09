@@ -14,7 +14,7 @@ use cpal::{SampleRate, SupportedStreamConfig};
 use futures::SinkExt;
 use hound::{WavSpec, WavWriter};
 
-const SAMPLE_RATE: u32 = 48000;
+pub const SAMPLE_RATE: u32 = 48000;
 pub const OFDM_FRAME_DISTANCE: usize = 30;
 pub const REDUNDANT_PERIODS: usize = 1;
 pub const ENABLE_ECC: bool = false;
@@ -102,19 +102,22 @@ impl Modulator {
         }
 
         // modulate the data for each carrier
-        let mut modulated_signal: Vec<f32> = vec![];
         let mut modulated_psk_signal: Vec<f32> = vec![];
         for i in 0..carrier_cnt {
             let data_start = i * phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING / 8;
             let data_end = (i + 1) * phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING / 8;
             let payload = data[data_start..data_end].to_vec();
-            let phy_len = if data_bits_len > (i + 1) * phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING
+            let phy_len = if data_bits_len >= (i + 1) * phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING
             {
                 phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING
             } else {
                 data_bits_len % phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING
             };
 
+            println!(
+                "[bits_2_wave_single_ofdm_frame_no_ecc] phy_len: {}",
+                phy_len
+            );
             let frame = phy_frame::PHYFrame::new_no_encoding(phy_len, payload);
             let frame_bits = PHYFrame::add_crc(frame.1);
             let decompressed_data = utils::read_compressed_u8_2_data(frame_bits);
@@ -122,35 +125,22 @@ impl Modulator {
                 self.modulate(&decompressed_data, i)
             } else {
                 let modulated_psk_signal_i = self.modulate(&decompressed_data, i);
-                let modulated_psk_signal_i: Vec<f32> = modulated_psk_signal_i
-                    .iter()
-                    .map(|&x| {
-                        x / ((self.carrier_freq[i] as f32 / self.carrier_freq[0] as f32).powf(2.0))
-                            as f32
-                    })
-                    .collect();
                 modulated_psk_signal
                     .iter()
                     .zip(modulated_psk_signal_i.iter())
                     .map(|(a, b)| a + b)
                     .collect()
-            }
+            };
         }
 
-        let divisor = (1..(carrier_cnt + 1)).fold(0.0, |acc, x| {
-            acc + 1.0
-                / ((self.carrier_freq[x - 1] as f32 / self.carrier_freq[0] as f32).powf(2.0)) as f32
-        });
         modulated_psk_signal = modulated_psk_signal
             .iter()
-            .map(|&x| x / divisor as f32)
+            .map(|&x| x / carrier_cnt as f32)
             .collect();
 
         // add FSK preamble
-        let preamble = phy_frame::gen_preamble(self.sample_rate);
-        modulated_signal.extend(preamble.clone());
+        let mut modulated_signal = phy_frame::gen_preamble(self.sample_rate);
         modulated_signal.extend(modulated_psk_signal);
-
         return modulated_signal;
     }
 
@@ -413,10 +403,19 @@ impl Modulator {
         return modulated_signal;
     }
 
+    pub async fn send_modulated_signal(&mut self, modulated_signal: Vec<f32>) {
+        self.output_stream
+            .send(AudioTrack::new(
+                modulated_signal.into_iter(),
+                self.config.clone(),
+            ))
+            .await
+            .unwrap();
+    }
+
     pub async fn send_single_ofdm_frame(&mut self, data: Vec<Byte>, len: isize) {
-        let modulated_signal = self
-            .bits_2_wave_single_ofdm_frame_no_ecc(utils::read_data_2_compressed_u8(data), len)
-            .await;
+        // data here is compressed u8
+        let modulated_signal = self.bits_2_wave_single_ofdm_frame_no_ecc(data, len).await;
 
         self.output_stream
             .send(AudioTrack::new(
@@ -425,6 +424,8 @@ impl Modulator {
             ))
             .await
             .unwrap();
+        // TODO: remove it after implementing the controller
+        tokio::time::sleep(tokio::time::Duration::from_millis(30)).await;
     }
 
     // [Preamble : 8][Payload : 36 x 6 = 216]
@@ -537,7 +538,7 @@ async fn test_b2w_single_ofdm_frame() {
     let modulated_signal = modulator
         .bits_2_wave_single_ofdm_frame_no_ecc(
             utils::read_data_2_compressed_u8(data.clone()),
-            data_len,
+            data_len as isize,
         )
         .await;
 
