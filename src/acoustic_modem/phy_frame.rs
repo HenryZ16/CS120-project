@@ -227,7 +227,7 @@ pub fn gen_preamble(sample_rate: u32) -> Vec<f32> {
     let dx: f64 = 1.0 / sample_rate as f64;
     let step = (end - start) as f64 / half_length as f64;
     let mut fp: Vec<f64> = (0..half_length).map(|i| start + i as f64 * step).collect();
-    let fp_rev = fp.clone().into_iter().rev();
+    let fp_rev: Vec<f64> = fp.clone().into_iter().rev().collect();
     fp.pop();
     fp.extend(fp_rev);
 

@@ -217,7 +217,7 @@ where
     I::Item: rodio::Sample + Send,
     f32: FromSample<I::Item>,
 {
-    _stream: OutputStream,
+    //_stream: OutputStream,
     sender: UnboundedSender<(AudioTrack<I>, Sender<()>)>,
     task: Option<Receiver<()>>,
 }
@@ -229,12 +229,14 @@ where
     f32: FromSample<I::Item>,
 {
     pub fn new(device: &Device, config: SupportedStreamConfig) -> Self {
-        let (_stream, handle) = OutputStream::try_from_device_config(device, config).unwrap();
+        let device = device.clone();
         let (sender, mut receiver) = mpsc::unbounded_channel::<(AudioTrack<I>, Sender<()>)>();
-        let sink = rodio::Sink::try_new(&handle).unwrap();
 
         task::spawn_blocking(move || {
             while let Some((track, sender)) = receiver.blocking_recv() {
+                let (_stream, handle) =
+                    OutputStream::try_from_device_config(&device, config.clone()).unwrap();
+                let sink = rodio::Sink::try_new(&handle).unwrap();
                 sink.append(track);
                 sink.sleep_until_end();
                 sender.send(()).unwrap();
@@ -242,7 +244,7 @@ where
         });
 
         return Self {
-            _stream,
+            //_stream,
             sender,
             task: None,
         };

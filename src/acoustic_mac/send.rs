@@ -25,8 +25,13 @@ impl MacSender {
         }
     }
 
-    pub async fn send_frame(&mut self, frame: MACFrame) {
+    pub async fn send_modulated_signal(&mut self, data: Vec<f32>) {
+        self.modulator.send_modulated_signal(data).await;
+    }
+
+    pub async fn send_frame(&mut self, frame: &MACFrame) {
         let bits = frame.get_whole_frame_bits();
+        println!("[MacSender::send_frame] bits: {:?}", bits);
         self.modulator
             .send_single_ofdm_frame(bits.clone(), bits.len() as isize * 8)
             .await;
@@ -39,9 +44,13 @@ impl MacSender {
             phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING * self.modulator.get_carrier_cnt() / 8 - 3; // 3 means dest, src, type
         let mut frames: Vec<MACFrame> = vec![];
         let mut data = data.clone();
-        while !data.is_empty() {
-            let payload = data.drain(0..frame_max_length).collect();
+        while data.len() > frame_max_length {
+            let payload: Vec<u8> = data.drain(0..frame_max_length).collect();
             let frame = MACFrame::new(dest, self.address, mac_frame::MACType::Data, payload);
+            frames.push(frame);
+        }
+        if !data.is_empty() {
+            let frame = MACFrame::new(dest, self.address, mac_frame::MACType::Data, data);
             frames.push(frame);
         }
 
