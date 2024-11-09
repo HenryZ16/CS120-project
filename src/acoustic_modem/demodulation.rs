@@ -131,6 +131,8 @@ pub struct Demodulation2 {
     demodulate_config: DemodulationConfig,
 }
 
+unsafe impl Send for Demodulation2 {}
+
 impl Demodulation2 {
     pub fn new(
         carrier_freq: Vec<u32>,
@@ -373,12 +375,13 @@ impl Demodulation2 {
         println!("listen stoped");
     }
 
-    pub async fn listening_controlled(
+    pub async fn listening_daemon(
         &mut self,
         output_tx: UnboundedSender<Vec<Byte>>,
         mut state_rx: UnboundedReceiver<SwitchSignal>,
         init_state: DemodulationState,
     ) -> Result<(), anyhow::Error> {
+        println!("listen daemon start");
         let demodulate_config = &self.demodulate_config;
         let payload_len = demodulate_config.payload_bits_length;
 

@@ -33,14 +33,22 @@ async fn test_receiver() {
 
 #[tokio::test]
 async fn test_detector() {
-    let instant = Instant::now();
-    let mut detector = MacDetector::new().await;
+    let (mut detector, request_rx, result_tx) = MacDetector::new().await;
+    let detector_daemon = MacDetector::daemon(request_rx, result_tx);
     // let _ = read_wav_and_play("send.wav");
-    let mut count = 0;
-    while instant.elapsed().as_secs() < 10 {
-        let _ = sleep(Duration::from_millis(200)).await;
-        println!("{} ", detector.is_empty().await);
-        count += 1;
-    }
-    println!("detect times: {}", count);
+    let detect_task = tokio::spawn(async move {
+        let mut count = 0;
+        let instant = Instant::now();
+        while instant.elapsed().as_secs() < 10 {
+            println!("channel is empty: {}", detector.is_empty().await);
+            count += 1;
+            let _ = sleep(Duration::from_millis(40)).await;
+        }
+        println!("detect times: {}", count);
+    });
+
+    let test = tokio::select! {
+        _ = detector_daemon => {Err(())}
+        _ = detect_task => {Ok(())}
+    };
 }
