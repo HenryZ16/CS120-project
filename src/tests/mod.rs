@@ -10,3 +10,6 @@ pub mod test_acoustic_modem;
 
 #[cfg(test)]
 pub mod test_config;
+
+#[cfg(test)]
+pub mod test_acoustic_mac;

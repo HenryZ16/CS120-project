@@ -7,9 +7,9 @@ use cpal::traits::{DeviceTrait, HostTrait};
 use cpal::{Device, SampleRate, SupportedStreamConfig};
 use futures::StreamExt;
 use std::collections::VecDeque;
-use std::mem;
 use std::ops::{Add, Mul};
 use std::result::Result::Ok;
+use std::{mem, vec};
 use tokio::signal;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
@@ -277,10 +277,10 @@ impl Demodulation2 {
                         start_index += demodulate_config.preamble_len - 1;
                         demodulate_state = demodulate_state.next();
                         // println!("detected preamble");
-                        // println!(
-                        //     "start index: {}, tmp buffer len: {}, max: {}",
-                        //     start_index, tmp_buffer_len, local_max
-                        // );
+                        println!(
+                            "start index: {}, tmp buffer len: {}, max: {}",
+                            start_index, tmp_buffer_len, local_max
+                        );
                         local_max = 0.0;
                         break;
                     }
@@ -429,6 +429,7 @@ impl Demodulation2 {
             }
 
             if demodulate_state == DemodulationState::Stop {
+                println!("stoped");
                 continue;
             }
             // println!("data len: {}", data.len());
@@ -445,6 +446,7 @@ impl Demodulation2 {
                     if dot_product > local_max && dot_product > power_lim_preamble {
                         // println!("detected");
                         local_max = dot_product;
+                        // println!("local max: {}", local_max);
                         start_index = i + 1;
                         // debug_vec.clear();
                         // debug_vec.extend(window);
@@ -462,10 +464,10 @@ impl Demodulation2 {
                         start_index += demodulate_config.preamble_len - 1;
                         demodulate_state = demodulate_state.next();
                         // println!("detected preamble");
-                        // println!(
-                        //     "start index: {}, tmp buffer len: {}, max: {}",
-                        //     start_index, tmp_buffer_len, local_max
-                        // );
+                        println!(
+                            "start index: {}, tmp buffer len: {}, max: {}",
+                            start_index, tmp_buffer_len, local_max
+                        );
                         local_max = 0.0;
                         break;
                     }
@@ -527,9 +529,10 @@ impl Demodulation2 {
                     }
                 }
                 if to_send.len() > 0 {
-                    output_tx.send(to_send);
+                    let _ = output_tx.send(to_send);
                 }
                 // println!("tmp bit len: {}", tmp_bits_data.len());
+                // println!("reboot");
             }
 
             let pop_times = if start_index == usize::MAX {
@@ -546,13 +549,14 @@ impl Demodulation2 {
 
             start_index = if start_index == usize::MAX || is_reboot {
                 is_reboot = false;
-                // println!("reboot");
                 usize::MAX
             } else {
                 0
             };
             tmp_buffer_len = tmp_buffer.len();
 
+            // println!("channel size: {}", output_tx.strong_count());
+            // println!("current state: {:?}", demodulate_state);
             // println!("buffer len: {}", tmp_buffer_len);
         }
 

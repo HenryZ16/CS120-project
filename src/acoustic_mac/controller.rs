@@ -1,6 +1,7 @@
 use std::{any, vec};
 
 use crate::{
+    acoustic_mac::mac_frame,
     acoustic_modem::{
         demodulation::{Demodulation2, DemodulationState, SwitchSignal, SWITCH_SIGNAL},
         generator::PhyLayerGenerator,
@@ -13,16 +14,16 @@ use std::result::Result::Ok;
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc::unbounded_channel;
 
+use super::mac_frame::MACType;
+
 const MAX_SEND: usize = 5;
 
 #[derive(PartialEq)]
 enum ControllerState {
     Idel,
-    RxFrame,
     TxACK,
     TxFrame,
     ACKTimeout,
-    LinkError,
 }
 
 #[derive(PartialEq)]
@@ -79,8 +80,8 @@ impl MacController {
 
     async fn task(
         &mut self,
-        receive_byte_num: usize,
         receive_output: &mut Vec<Byte>,
+        receive_byte_num: usize,
         send_data: &mut Vec<Byte>,
         send_byte_num: usize,
     ) -> Result<(), anyhow::Error> {
@@ -93,9 +94,9 @@ impl MacController {
         }
 
         // start decode listening
-        let listen_task =
+        let _listen_task =
             self.demodulator
-                .listening_controlled(decoded_data_tx, status_rx, init_state);
+                .listening_controlled(decoded_data_tx, status_rx, init_state, vec![]);
 
         let mut controller_state = ControllerState::Idel;
 
@@ -107,13 +108,27 @@ impl MacController {
         let mut send_padding: bool = true;
         let mut recv_padding: bool = true;
 
-        let mut recv_frame: Vec<Byte> = vec![];
+        // let mut recv_frame: Vec<Byte> = vec![];
         let mut retry_times: usize = 0;
 
         while send_padding || recv_padding {
             if controller_state == ControllerState::Idel {
                 if let Ok(data) = decoded_data_rx.try_recv() {
                     // check data type
+                    if mac_frame::MACFrame::get_dst(&data) == 1 {
+                        if mac_frame::MACFrame::get_type(&data) == MACType::Ack {
+                        } else {
+                            receive_output
+                                .extend_from_slice(mac_frame::MACFrame::get_payload(&data));
+                            if receive_output.len() >= receive_byte_num {
+                                recv_padding = false;
+                            }
+
+                            // send ack
+                            let _ = status_tx.send(SWITCH_SIGNAL);
+                            let _ = status_tx.send(SWITCH_SIGNAL);
+                        }
+                    }
                 }
 
                 if timer.is_timeout() {
@@ -122,7 +137,7 @@ impl MacController {
                             retry_times += 1;
 
                             if retry_times >= MAX_SEND {
-                                controller_state = ControllerState::LinkError;
+                                // controller_state = ControllerState::LinkError;
                                 return Err(Error::msg("link error"));
                             }
 

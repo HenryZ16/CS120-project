@@ -62,4 +62,8 @@ impl MACFrame {
     pub fn get_type(data: &[Byte]) -> MACType {
         u8_2_mactype(data[2])
     }
+
+    pub fn get_payload(data: &[Byte]) -> &[Byte] {
+        &data[3..data.len()]
+    }
 }

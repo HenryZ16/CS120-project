@@ -10,7 +10,7 @@ frame_crc_length_no_encoding: 8
 frame_distance: 20
 
 # demodulator parameters
-lowest_power_limit: 6.0
+lowest_power_limit: 0.1
 
 # 载波频率列表
 carrier_freq: [6000, 12000]
