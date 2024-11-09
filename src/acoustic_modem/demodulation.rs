@@ -10,7 +10,6 @@ use std::collections::VecDeque;
 use std::ops::{Add, Mul};
 use std::result::Result::Ok;
 use std::{mem, vec};
-use tokio::signal;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 pub const SWITCH_SIGNAL: u8 = 1;
@@ -177,7 +176,7 @@ impl Demodulation2 {
             ref_signal_len.push(ref_len);
             let ref_sin = (0..ref_len)
                 .map(|t| {
-                    (2.0 * std::f32::consts::PI * *carrier as f32 * (t as f32 / sample_rate as f32))
+                    (2.0 * std::f32::consts::PI * *carrier as f32 / sample_rate as f32 * t as f32)
                         .sin()
                 })
                 .collect::<Vec<f32>>();
@@ -208,11 +207,11 @@ impl Demodulation2 {
         let demodulate_config = &self.demodulate_config;
         let payload_len = demodulate_config.payload_bits_length;
         // let bits_len = demodulate_config.data_bits_length;
-        let bits_len = if ENABLE_ECC {
-            phy_frame::MAX_FRAME_DATA_LENGTH
-        } else {
-            phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING
-        };
+        // let bits_len = if ENABLE_ECC {
+        //     phy_frame::MAX_FRAME_DATA_LENGTH
+        // } else {
+        //     phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING
+        // };
 
         let mut input_stream = self.input_config.create_input_stream();
         let alpha_check = 1.0;
@@ -257,6 +256,7 @@ impl Demodulation2 {
                 for i in 0..tmp_buffer_len - demodulate_config.preamble_len - 1 {
                     let window = &tmp_buffer.as_slices().0[i..i + demodulate_config.preamble_len];
                     let dot_product = dot_product(window, &demodulate_config.preamble);
+                    // println!("product: {:?}", dot_product);
                     if dot_product > local_max && dot_product > power_lim_preamble {
                         // println!("detected");
                         local_max = dot_product;
@@ -308,6 +308,7 @@ impl Demodulation2 {
                     for k in 0..carrier_num {
                         let dot_product =
                             dot_product(window, &self.demodulate_config.ref_signal[k]);
+                        // println!("product: {}", dot_product);
                         // debug_vec.extend(
                         //     &tmp_buffer.as_slices().0
                         //         [start_index..start_index + demodulate_config.ref_signal_len[k]],
@@ -320,7 +321,7 @@ impl Demodulation2 {
             }
 
             if tmp_bits_data[0].len() >= payload_len {
-                println!("debug vec: {:?}", debug_vec);
+                // println!("debug vec: {:?}", debug_vec);
                 is_reboot = true;
                 demodulate_state = demodulate_state.next();
                 last_frame_index = 0;
@@ -338,7 +339,7 @@ impl Demodulation2 {
                         }
                         Err(msg) => {
                             println!("{}", msg);
-                            break;
+                            // break;
                         }
                     }
                 }
@@ -553,13 +554,14 @@ impl Demodulation2 {
 }
 
 fn decode(input_data: Vec<Bit>) -> Result<(Vec<Byte>, usize), Error> {
-    println!("input data: {:?}", input_data);
+    // println!("input data: {:?}", input_data);
     if ENABLE_ECC {
         let hexbits = u8_2_code_rs_hexbit(read_data_2_compressed_u8(input_data));
         PHYFrame::payload_2_data(hexbits)
     } else {
         let compressed_data = read_data_2_compressed_u8(input_data);
         if !PHYFrame::check_crc(&compressed_data) {
+            println!("wrong data: {:?}", compressed_data);
             return Err(Error::msg("CRC wrong"));
         }
 

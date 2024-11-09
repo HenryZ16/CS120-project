@@ -1,13 +1,10 @@
 use crate::acoustic_modem::generator::PhyLayerGenerator;
 use crate::asio_stream::read_wav_and_play;
 use anyhow::{Error, Result};
-use hound;
 use std::fs::File;
 use std::io::Read;
 use std::io::Write;
 use std::vec;
-use tokio::join;
-use tokio::sync::mpsc::unbounded_channel;
 use tokio::time::{self, Duration};
 const CONFIG_FILE: &str = "configuration/pa2.yml";
 

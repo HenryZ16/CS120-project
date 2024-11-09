@@ -1,14 +1,11 @@
 use std::fs::File;
 use std::io::Read;
-use std::time::Duration;
 use std::vec;
 
-use crate::acoustic_modem::demodulation::Demodulation2;
 use crate::acoustic_modem::modulation::Modulator;
-use crate::acoustic_modem::{modulation, phy_frame};
+use crate::acoustic_modem::phy_frame;
 use crate::utils::{self, read_data_2_compressed_u8};
 use plotters::prelude::*;
-use tokio::time;
 
 use hound::{WavSpec, WavWriter};
 
@@ -22,8 +19,7 @@ fn plot(modulated_signal: Vec<f32>, filename: &str) -> Result<(), Box<dyn std::e
         coordinates.push((i as f64, *sample as f64));
     }
 
-    let drawing_area =
-        SVGBackend::new(filename, (3000, 200)).into_drawing_area();
+    let drawing_area = SVGBackend::new(filename, (3000, 200)).into_drawing_area();
     drawing_area.fill(&WHITE).unwrap();
     let mut chart_builder = ChartBuilder::on(&drawing_area);
     chart_builder

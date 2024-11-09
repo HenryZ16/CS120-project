@@ -1,13 +1,9 @@
-use std::vec;
-
 use crate::asio_stream::InputAudioStream;
 use cpal;
 use cpal::traits::{DeviceTrait, HostTrait};
 use cpal::{SampleRate, SupportedStreamConfig};
-use futures::stream::Count;
-use futures::{SinkExt, StreamExt};
+use futures::StreamExt;
 use hound::WavWriter;
-use plotters::data;
 use std::i16;
 
 #[tokio::test]

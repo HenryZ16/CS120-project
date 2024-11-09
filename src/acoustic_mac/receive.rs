@@ -10,8 +10,6 @@ use crate::{
 };
 use core::result::Result::Ok;
 use tokio::sync::mpsc::unbounded_channel;
-use tokio_stream::wrappers::UnboundedReceiverStream;
-use tokio_stream::StreamExt;
 
 pub struct MacReceiver {
     demodulator: Demodulation2,
@@ -34,26 +32,26 @@ impl MacReceiver {
             DemodulationState::DetectPreamble,
         );
         println!("receive task start");
-        let _ = tokio::spawn(async move {
-            loop {
-                tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
-                println!("send signal");
-                let _ = status_tx.send(SWITCH_SIGNAL);
-            }
-        });
+        // let _ = tokio::spawn(async move {
+        //     loop {
+        //         tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+        //         println!("send signal");
+        //         let _ = status_tx.send(SWITCH_SIGNAL);
+        //     }
+        // });
         let recv_task = tokio::spawn(async move {
             let mut recv_data: Vec<Byte> = vec![];
             // let mut decoded_data_stream = UnboundedReceiverStream::new(decoded_data_rx);
             while recv_data.len() < byte_num {
                 while let Some(data) = decoded_data_rx.recv().await {
-                    println!("received raw data: {:?}", data);
-                    if MACFrame::get_src(&data) == self_mac
+                    // println!("received raw data: {:?}", data);
+                    if MACFrame::get_dst(&data) == self_mac
                         && MACFrame::get_type(&data) == MACType::Data
                     {
                         println!("receive mac frame");
                         recv_data.extend_from_slice(MACFrame::get_payload(&data));
                     } else {
-                        println!("receive wrong dst: {}", MACFrame::get_src(&data));
+                        println!("receive wrong dst: {}", MACFrame::get_dst(&data));
                     }
                 }
                 // tokio::time::sleep(Duration::from_millis(500)).await;

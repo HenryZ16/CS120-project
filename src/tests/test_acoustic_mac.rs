@@ -34,10 +34,13 @@ async fn test_receiver() {
 #[tokio::test]
 async fn test_detector() {
     let instant = Instant::now();
-    let mut detector = MacDetector::new();
+    let mut detector = MacDetector::new().await;
     // let _ = read_wav_and_play("send.wav");
+    let mut count = 0;
     while instant.elapsed().as_secs() < 10 {
-        let _ = sleep(Duration::from_millis(20)).await;
+        let _ = sleep(Duration::from_millis(200)).await;
         println!("{} ", detector.is_empty().await);
+        count += 1;
     }
+    println!("detect times: {}", count);
 }
