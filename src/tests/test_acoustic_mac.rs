@@ -1,11 +1,13 @@
-use crate::acoustic_mac::{mac_frame, receive};
-use crate::acoustic_modem::demodulation;
-use crate::acoustic_modem::generator::PhyLayerGenerator;
-use plotters::data;
+use crate::{
+    acoustic_mac::{controller::MacDetector, receive},
+    asio_stream::read_wav_and_play,
+};
 use std::fs::File;
 use std::io::Write;
-use tokio::sync::mpsc::unbounded_channel;
-use tokio::{test, time::timeout, time::Duration};
+use tokio::{
+    test,
+    time::{sleep, timeout, Duration, Instant},
+};
 
 #[tokio::test]
 async fn test_receiver() {
@@ -26,5 +28,16 @@ async fn test_receiver() {
         Err(e) => {
             println!("Failed to receive bytes: {:?}", e);
         }
+    }
+}
+
+#[tokio::test]
+async fn test_detector() {
+    let instant = Instant::now();
+    let mut detector = MacDetector::new();
+    // let _ = read_wav_and_play("send.wav");
+    while instant.elapsed().as_secs() < 10 {
+        let _ = sleep(Duration::from_millis(20)).await;
+        println!("{} ", detector.is_empty().await);
     }
 }

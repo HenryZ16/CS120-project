@@ -1,4 +1,4 @@
-use std::{any, vec};
+use std::{any, result, vec};
 
 use crate::{
     acoustic_mac::mac_frame,
@@ -7,12 +7,16 @@ use crate::{
         generator::PhyLayerGenerator,
         modulation::Modulator,
     },
+    asio_stream::InputAudioStream,
     utils::Byte,
 };
 use anyhow::Error;
+use cpal::traits::{DeviceTrait, HostTrait};
+use cpal::{Device, SampleRate, SupportedStreamConfig};
+use futures::{SinkExt, StreamExt};
 use std::result::Result::Ok;
 use std::time::{Duration, Instant};
-use tokio::sync::mpsc::unbounded_channel;
+use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
 use super::mac_frame::MACType;
 
@@ -88,15 +92,13 @@ impl MacController {
         let (decoded_data_tx, mut decoded_data_rx) = unbounded_channel();
         let (status_tx, status_rx) = unbounded_channel();
 
-        let mut init_state = DemodulationState::DetectPreamble;
-        if send_data.len() == 0 {
-            init_state.switch();
-        }
+        let init_state = DemodulationState::DetectPreamble;
+        let detector = MacDetector::new();
 
         // start decode listening
         let _listen_task =
             self.demodulator
-                .listening_controlled(decoded_data_tx, status_rx, init_state, vec![]);
+                .listening_controlled(decoded_data_tx, status_rx, init_state);
 
         let mut controller_state = ControllerState::Idel;
 
@@ -117,7 +119,9 @@ impl MacController {
                     // check data type
                     if mac_frame::MACFrame::get_dst(&data) == 1 {
                         if mac_frame::MACFrame::get_type(&data) == MACType::Ack {
+                            println!("received ack");
                         } else {
+                            println!("received data");
                             receive_output
                                 .extend_from_slice(mac_frame::MACFrame::get_payload(&data));
                             if receive_output.len() >= receive_byte_num {
@@ -128,6 +132,11 @@ impl MacController {
                             let _ = status_tx.send(SWITCH_SIGNAL);
                             let _ = status_tx.send(SWITCH_SIGNAL);
                         }
+                    } else {
+                        println!(
+                            "received other macaddress: {}",
+                            mac_frame::MACFrame::get_dst(&data)
+                        );
                     }
                 }
 
@@ -165,4 +174,78 @@ impl MacController {
 
         Ok(())
     }
+}
+
+const DETECT_SIGNAL: Byte = 1;
+const ENERGE_LIMIT: f32 = 4.0;
+pub struct MacDetector {
+    request_tx: UnboundedSender<Byte>,
+    result_rx: UnboundedReceiver<Vec<f32>>,
+}
+
+impl MacDetector {
+    pub fn new() -> Self {
+        let (request_tx, request_rx) = unbounded_channel::<Byte>();
+        let (result_tx, result_rx) = unbounded_channel();
+
+        let _deamon = Self::daemon(request_rx, result_tx);
+
+        Self {
+            request_tx,
+            result_rx,
+        }
+    }
+
+    pub async fn is_empty(&mut self) -> bool {
+        let _ = self.request_tx.send(DETECT_SIGNAL);
+        if let Some(samples) = self.result_rx.recv().await {
+            if calculate_energy(&samples) > ENERGE_LIMIT {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    async fn daemon(mut request_rx: UnboundedReceiver<Byte>, result_tx: UnboundedSender<Vec<f32>>) {
+        let host = cpal::host_from_id(cpal::HostId::Asio).expect("failed to initialise ASIO host");
+        // let host = cpal::default_host();
+        let device = host.input_devices().expect("failed to find input device");
+        let device = device
+            .into_iter()
+            .next()
+            .expect("no input device available");
+        println!("Input device: {:?}", device.name().unwrap());
+
+        let default_config = device.default_input_config().unwrap();
+        let config = SupportedStreamConfig::new(
+            // default_config.channels(),
+            1,                 // mono
+            SampleRate(48000), // sample rate
+            default_config.buffer_size().clone(),
+            default_config.sample_format(),
+        );
+
+        println!("config: {:?}", config);
+
+        let mut sample_stream = InputAudioStream::new(&device, config);
+        let mut sample = vec![];
+        loop {
+            tokio::select! {
+                _ = request_rx.recv() => {
+                    let _ = result_tx.send(sample.clone());
+                }
+
+                Some(data) = sample_stream.next() =>{
+                    sample = data;
+                }
+            }
+        }
+    }
+}
+
+fn calculate_energy(samples: &[f32]) -> f32 {
+    let sum_of_squares: f32 = samples.iter().map(|&sample| sample * sample).sum();
+    let energy = sum_of_squares / samples.len() as f32;
+    energy
 }

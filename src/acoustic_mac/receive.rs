@@ -3,7 +3,7 @@ use std::{time::Duration, vec};
 use crate::{
     acoustic_mac::mac_frame::{MACFrame, MACType, MacAddress},
     acoustic_modem::{
-        demodulation::{Demodulation2, DemodulationState},
+        demodulation::{Demodulation2, DemodulationState, SWITCH_SIGNAL},
         generator::PhyLayerGenerator,
     },
     utils::Byte,
@@ -26,7 +26,7 @@ impl MacReceiver {
     }
 
     pub async fn receive_bytes(&mut self, byte_num: usize, self_mac: MacAddress) -> Vec<Byte> {
-        let (decoded_data_tx, decoded_data_rx) = unbounded_channel();
+        let (decoded_data_tx, mut decoded_data_rx) = unbounded_channel();
         let (status_tx, status_rx) = unbounded_channel();
         let listen_task = self.demodulator.listening_controlled(
             decoded_data_tx,
@@ -34,11 +34,18 @@ impl MacReceiver {
             DemodulationState::DetectPreamble,
         );
         println!("receive task start");
+        let _ = tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+                println!("send signal");
+                let _ = status_tx.send(SWITCH_SIGNAL);
+            }
+        });
         let recv_task = tokio::spawn(async move {
             let mut recv_data: Vec<Byte> = vec![];
-            let mut decoded_data_stream = UnboundedReceiverStream::new(decoded_data_rx);
+            // let mut decoded_data_stream = UnboundedReceiverStream::new(decoded_data_rx);
             while recv_data.len() < byte_num {
-                while let Some(data) = decoded_data_stream.next().await {
+                while let Some(data) = decoded_data_rx.recv().await {
                     println!("received raw data: {:?}", data);
                     if MACFrame::get_src(&data) == self_mac
                         && MACFrame::get_type(&data) == MACType::Data

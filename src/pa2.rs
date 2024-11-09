@@ -77,7 +77,7 @@ pub async fn obj_1_recv_file() -> Result<u32> {
     let handle = demodulator.listening(&mut decoded_data);
     let handle = time::timeout(Duration::from_secs(10), handle);
     println!("[pa1-obj3-receive] Start");
-    handle.await;
+    let _ = handle.await;
     let mut file = File::create("testset/output.txt").unwrap();
     // file.write_all(&decoded_data).unwrap();
     file.write_all(&mut decoded_data).unwrap();
@@ -133,7 +133,7 @@ pub async fn pa2(sel: i32, additional_type: &str) -> Result<u32> {
                 let handle = demodulator.listening(&mut decoded_data);
                 let handle = time::timeout(Duration::from_secs(10), handle);
                 println!("[pa1-obj3-receive] Start");
-                handle.await;
+                let _ = handle.await;
                 let mut file = File::create("testset/output.txt").unwrap();
                 // file.write_all(&decoded_data).unwrap();
                 file.write_all(&mut decoded_data).unwrap();

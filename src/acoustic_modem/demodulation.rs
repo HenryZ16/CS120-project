@@ -241,7 +241,7 @@ impl Demodulation2 {
         let channels = self.input_config.config.channels() as usize;
 
         let mut last_frame_index = 0;
-
+        let mut debug_vec: Vec<f32> = vec![];
         while let Some(data) = input_stream.next().await {
             if demodulate_state == DemodulationState::Stop {
                 continue;
@@ -282,6 +282,7 @@ impl Demodulation2 {
                             start_index, tmp_buffer_len, local_max
                         );
                         local_max = 0.0;
+                        // println!("debug vec: {:?}", debug_vec);
                         break;
                     }
                 }
@@ -303,6 +304,7 @@ impl Demodulation2 {
                 {
                     let window = &tmp_buffer.as_slices().0
                         [start_index..start_index + demodulate_config.ref_signal_len[0]];
+                    debug_vec.extend_from_slice(window);
                     for k in 0..carrier_num {
                         let dot_product =
                             dot_product(window, &self.demodulate_config.ref_signal[k]);
@@ -318,6 +320,7 @@ impl Demodulation2 {
             }
 
             if tmp_bits_data[0].len() >= payload_len {
+                println!("debug vec: {:?}", debug_vec);
                 is_reboot = true;
                 demodulate_state = demodulate_state.next();
                 last_frame_index = 0;
@@ -330,29 +333,12 @@ impl Demodulation2 {
                     // tmp_bits_data[k].clear();
 
                     match result {
-                        Ok((mut vec, length)) => {
-                            if length > bits_len {
-                                println!("wrong data length: {}", length);
-                            } else {
-                                // println!("length: {:?}", length);
-                                let remove_bit_length: usize = 8 - (length & 0b111);
-                                if remove_bit_length != 8 {
-                                    // println!("remove bit: {:?}", remove_bit_length);
-                                    let mut fix_mask = 0xFF;
-                                    fix_mask >>= remove_bit_length;
-                                    fix_mask <<= remove_bit_length;
-                                    let fix_byte = vec.get_mut(length / 8).unwrap();
-                                    *fix_byte &= fix_mask;
-                                }
-                                // println!("vec: {:?}", vec);
-                                decoded_data.extend_from_slice(&vec[0..length / 8]);
-
-                                // decoded_data.extend_from_slice(&decompressed[0..length]);
-                            }
+                        Ok((meta_data, _)) => {
+                            decoded_data.extend(meta_data.iter());
                         }
-
-                        Err(_) => {
-                            println!("Error: received invalid data");
+                        Err(msg) => {
+                            println!("{}", msg);
+                            break;
                         }
                     }
                 }
@@ -425,11 +411,12 @@ impl Demodulation2 {
 
         while let Some(data) = input_stream.next().await {
             if let Ok(_) = state_rx.try_recv() {
+                println!("switched");
                 demodulate_state.switch();
             }
 
             if demodulate_state == DemodulationState::Stop {
-                println!("stoped");
+                // println!("stoped");
                 continue;
             }
             // println!("data len: {}", data.len());
@@ -566,6 +553,7 @@ impl Demodulation2 {
 }
 
 fn decode(input_data: Vec<Bit>) -> Result<(Vec<Byte>, usize), Error> {
+    println!("input data: {:?}", input_data);
     if ENABLE_ECC {
         let hexbits = u8_2_code_rs_hexbit(read_data_2_compressed_u8(input_data));
         PHYFrame::payload_2_data(hexbits)

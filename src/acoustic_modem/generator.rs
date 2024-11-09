@@ -7,13 +7,13 @@ pub struct PhyLayerGenerator {
     // phy_frame parameters
     max_frame_data_length: usize,
     frame_payload_length: usize,
-    frame_length_length: usize,
+    // frame_length_length: usize,
     max_frame_data_length_no_encoding: usize,
     frame_length_length_no_encoding: usize,
     frame_crc_length_no_encoding: usize,
 
     // modulator parameters
-    frame_distance: usize,
+    // frame_distance: usize,
 
     // demodulation parameters
     lowest_power_limit: f32,

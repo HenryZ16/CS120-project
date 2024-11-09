@@ -12,12 +12,12 @@ pub fn test_config_new() {
 #[test]
 pub fn test_demodulation() {
     let config = PhyLayerGenerator::new_from_yaml(TEST_FILE);
-    let mut demodulation = config.gen_demodulation();
+    let _demodulation = config.gen_demodulation();
 }
 
 #[test]
 pub fn test_modulator() {
     let config = PhyLayerGenerator::new_from_yaml(TEST_FILE);
     let mut modulator = config.gen_modulator();
-    modulator.test_carrier_wave();
+    let _ = modulator.test_carrier_wave();
 }
