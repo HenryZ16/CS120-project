@@ -11,6 +11,7 @@ use std::process;
 use std::time::Instant;
 use std::vec;
 use tokio::time::sleep;
+use tokio::time::timeout;
 use tokio::time::{self, Duration};
 const CONFIG_FILE: &str = "configuration/pa2.yml";
 
@@ -156,11 +157,7 @@ pub async fn obj_2_recv() -> Result<u32> {
     let mut mac_controller = MacController::new(CONFIG_FILE, RECEIVER_ADDRESS);
     let task_handle = mac_controller.task(&mut decoded_data, 6250, vec![], SENDER_ADDRESS);
 
-    let timer_handle = sleep(Duration::from_secs(20));
-    let _ = tokio::select! {
-        _ = task_handle => {}
-        _ = timer_handle => {}
-    };
+    let _handle = timeout(Duration::from_secs(20), task_handle).await;
     let mut file = File::create("testset/output.txt").unwrap();
     // file.write_all(&decoded_data).unwrap();
     file.write_all(&mut decoded_data).unwrap();

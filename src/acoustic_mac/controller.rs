@@ -230,7 +230,6 @@ impl MacController {
                     }
                 }
             }
-            println!("[MacController]: task end");
             return Ok(received);
         });
 
@@ -239,6 +238,7 @@ impl MacController {
             _ = _listen_task => {vec![]}
             Ok(data) = main_task => {
                 if let Ok(data) = data{
+                    println!("return successfully");
                     data
                 }
                 else
@@ -249,6 +249,7 @@ impl MacController {
             }
         };
         receive_output.extend(handle.iter());
+        println!("[MacController]: task end");
         Ok(())
     }
 
