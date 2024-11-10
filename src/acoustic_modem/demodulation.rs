@@ -168,8 +168,30 @@ impl Demodulation2 {
             default_config.sample_format(),
         );
 
-        println!("config: {:?}", config);
+        Self::new_with_device_config(
+            carrier_freq,
+            sample_rate,
+            redundent_times,
+            enable_ofdm,
+            payload_bits_length,
+            data_bits_length,
+            lowest_power_limit,
+            device,
+            config,
+        )
+    }
 
+    pub fn new_with_device_config(
+        carrier_freq: Vec<u32>,
+        sample_rate: u32,
+        redundent_times: usize,
+        enable_ofdm: bool,
+        payload_bits_length: usize,
+        data_bits_length: usize,
+        lowest_power_limit: f32,
+        device: Device,
+        config: SupportedStreamConfig,
+    ) -> Self {
         let input_stream_config = InputStreamConfig::new(config, device);
 
         // sort carrier_freq in ascending order
