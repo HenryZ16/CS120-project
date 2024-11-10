@@ -391,10 +391,6 @@ impl Demodulation2 {
         let demodulate_config = &self.demodulate_config;
         let payload_len = demodulate_config.payload_bits_length;
 
-        let mut input_stream = self.input_config.create_input_stream();
-        let alpha_check = 1.0;
-        let mut prev = 0.0;
-
         let mut demodulate_state = init_state;
 
         let power_lim_preamble = demodulate_config.lowest_power_limit;
@@ -415,10 +411,9 @@ impl Demodulation2 {
 
         let mut is_reboot = false;
 
-        let channels = self.input_config.config.channels() as usize;
-
         let mut last_frame_index = 0;
 
+        let mut input_stream = self.input_config.create_input_stream();
         println!("listen daemon start");
         while let Some(data) = input_stream.next().await {
             if let Ok(signal) = state_rx.try_recv() {
@@ -440,8 +435,11 @@ impl Demodulation2 {
                 continue;
             }
             // println!("data len: {}", data.len());
-            tmp_buffer_len += data.len() / channels;
-            move_data_into_buffer(data, &mut tmp_buffer, alpha_check, channels, &mut prev);
+            tmp_buffer_len += data.len();
+            // move_data_into_buffer(data, &mut tmp_buffer, alpha_check, channels, &mut prev);
+            for sample in data {
+                tmp_buffer.push_back(sample);
+            }
             if demodulate_state == DemodulationState::DetectPreamble {
                 if tmp_buffer_len <= demodulate_config.preamble_len {
                     continue;

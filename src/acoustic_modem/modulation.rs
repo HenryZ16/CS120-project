@@ -427,7 +427,7 @@ impl Modulator {
             .await
             .unwrap();
         // TODO: remove it after implementing the controller
-        tokio::time::sleep(tokio::time::Duration::from_millis(30)).await;
+        // tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
     }
 
     // [Preamble : 8][Payload : 36 x 6 = 216]
@@ -496,7 +496,6 @@ impl Modulator {
     pub fn modulate(&self, bits: &Vec<u8>, carrrier_freq_id: usize) -> Vec<f32> {
         // println!("output: {:?}, length: {}", bits, bits.len());
 
-        // TODO: PSK
         let mut modulated_signal = vec![];
         // redundant periods for each bit
         let sample_cnt_each_bit =
