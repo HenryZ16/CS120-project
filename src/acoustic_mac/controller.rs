@@ -7,12 +7,16 @@ use crate::{
         generator::PhyLayerGenerator,
     },
     asio_stream::InputAudioStream,
-    utils::Byte,
+    utils::{get_audio_device_and_config, Byte},
 };
 use anyhow::Error;
-use cpal::traits::{DeviceTrait, HostTrait};
+use cpal::{
+    traits::{DeviceTrait, HostTrait},
+    Device,
+};
 use cpal::{SampleRate, SupportedStreamConfig};
 use futures::StreamExt;
+use serde::de;
 use std::result::Result::Ok;
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
@@ -101,12 +105,17 @@ impl MacController {
 
         let init_state = DemodulationState::DetectPreamble;
         let (mut detector, request_rx, result_tx) = MacDetector::new().await;
-        let mut demodulator = self.phy_config.gen_demodulation();
+        let (device, config) = get_audio_device_and_config(self.phy_config.get_sample_rate());
+        let mut demodulator = self
+            .phy_config
+            .gen_demodulation(device.clone(), config.clone());
         // start decode listening
         let _listen_task =
             demodulator.listening_daemon(decoded_data_tx, demodulate_status_rx, init_state);
-        let _detector_daemon = MacDetector::daemon(request_rx, result_tx);
-        let mut sender = MacSender::new_from_genrator(&self.phy_config, self.mac_address);
+        let _detector_daemon =
+            MacDetector::daemon(request_rx, result_tx, device.clone(), config.clone());
+        let mut sender =
+            MacSender::new_from_genrator(&self.phy_config, self.mac_address, device, config);
 
         // setup timer
         let mut timer = RecordTimer::new();
@@ -305,25 +314,10 @@ impl MacDetector {
     pub async fn daemon(
         mut request_rx: UnboundedReceiver<Byte>,
         result_tx: UnboundedSender<Vec<f32>>,
+        device: Device,
+        config: SupportedStreamConfig,
     ) {
         // println!("run daemon setup");
-        let host = cpal::host_from_id(cpal::HostId::Asio).expect("failed to initialise ASIO host");
-        // let host = cpal::default_host();
-        let device = host.input_devices().expect("failed to find input device");
-        let device = device
-            .into_iter()
-            .next()
-            .expect("no input device available");
-
-        let default_config = device.default_input_config().unwrap();
-        let config = SupportedStreamConfig::new(
-            // default_config.channels(),
-            1,                 // mono
-            SampleRate(48000), // sample rate
-            default_config.buffer_size().clone(),
-            default_config.sample_format(),
-        );
-
         let mut sample_stream = InputAudioStream::new(&device, config);
         let mut sample = vec![];
         println!("detector daemon start");

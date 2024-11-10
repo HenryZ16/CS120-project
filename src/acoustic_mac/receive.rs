@@ -9,6 +9,7 @@ use crate::{
     utils::Byte,
 };
 use core::result::Result::Ok;
+use cpal::{Device, SupportedStreamConfig};
 use tokio::sync::mpsc::unbounded_channel;
 use tokio_util::io::ReaderStream;
 
@@ -17,9 +18,9 @@ pub struct MacReceiver {
 }
 
 impl MacReceiver {
-    pub fn new(config_file: &str) -> Self {
-        let config = PhyLayerGenerator::new_from_yaml(config_file);
-        let demodulator = config.gen_demodulation();
+    pub fn new(config_file: &str, device: Device, config: SupportedStreamConfig) -> Self {
+        let yaml_config = PhyLayerGenerator::new_from_yaml(config_file);
+        let demodulator = yaml_config.gen_demodulation(device, config);
 
         Self { demodulator }
     }

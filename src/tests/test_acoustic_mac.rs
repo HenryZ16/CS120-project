@@ -1,7 +1,9 @@
 use crate::{
     acoustic_mac::{controller::MacDetector, receive},
     asio_stream::read_wav_and_play,
+    utils::get_audio_device_and_config,
 };
+use serde::de;
 use std::fs::File;
 use std::io::Write;
 use tokio::{
@@ -12,8 +14,8 @@ use tokio::{
 #[tokio::test]
 async fn test_receiver() {
     let config_file = "configuration/pa2.yml";
-
-    let mut receiver = receive::MacReceiver::new(config_file);
+    let (device, config) = get_audio_device_and_config(48000);
+    let mut receiver = receive::MacReceiver::new(config_file, device, config);
 
     let future = receiver.receive_bytes(6250, 1);
     let result = timeout(Duration::from_secs(10), future).await;
@@ -34,7 +36,8 @@ async fn test_receiver() {
 #[tokio::test]
 async fn test_detector() {
     let (mut detector, request_rx, result_tx) = MacDetector::new().await;
-    let detector_daemon = MacDetector::daemon(request_rx, result_tx);
+    let (device, config) = get_audio_device_and_config(48000);
+    let detector_daemon = MacDetector::daemon(request_rx, result_tx, device, config);
     // let _ = read_wav_and_play("send.wav");
     let detect_task = tokio::spawn(async move {
         let mut count = 0;

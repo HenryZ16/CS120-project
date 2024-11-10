@@ -57,7 +57,7 @@ impl PhyLayerGenerator {
         device: cpal::Device,
         config: cpal::SupportedStreamConfig,
     ) -> Demodulation2 {
-        Demodulation2::new(
+        Demodulation2::new_with_device_config(
             self.carrier_freq.clone(),
             self.sample_rate,
             self.redundent_times,
@@ -65,6 +65,8 @@ impl PhyLayerGenerator {
             self.payload_bits_length,
             self.data_bits_length,
             self.lowest_power_limit,
+            device,
+            config,
         )
     }
 

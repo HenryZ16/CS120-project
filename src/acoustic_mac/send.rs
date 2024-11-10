@@ -1,3 +1,5 @@
+use cpal::{Device, SupportedStreamConfig};
+
 use crate::{
     acoustic_mac::mac_frame::{self, MACFrame},
     acoustic_modem::{
@@ -24,10 +26,13 @@ impl MacSender {
         Self { modulator, address }
     }
 
-    pub fn new_from_genrator(generator: &PhyLayerGenerator, address: u8) -> Self {
-        let (cpal_device, cpal_config) =
-            crate::utils::get_audio_device_and_config(generator.get_sample_rate());
-        let modulator = generator.gen_modulator(cpal_device, cpal_config);
+    pub fn new_from_genrator(
+        generator: &PhyLayerGenerator,
+        address: u8,
+        device: Device,
+        config: SupportedStreamConfig,
+    ) -> Self {
+        let modulator = generator.gen_modulator(device, config);
 
         Self { modulator, address }
     }

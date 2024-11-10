@@ -2,6 +2,7 @@ use crate::acoustic_modem::generator::PhyLayerGenerator;
 use crate::acoustic_modem::modulation::Modulator;
 use crate::pa0;
 use crate::utils;
+use crate::utils::get_audio_device_and_config;
 use anyhow::{Error, Result};
 use tokio::time::{self, Duration};
 // use cpal::{
@@ -117,8 +118,9 @@ pub async fn obj_3_recv_file() -> Result<u32> {
     //     bits_len,
     // );
 
-    let config = PhyLayerGenerator::new_from_yaml(CONFIG_FILE);
-    let mut demodulator = config.gen_demodulation();
+    let yaml_config = PhyLayerGenerator::new_from_yaml(CONFIG_FILE);
+    let (device, config) = get_audio_device_and_config(yaml_config.get_sample_rate());
+    let mut demodulator = yaml_config.gen_demodulation(device, config);
 
     let mut decoded_data = vec![];
     let handle = demodulator.listening(&mut decoded_data);

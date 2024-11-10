@@ -2,6 +2,7 @@ use crate::acoustic_mac::controller::MacController;
 use crate::acoustic_mac::mac_frame::MacAddress;
 use crate::acoustic_modem::generator::PhyLayerGenerator;
 use crate::asio_stream::read_wav_and_play;
+use crate::utils::get_audio_device_and_config;
 use anyhow::{Error, Result};
 use core::task;
 use std::fs::File;
@@ -109,8 +110,9 @@ pub async fn obj_1_send_file() -> Result<u32> {
 }
 
 pub async fn obj_1_recv_file() -> Result<u32> {
-    let config = PhyLayerGenerator::new_from_yaml(CONFIG_FILE);
-    let mut demodulator = config.gen_demodulation();
+    let ymal_config = PhyLayerGenerator::new_from_yaml(CONFIG_FILE);
+    let (device, config) = get_audio_device_and_config(ymal_config.get_sample_rate());
+    let mut demodulator = ymal_config.gen_demodulation(device, config);
 
     let mut decoded_data = vec![];
     let handle = demodulator.listening(&mut decoded_data);
@@ -220,22 +222,7 @@ pub async fn pa2(sel: i32, additional_type: &str) -> Result<u32> {
                     }
                 }
             }
-            "test" => {
-                let config = PhyLayerGenerator::new_from_yaml(CONFIG_FILE);
-                let mut demodulator = config.gen_demodulation();
 
-                let mut decoded_data = vec![];
-                let handle = demodulator.listening(&mut decoded_data);
-                let handle = time::timeout(Duration::from_secs(10), handle);
-                println!("[pa1-obj3-receive] Start");
-                let _ = handle.await;
-                let mut file = File::create("testset/output.txt").unwrap();
-                // file.write_all(&decoded_data).unwrap();
-                file.write_all(&mut decoded_data).unwrap();
-                println!("[pa1-obj3-recrive] Stop");
-
-                return Ok(0);
-            }
             _ => {
                 println!("Unsupported function.");
             }
