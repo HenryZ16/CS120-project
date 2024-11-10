@@ -24,7 +24,7 @@ use super::{
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
 const MAX_SEND: u64 = 3;
-const ACK_WAIT_TIME: u64 = 85;
+const ACK_WAIT_TIME: u64 = 5000;
 const BACKOFF_SLOT_TIME: u64 = 85;
 
 #[derive(PartialEq)]
