@@ -48,7 +48,15 @@ impl PhyLayerGenerator {
         config
     }
 
-    pub fn gen_demodulation(&self) -> Demodulation2 {
+    pub fn get_sample_rate(&self) -> u32 {
+        self.sample_rate
+    }
+
+    pub fn gen_demodulation(
+        &self,
+        device: cpal::Device,
+        config: cpal::SupportedStreamConfig,
+    ) -> Demodulation2 {
         Demodulation2::new(
             self.carrier_freq.clone(),
             self.sample_rate,
@@ -60,11 +68,11 @@ impl PhyLayerGenerator {
         )
     }
 
-    pub fn gen_modulator(&self) -> Modulator {
-        Modulator::new(
-            self.carrier_freq.clone(),
-            self.sample_rate,
-            self.enable_ofdm,
-        )
+    pub fn gen_modulator(
+        &self,
+        device: cpal::Device,
+        config: cpal::SupportedStreamConfig,
+    ) -> Modulator {
+        Modulator::new(self.carrier_freq.clone(), device, config, self.enable_ofdm)
     }
 }

@@ -70,8 +70,9 @@ async fn test_modulation() {
 
     // modulation
     let sample_rate = 48000;
+    let (device, config) = utils::get_audio_device_and_config(sample_rate);
     let carrier_freq = 1000;
-    let mut modulator = Modulator::new(vec![carrier_freq], sample_rate, false);
+    let mut modulator = Modulator::new(vec![carrier_freq], device, config, false);
     let modulated_signal = modulator.modulate(&data, 0);
 
     // show figure of the modulated_signal: Vec<f32>
@@ -148,8 +149,9 @@ fn test_simple_gen() {
 #[tokio::test]
 async fn test_frame_gen() {
     let sample_rate = 48000;
+    let (device, config) = utils::get_audio_device_and_config(sample_rate);
     let carrier = CARRIER;
-    let mut modulation = Modulator::new(vec![carrier], sample_rate, false);
+    let mut modulation = Modulator::new(vec![carrier], device, config, false);
 
     // let data = vec![0,1,1,0,1,0,0,1,0,1];
     let mut file = File::open("testset/data.txt").unwrap();

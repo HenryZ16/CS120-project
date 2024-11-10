@@ -91,3 +91,28 @@ pub fn code_rs_hexbit_2_u8(data: Vec<code_rs::bits::Hexbit>) -> Vec<Byte> {
 
     return u8s;
 }
+
+pub fn get_audio_device_and_config(
+    sample_rate: u32,
+) -> (cpal::Device, cpal::SupportedStreamConfig) {
+    use cpal::traits::{DeviceTrait, HostTrait};
+    use cpal::{SampleRate, SupportedStreamConfig};
+
+    let host = cpal::host_from_id(cpal::HostId::Asio).expect("failed to initialise ASIO host");
+    // let host = cpal::default_host();
+    let device = host.default_output_device().unwrap();
+    println!(
+        "[get_audio_device_and_config] Output device: {:?}",
+        device.name().unwrap()
+    );
+
+    let default_config = device.default_output_config().unwrap();
+    let config = SupportedStreamConfig::new(
+        1,                       // mono
+        SampleRate(sample_rate), // sample rate
+        default_config.buffer_size().clone(),
+        default_config.sample_format(),
+    );
+    println!("[get_audio_device_and_config] Output config: {:?}", config);
+    return (device, config);
+}
