@@ -445,6 +445,7 @@ impl Demodulation2 {
                 match signal {
                     SwitchSignal::StopSignal => {
                         tmp_buffer.clear();
+                        start_index = 0;
                         demodulate_state = demodulate_state.stop();
                     }
                     SwitchSignal::ResumeSignal => {
