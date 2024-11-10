@@ -9,8 +9,7 @@ Input data
 use super::phy_frame::{self, PHYFrame};
 use crate::asio_stream::{AudioTrack, OutputAudioStream};
 use crate::utils::{self, Byte};
-use cpal::traits::{DeviceTrait, HostTrait};
-use cpal::{SampleRate, SupportedStreamConfig};
+use cpal::SupportedStreamConfig;
 use futures::SinkExt;
 use hound::{WavSpec, WavWriter};
 
@@ -29,22 +28,14 @@ pub struct Modulator {
 }
 
 impl Modulator {
-    pub fn new(carrier_freq: Vec<u32>, sample_rate: u32, enable_ofdm: bool) -> Self {
-        let host = cpal::host_from_id(cpal::HostId::Asio).expect("failed to initialise ASIO host");
-        // let host = cpal::default_host();
-        let device = host.default_output_device().unwrap();
-        println!("[Modulator] Output device: {:?}", device.name().unwrap());
-
-        let default_config = device.default_output_config().unwrap();
-        let config = SupportedStreamConfig::new(
-            1,                       // mono
-            SampleRate(sample_rate), // sample rate
-            default_config.buffer_size().clone(),
-            default_config.sample_format(),
-        );
-        println!("[Modulator] Output config: {:?}", config);
-
+    pub fn new(
+        carrier_freq: Vec<u32>,
+        device: cpal::Device,
+        config: SupportedStreamConfig,
+        enable_ofdm: bool,
+    ) -> Self {
         let output_stream = OutputAudioStream::new(&device, config.clone());
+        let sample_rate = config.sample_rate().0;
 
         Modulator {
             carrier_freq,
@@ -532,8 +523,9 @@ async fn test_b2w_single_ofdm_frame() {
 
     // modulator
     let sample_rate = 48000;
+    let (device, config) = utils::get_audio_device_and_config(sample_rate);
     let carrier_freq = 6000;
-    let mut modulator = Modulator::new(vec![carrier_freq, carrier_freq * 2], sample_rate, true);
+    let mut modulator = Modulator::new(vec![carrier_freq, carrier_freq * 2], device, config, true);
 
     // bits 2 wave single ofdm frame
     let modulated_signal = modulator

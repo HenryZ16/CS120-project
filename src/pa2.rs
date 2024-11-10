@@ -55,7 +55,9 @@ pub async fn obj_1_send() -> Result<u32> {
     file.read_to_end(&mut data)?;
 
     let config = PhyLayerGenerator::new_from_yaml(CONFIG_FILE);
-    let mut modulator = config.gen_modulator();
+    let (cpal_device, cpal_config) =
+        crate::utils::get_audio_device_and_config(config.get_sample_rate());
+    let mut modulator = config.gen_modulator(cpal_device, cpal_config);
     println!("[pa2-obj1-send] Elapsed time: {:?}", t_start.elapsed());
 
     // send
@@ -81,7 +83,9 @@ pub async fn obj_1_send_file() -> Result<u32> {
 
     // println!("data: {:?}", data);
     let config = PhyLayerGenerator::new_from_yaml(CONFIG_FILE);
-    let mut modulator = config.gen_modulator();
+    let (cpal_device, cpal_config) =
+        crate::utils::get_audio_device_and_config(config.get_sample_rate());
+    let mut modulator = config.gen_modulator(cpal_device, cpal_config);
 
     // modulator
     // let sample_rate = 48000;

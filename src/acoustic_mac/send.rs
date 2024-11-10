@@ -17,13 +17,17 @@ pub struct MacSender {
 impl MacSender {
     pub fn new(config_file: &str, address: u8) -> Self {
         let config = PhyLayerGenerator::new_from_yaml(config_file);
-        let modulator = config.gen_modulator();
+        let (cpal_device, cpal_config) =
+            crate::utils::get_audio_device_and_config(config.get_sample_rate());
+        let modulator = config.gen_modulator(cpal_device, cpal_config);
 
         Self { modulator, address }
     }
 
     pub fn new_from_genrator(generator: &PhyLayerGenerator, address: u8) -> Self {
-        let modulator = generator.gen_modulator();
+        let (cpal_device, cpal_config) =
+            crate::utils::get_audio_device_and_config(generator.get_sample_rate());
+        let modulator = generator.gen_modulator(cpal_device, cpal_config);
 
         Self { modulator, address }
     }

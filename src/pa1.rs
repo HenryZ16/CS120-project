@@ -17,7 +17,8 @@ const OFDM: bool = true;
 const CONFIG_FILE: &str = "configuration/pa1.yml";
 
 pub async fn obj_2() -> Result<u32> {
-    let mut modulator_1 = Modulator::new(vec![1000, 10000], 48000, false);
+    let (device, config) = utils::get_audio_device_and_config(48000);
+    let mut modulator_1 = Modulator::new(vec![1000, 10000], device, config, false);
     modulator_1.test_carrier_wave().await;
     return Ok(0);
 }
@@ -36,8 +37,9 @@ pub async fn obj_3_send() -> Result<u32> {
 
     // modulator
     let sample_rate = 48000;
+    let (device, config) = utils::get_audio_device_and_config(sample_rate);
     let carrier_freq = CARRIER;
-    let mut modulator = Modulator::new(vec![carrier_freq, carrier_freq * 2], sample_rate, OFDM);
+    let mut modulator = Modulator::new(vec![carrier_freq, carrier_freq * 2], device, config, OFDM);
 
     // send
     modulator
@@ -69,8 +71,9 @@ pub async fn obj_3_send_file() -> Result<u32> {
 
     // modulator
     let sample_rate = 48000;
+    let (device, config) = utils::get_audio_device_and_config(sample_rate);
     let carrier_freq = CARRIER;
-    let mut modulator = Modulator::new(vec![carrier_freq, carrier_freq * 2], sample_rate, OFDM);
+    let mut modulator = Modulator::new(vec![carrier_freq, carrier_freq * 2], device, config, OFDM);
 
     let file = "testset/send.wav";
     // send
