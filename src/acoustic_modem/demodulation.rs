@@ -13,9 +13,9 @@ use std::{mem, vec};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 pub enum SwitchSignal {
-    STOP_SIGNAL,
-    RESUME_SIGNAL,
-    SWITCH_SIGNAL,
+    StopSignal,
+    ResumeSignal,
+    SwitchSignal,
 }
 
 // pub const SWITCH_SIGNAL: SwitchSignal = 2;
@@ -440,13 +440,13 @@ impl Demodulation2 {
         while let Some(data) = input_stream.next().await {
             if let Ok(signal) = state_rx.try_recv() {
                 match signal {
-                    SwitchSignal::STOP_SIGNAL => {
+                    SwitchSignal::StopSignal => {
                         demodulate_state = demodulate_state.stop();
                     }
-                    SwitchSignal::RESUME_SIGNAL => {
+                    SwitchSignal::ResumeSignal => {
                         demodulate_state = demodulate_state.resume();
                     }
-                    SwitchSignal::SWITCH_SIGNAL => {
+                    SwitchSignal::SwitchSignal => {
                         demodulate_state.switch();
                     }
                 }

@@ -1,15 +1,10 @@
 use crate::{
     acoustic_mac::{controller::MacDetector, receive},
-    asio_stream::read_wav_and_play,
     utils::get_audio_device_and_config,
 };
-use serde::de;
 use std::fs::File;
 use std::io::Write;
-use tokio::{
-    test,
-    time::{sleep, timeout, Duration, Instant},
-};
+use tokio::time::{sleep, timeout, Duration, Instant};
 
 #[tokio::test]
 async fn test_receiver() {
@@ -50,7 +45,7 @@ async fn test_detector() {
         println!("detect times: {}", count);
     });
 
-    let test = tokio::select! {
+    let _: Result<(), ()> = tokio::select! {
         _ = detector_daemon => {Err(())}
         _ = detect_task => {Ok(())}
     };

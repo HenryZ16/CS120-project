@@ -1,7 +1,7 @@
 use anyhow::{Error, Result};
 use cpal::{
     traits::{DeviceTrait, HostTrait, StreamTrait},
-    Device, FromSample, Sample, SampleFormat, SampleRate, SizedSample,
+    Device, FromSample, Sample, SampleFormat, SizedSample,
 };
 use futures::{FutureExt, Sink, SinkExt, Stream};
 use rodio::{OutputStream, Source, SupportedStreamConfig};
@@ -399,44 +399,4 @@ pub async fn read_wav_and_play(filename: &str) {
 
     let mut output_stream = OutputAudioStream::new(&device, config);
     output_stream.send(track).await.unwrap();
-}
-
-pub fn gen_inputstream(sample_rate: u32) -> InputAudioStream {
-    let host = cpal::host_from_id(cpal::HostId::Asio).expect("failed to initialise ASIO host");
-    // let host = cpal::default_host();
-    let device = host
-        .default_input_device()
-        .expect("failed to find input device");
-
-    let default_config = device.default_input_config().unwrap();
-    let config = SupportedStreamConfig::new(
-        // default_config.channels(),
-        1,                       // mono
-        SampleRate(sample_rate), // sample rate
-        default_config.buffer_size().clone(),
-        default_config.sample_format(),
-    );
-
-    // println!("config: {:?}", config);
-    InputAudioStream::new(&device, config)
-}
-
-pub fn gen_outputstream(sample_rate: u32) -> OutputAudioStream<std::vec::IntoIter<f32>> {
-    let host = cpal::host_from_id(cpal::HostId::Asio).expect("failed to initialise ASIO host");
-    // let host = cpal::default_host();
-    let device = host
-        .default_input_device()
-        .expect("failed to find input device");
-
-    let default_config = device.default_input_config().unwrap();
-    let config = SupportedStreamConfig::new(
-        // default_config.channels(),
-        1,                       // mono
-        SampleRate(sample_rate), // sample rate
-        default_config.buffer_size().clone(),
-        default_config.sample_format(),
-    );
-
-    // println!("config: {:?}", config);
-    OutputAudioStream::new(&device, config)
 }

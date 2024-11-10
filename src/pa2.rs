@@ -4,14 +4,13 @@ use crate::acoustic_modem::generator::PhyLayerGenerator;
 use crate::asio_stream::read_wav_and_play;
 use crate::utils::get_audio_device_and_config;
 use anyhow::{Error, Result};
-use core::task;
 use std::fs::File;
 use std::io::Read;
 use std::io::Write;
+use std::process;
 use std::time::Instant;
 use std::vec;
 use tokio::time::sleep;
-use tokio::time::timeout;
 use tokio::time::{self, Duration};
 const CONFIG_FILE: &str = "configuration/pa2.yml";
 
@@ -155,7 +154,7 @@ pub async fn obj_2_recv() -> Result<u32> {
 
     let mut decoded_data = vec![];
     let mut mac_controller = MacController::new(CONFIG_FILE, RECEIVER_ADDRESS);
-    let task_handle = mac_controller.task(&mut decoded_data, 6250, vec![], SENDER_ADDRESS);
+    let task_handle = mac_controller.task(&mut decoded_data, 2, vec![], SENDER_ADDRESS);
 
     let timer_handle = sleep(Duration::from_secs(20));
     let _ = tokio::select! {
@@ -239,7 +238,9 @@ pub async fn pa2(sel: i32, additional_type: &str) -> Result<u32> {
                 }
             },
             "recv" => match obj_2_recv().await {
-                Ok(_) => {}
+                Ok(_) => {
+                    process::exit(0);
+                }
                 Err(e) => {
                     println!("Error: {}", e);
                 }

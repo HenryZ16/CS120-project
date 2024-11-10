@@ -10,13 +10,9 @@ use crate::{
     utils::{get_audio_device_and_config, Byte},
 };
 use anyhow::Error;
-use cpal::{
-    traits::{DeviceTrait, HostTrait},
-    Device,
-};
-use cpal::{SampleRate, SupportedStreamConfig};
+use cpal::Device;
+use cpal::SupportedStreamConfig;
 use futures::StreamExt;
-use serde::de;
 use std::result::Result::Ok;
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
@@ -135,6 +131,14 @@ impl MacController {
                 // send_padding = true;
             }
             while send_padding || recv_padding {
+                let _ = MacController::send_frame(
+                    &demodulate_status_tx,
+                    &mut detector,
+                    &mut sender,
+                    &ack_frame,
+                    false,
+                )
+                .await;
                 if let Ok(data) = decoded_data_rx.try_recv() {
                     // check data type
                     if mac_frame::MACFrame::get_dst(&data) == mac_address {
@@ -233,11 +237,11 @@ impl MacController {
         Ok(())
     }
 
-    async fn task_daemon(
-        decoded_data_rx: &mut UnboundedReceiver<Vec<Byte>>,
-        demodulate_status_tx: &UnboundedSender<SwitchSignal>,
-    ) {
-    }
+    // async fn task_daemon(
+    //     decoded_data_rx: &mut UnboundedReceiver<Vec<Byte>>,
+    //     demodulate_status_tx: &UnboundedSender<SwitchSignal>,
+    // ) {
+    // }
 
     // true if channel empty
     // false if channel busy
@@ -249,7 +253,7 @@ impl MacController {
         to_detect: bool,
     ) -> bool {
         // demodulator close
-        let _ = demodulate_status_tx.send(SwitchSignal::STOP_SIGNAL);
+        let _ = demodulate_status_tx.send(SwitchSignal::StopSignal);
 
         // send frame
         // detect
@@ -264,7 +268,7 @@ impl MacController {
         }
 
         // demodulator open
-        let _ = demodulate_status_tx.send(SwitchSignal::RESUME_SIGNAL);
+        let _ = demodulate_status_tx.send(SwitchSignal::ResumeSignal);
 
         is_empty
     }
