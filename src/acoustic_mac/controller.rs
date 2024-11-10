@@ -15,7 +15,10 @@ use cpal::SupportedStreamConfig;
 use futures::StreamExt;
 use std::result::Result::Ok;
 use std::time::{Duration, Instant};
-use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
+use tokio::{
+    sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
+    time::timeout,
+};
 
 use super::{
     mac_frame::{MACType, MacAddress},
@@ -26,6 +29,7 @@ use rand::{rngs::StdRng, Rng, SeedableRng};
 const MAX_SEND: u64 = 3;
 const ACK_WAIT_TIME: u64 = 5000;
 const BACKOFF_SLOT_TIME: u64 = 85;
+const CHECK_RECEIVE_TIME: u64 = 5;
 
 #[derive(PartialEq)]
 enum TimerType {
@@ -131,15 +135,20 @@ impl MacController {
                 // send_padding = true;
             }
             while send_padding || recv_padding {
-                let _ = MacController::send_frame(
-                    &demodulate_status_tx,
-                    &mut detector,
-                    &mut sender,
-                    &ack_frame,
-                    false,
+                // let _ = MacController::send_frame(
+                //     &demodulate_status_tx,
+                //     &mut detector,
+                //     &mut sender,
+                //     &ack_frame,
+                //     false,
+                // )
+                // .await;
+                if let Ok(Some(data)) = timeout(
+                    Duration::from_millis(CHECK_RECEIVE_TIME),
+                    decoded_data_rx.recv(),
                 )
-                .await;
-                if let Ok(data) = decoded_data_rx.try_recv() {
+                .await
+                {
                     // check data type
                     if mac_frame::MACFrame::get_dst(&data) == mac_address {
                         if mac_frame::MACFrame::get_type(&data) == MACType::Ack {

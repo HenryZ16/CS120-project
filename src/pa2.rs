@@ -239,7 +239,7 @@ pub async fn pa2(sel: i32, additional_type: &str) -> Result<u32> {
             },
             "recv" => match obj_2_recv().await {
                 Ok(_) => {
-                    process::exit(0);
+                    process::exit(9);
                 }
                 Err(e) => {
                     println!("Error: {}", e);
