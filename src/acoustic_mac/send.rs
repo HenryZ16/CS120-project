@@ -7,24 +7,23 @@ use crate::{
 };
 use std::vec;
 
-const ADDRESS: u8 = 0x33;
-
 pub struct MacSender {
     modulator: Modulator,
     address: u8,
 }
 
 impl MacSender {
-    pub fn new(config_file: &str) -> Self {
+    pub fn new(config_file: &str, address: u8) -> Self {
         let config = PhyLayerGenerator::new_from_yaml(config_file);
         let modulator = config.gen_modulator();
 
         Self {
             modulator,
-            address: ADDRESS,
+            address: address,
         }
     }
 
+    // for debug use
     pub async fn send_modulated_signal(&mut self, data: Vec<f32>) {
         self.modulator.send_modulated_signal(data).await;
     }
@@ -35,6 +34,10 @@ impl MacSender {
         self.modulator
             .send_single_ofdm_frame(bits.clone(), bits.len() as isize * 8)
             .await;
+    }
+
+    pub async fn generate_ack_frame(&mut self, dest: u8) -> MACFrame {
+        MACFrame::new(dest, self.address, mac_frame::MACType::Ack, vec![])
     }
 
     // we need modulator to determine the ofdm carrier cnt, then the length of the frame

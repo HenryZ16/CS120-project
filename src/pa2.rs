@@ -9,10 +9,11 @@ use tokio::time::{self, Duration};
 const CONFIG_FILE: &str = "configuration/pa2.yml";
 
 pub async fn obj_1_mac_send() -> Result<u32> {
+    let address = 0x33;
     let t_start = std::time::Instant::now();
 
     let dest: u8 = 0x01;
-    let mut sender = crate::acoustic_mac::send::MacSender::new(CONFIG_FILE);
+    let mut sender = crate::acoustic_mac::send::MacSender::new(CONFIG_FILE, address);
 
     // read data from testset/data.bin
     let mut file = File::open("testset/data.bin")?;
