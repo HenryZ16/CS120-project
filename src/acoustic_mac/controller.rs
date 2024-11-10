@@ -152,7 +152,7 @@ impl MacController {
                     // check data type
                     if mac_frame::MACFrame::get_dst(&data) == mac_address {
                         if mac_frame::MACFrame::get_type(&data) == MACType::Ack {
-                            println!("received ack, set backoff");
+                            println!("[MacController]: received ACK, set backoff");
                             cur_frame += 1;
                             if cur_frame == send_frame.len() {
                                 send_padding = false;
@@ -165,7 +165,7 @@ impl MacController {
                                 recv_padding = false;
                             }
 
-                            println!("received data and send ack");
+                            println!("[MacController]: received data and send ACK");
                             MacController::send_frame(
                                 &demodulate_status_tx,
                                 &mut detector,
@@ -177,7 +177,7 @@ impl MacController {
                         }
                     } else {
                         println!(
-                            "received other macaddress: {}",
+                            "[MacController]: received other macaddress: {}",
                             mac_frame::MACFrame::get_dst(&data)
                         );
                     }
@@ -186,7 +186,7 @@ impl MacController {
                 if timer.is_timeout() {
                     match timer.timer_type {
                         TimerType::ACK => {
-                            println!("ack timeout times: {}", retry_times);
+                            println!("[MacController]: ACK timeout times: {}", retry_times);
                             retry_times += 1;
                             if retry_times >= MAX_SEND {
                                 return Err(Error::msg("link error"));
@@ -213,10 +213,13 @@ impl MacController {
                             )
                             .await
                             {
-                                println!("send frame{} successfully", cur_frame);
+                                println!("[MacController]: send frame {} successfully", cur_frame);
                                 timer.start(TimerType::ACK, retry_times);
                             } else {
-                                println!("send frame{} failed, set backoff", cur_frame);
+                                println!(
+                                    "[MacController]: send frame {} failed, set backoff",
+                                    cur_frame
+                                );
                                 timer.start(TimerType::BACKOFF, retry_times);
                             }
                         }
@@ -224,7 +227,7 @@ impl MacController {
                     }
                 }
             }
-
+            println!("[MacController]: task end");
             return Ok(received);
         });
 

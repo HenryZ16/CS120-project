@@ -481,20 +481,20 @@ impl Demodulation2 {
                         && i - start_index > demodulate_config.preamble_len
                         && local_max > power_lim_preamble
                     {
-                        if ((last_frame_index + start_index) as isize
-                            - modulation::OFDM_FRAME_DISTANCE as isize)
-                            .abs()
-                            > 10
-                        {
-                            println!("last frame distance: {}", last_frame_index + start_index);
-                        }
+                        // if ((last_frame_index + start_index) as isize
+                        //     - modulation::OFDM_FRAME_DISTANCE as isize)
+                        //     .abs()
+                        //     > 10
+                        // {
+                        //     println!("last frame distance: {}", last_frame_index + start_index);
+                        // }
                         start_index += demodulate_config.preamble_len - 1;
                         demodulate_state = demodulate_state.next();
                         // println!("detected preamble");
-                        println!(
-                            "start index: {}, tmp buffer len: {}, max: {}",
-                            start_index, tmp_buffer_len, local_max
-                        );
+                        // println!(
+                        //     "start index: {}, tmp buffer len: {}, max: {}",
+                        //     start_index, tmp_buffer_len, local_max
+                        // );
                         local_max = 0.0;
                         break;
                     }
@@ -600,8 +600,8 @@ fn decode(input_data: Vec<Bit>) -> Result<(Vec<Byte>, usize), Error> {
     } else {
         let compressed_data = read_data_2_compressed_u8(input_data);
         if !PHYFrame::check_crc(&compressed_data) {
-            println!("wrong data: {:?}", compressed_data);
-            return Err(Error::msg("CRC wrong"));
+            // println!("wrong data: {:?}", compressed_data);
+            return Err(Error::msg("[Demodulation]: CRC wrong"));
         }
 
         let mut length = 0;
@@ -616,9 +616,10 @@ fn decode(input_data: Vec<Bit>) -> Result<(Vec<Byte>, usize), Error> {
                 phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING
             }
         {
-            return Err(Error::msg("Length wrong"));
+            return Err(Error::msg("[Demodulation]: Length wrong"));
         }
 
+        println!("[Demodulation]: received right data");
         Ok((
             compressed_data[phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING / 8
                 ..(phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING + length) / 8]
