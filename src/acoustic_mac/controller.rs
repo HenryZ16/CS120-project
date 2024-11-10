@@ -19,6 +19,7 @@ use tokio::{
     sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
     time::timeout,
 };
+use tokio_stream::wrappers::UnboundedReceiverStream;
 
 use super::{
     mac_frame::{MACType, MacAddress},
@@ -26,7 +27,7 @@ use super::{
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
-const MAX_SEND: u64 = 3;
+const MAX_SEND: u64 = 8;
 const ACK_WAIT_TIME: u64 = 85;
 const BACKOFF_SLOT_TIME: u64 = 85;
 const CHECK_RECEIVE_TIME: u64 = 5;
@@ -126,6 +127,7 @@ impl MacController {
         println!("set up time: {:?}", start.elapsed());
         let main_task = tokio::spawn(async move {
             let mut received: Vec<Byte> = vec![];
+            let mut decode_stream = UnboundedReceiverStream::new(decoded_data_rx);
             let mut retry_times: u64 = 0;
             let ack_frame = sender.generate_ack_frame(dest);
             let send_frame = sender.generate_data_frames(send_data, dest);
@@ -145,10 +147,11 @@ impl MacController {
                 // .await;
                 if let Ok(Some(data)) = timeout(
                     Duration::from_millis(CHECK_RECEIVE_TIME),
-                    decoded_data_rx.recv(),
+                    decode_stream.next(),
                 )
                 .await
                 {
+                    println!("[MacController]: received decoded data");
                     // check data type
                     if mac_frame::MACFrame::get_dst(&data) == mac_address {
                         if mac_frame::MACFrame::get_type(&data) == MACType::Ack {
