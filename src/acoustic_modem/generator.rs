@@ -2,7 +2,7 @@ use crate::acoustic_modem::{demodulation::Demodulation2, modulation::Modulator};
 use serde::Deserialize;
 use std::fs;
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct PhyLayerGenerator {
     // phy_frame parameters
     max_frame_data_length: usize,

@@ -3,7 +3,7 @@ use std::{time::Duration, vec};
 use crate::{
     acoustic_mac::mac_frame::{MACFrame, MACType, MacAddress},
     acoustic_modem::{
-        demodulation::{Demodulation2, DemodulationState, SWITCH_SIGNAL},
+        demodulation::{Demodulation2, DemodulationState, SwitchSignal},
         generator::PhyLayerGenerator,
     },
     utils::Byte,

@@ -114,10 +114,10 @@ impl Modulator {
                 data_bits_len % phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING
             };
 
-            println!(
-                "[bits_2_wave_single_ofdm_frame_no_ecc] phy_len: {}",
-                phy_len
-            );
+            // println!(
+            //     "[bits_2_wave_single_ofdm_frame_no_ecc] phy_len: {}",
+            //     phy_len
+            // );
             let frame = phy_frame::PHYFrame::new_no_encoding(phy_len, payload);
             let frame_bits = PHYFrame::add_crc(frame.1);
             let decompressed_data = utils::read_compressed_u8_2_data(frame_bits);

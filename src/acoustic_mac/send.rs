@@ -1,8 +1,10 @@
 use crate::{
-    acoustic_mac::mac_frame,
-    acoustic_mac::mac_frame::MACFrame,
-    acoustic_modem::phy_frame,
-    acoustic_modem::{generator::PhyLayerGenerator, modulation::Modulator},
+    acoustic_mac::mac_frame::{self, MACFrame},
+    acoustic_modem::{
+        generator::{self, PhyLayerGenerator},
+        modulation::Modulator,
+        phy_frame,
+    },
     utils::Byte,
 };
 use std::vec;
@@ -17,10 +19,13 @@ impl MacSender {
         let config = PhyLayerGenerator::new_from_yaml(config_file);
         let modulator = config.gen_modulator();
 
-        Self {
-            modulator,
-            address: address,
-        }
+        Self { modulator, address }
+    }
+
+    pub fn new_from_genrator(generator: &PhyLayerGenerator, address: u8) -> Self {
+        let modulator = generator.gen_modulator();
+
+        Self { modulator, address }
     }
 
     // for debug use
@@ -30,19 +35,19 @@ impl MacSender {
 
     pub async fn send_frame(&mut self, frame: &MACFrame) {
         let bits = frame.get_whole_frame_bits();
-        println!("[MacSender::send_frame] bits: {:?}", bits);
+        // println!("[MacSender::send_frame] bits: {:?}", bits);
         self.modulator
             .send_single_ofdm_frame(bits.clone(), bits.len() as isize * 8)
             .await;
     }
 
-    pub async fn generate_ack_frame(&mut self, dest: u8) -> MACFrame {
+    pub fn generate_ack_frame(&mut self, dest: u8) -> MACFrame {
         MACFrame::new(dest, self.address, mac_frame::MACType::Ack, vec![])
     }
 
     // we need modulator to determine the ofdm carrier cnt, then the length of the frame
     // so `generate_data_frames` is put here
-    pub async fn generate_data_frames(&mut self, data: Vec<Byte>, dest: u8) -> Vec<MACFrame> {
+    pub fn generate_data_frames(&mut self, data: Vec<Byte>, dest: u8) -> Vec<MACFrame> {
         let frame_max_length =
             phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING * self.modulator.get_carrier_cnt() / 8 - 3; // 3 means dest, src, type
         let mut frames: Vec<MACFrame> = vec![];

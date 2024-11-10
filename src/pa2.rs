@@ -1,12 +1,21 @@
+use crate::acoustic_mac::controller::MacController;
+use crate::acoustic_mac::mac_frame::MacAddress;
 use crate::acoustic_modem::generator::PhyLayerGenerator;
 use crate::asio_stream::read_wav_and_play;
 use anyhow::{Error, Result};
+use core::task;
 use std::fs::File;
 use std::io::Read;
 use std::io::Write;
+use std::time::Instant;
 use std::vec;
+use tokio::time::sleep;
+use tokio::time::timeout;
 use tokio::time::{self, Duration};
 const CONFIG_FILE: &str = "configuration/pa2.yml";
+
+const SENDER_ADDRESS: MacAddress = 1;
+const RECEIVER_ADDRESS: MacAddress = 2;
 
 pub async fn obj_1_mac_send() -> Result<u32> {
     let address = 0x33;
@@ -19,10 +28,10 @@ pub async fn obj_1_mac_send() -> Result<u32> {
     let mut file = File::open("testset/data.bin")?;
     let mut data: Vec<u8> = vec![];
     file.read_to_end(&mut data)?;
-    println!("[pa1-obj3-send] Elapsed time: {:?}", t_start.elapsed());
+    println!("[pa2-obj1-send] Elapsed time: {:?}", t_start.elapsed());
 
     // send
-    let frames = sender.generate_data_frames(data, dest).await;
+    let frames = sender.generate_data_frames(data, dest);
     for frame in &frames {
         sender.send_frame(frame).await;
         println!("\n");
@@ -30,7 +39,7 @@ pub async fn obj_1_mac_send() -> Result<u32> {
     //sender.send_frame(&frames[0]).await;
 
     println!(
-        "[pa1-obj3-send] Total elapsed time: {:?}",
+        "[pa2-obj1-send] Total elapsed time: {:?}",
         t_start.elapsed()
     );
 
@@ -47,7 +56,7 @@ pub async fn obj_1_send() -> Result<u32> {
 
     let config = PhyLayerGenerator::new_from_yaml(CONFIG_FILE);
     let mut modulator = config.gen_modulator();
-    println!("[pa1-obj3-send] Elapsed time: {:?}", t_start.elapsed());
+    println!("[pa2-obj1-send] Elapsed time: {:?}", t_start.elapsed());
 
     // send
     modulator
@@ -55,7 +64,7 @@ pub async fn obj_1_send() -> Result<u32> {
         .await;
 
     println!(
-        "[pa1-obj3-send] Total elapsed time: {:?}",
+        "[pa2-obj1-send] Total elapsed time: {:?}",
         t_start.elapsed()
     );
 
@@ -88,7 +97,7 @@ pub async fn obj_1_send_file() -> Result<u32> {
     read_wav_and_play(&file).await;
 
     println!(
-        "[pa1-obj3-send] Total elapsed time: {:?}",
+        "[pa2-obj1-send] Total elapsed time: {:?}",
         t_start.elapsed()
     );
 
@@ -107,9 +116,55 @@ pub async fn obj_1_recv_file() -> Result<u32> {
     let mut file = File::create("testset/output.txt").unwrap();
     // file.write_all(&decoded_data).unwrap();
     file.write_all(&mut decoded_data).unwrap();
-    println!("[pa1-obj3-recrive] Stop");
+    println!("[pa2-obj2-receive] Stop");
 
     return Ok(0);
+}
+
+pub async fn obj_2_send() -> Result<u32> {
+    let t_start = std::time::Instant::now();
+
+    // read data from testset/data.bin
+    let mut file = File::open("testset/data.bin")?;
+    let mut data: Vec<u8> = vec![];
+    file.read_to_end(&mut data)?;
+
+    // println!("init");
+    let mut mac_controller = MacController::new(CONFIG_FILE, SENDER_ADDRESS);
+    let mut tmp = vec![];
+    // println!("mac init complete");
+    let _ = mac_controller
+        .task(&mut tmp, 0, data, RECEIVER_ADDRESS)
+        .await;
+
+    println!(
+        "[pa2-obj2-send] Total elapsed time: {:?}",
+        t_start.elapsed()
+    );
+    return Ok(0);
+}
+
+pub async fn obj_2_recv() -> Result<u32> {
+    let t_start = Instant::now();
+
+    let mut decoded_data = vec![];
+    let mut mac_controller = MacController::new(CONFIG_FILE, RECEIVER_ADDRESS);
+    let task_handle = mac_controller.task(&mut decoded_data, 6250, vec![], SENDER_ADDRESS);
+
+    let timer_handle = sleep(Duration::from_secs(20));
+    let _ = tokio::select! {
+        _ = task_handle => {}
+        _ = timer_handle => {}
+    };
+    let mut file = File::create("testset/output.txt").unwrap();
+    // file.write_all(&decoded_data).unwrap();
+    file.write_all(&mut decoded_data).unwrap();
+
+    println!(
+        "[pa2-obj2-receive] Total elapsed time: {:?}",
+        t_start.elapsed()
+    );
+    Ok(0)
 }
 
 pub async fn pa2(sel: i32, additional_type: &str) -> Result<u32> {
@@ -181,6 +236,26 @@ pub async fn pa2(sel: i32, additional_type: &str) -> Result<u32> {
                 println!("Unsupported function.");
             }
         }
+    }
+
+    if sel == 0 || sel == 2 {
+        println!("Objective 2 start");
+        match additional_type {
+            "send" => match obj_2_send().await {
+                Ok(_) => {}
+                Err(e) => {
+                    println!("Error: {}", e);
+                }
+            },
+            "recv" => match obj_2_recv().await {
+                Ok(_) => {}
+                Err(e) => {
+                    println!("Error: {}", e);
+                }
+            },
+            _ => {}
+        }
+        println!("Objective 2 end")
     }
 
     return Ok(0);

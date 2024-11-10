@@ -12,8 +12,15 @@ use std::result::Result::Ok;
 use std::{mem, vec};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
-pub const SWITCH_SIGNAL: u8 = 1;
-pub type SwitchSignal = u8;
+pub enum SwitchSignal {
+    STOP_SIGNAL,
+    RESUME_SIGNAL,
+    SWITCH_SIGNAL,
+}
+
+// pub const SWITCH_SIGNAL: SwitchSignal = 2;
+// pub const STOP_SIGNAL: SwitchSignal = 0;
+// pub const RESUME_SIGNAL: SwitchSignal = 1;
 struct InputStreamConfig {
     config: SupportedStreamConfig,
     device: Device,
@@ -381,7 +388,6 @@ impl Demodulation2 {
         mut state_rx: UnboundedReceiver<SwitchSignal>,
         init_state: DemodulationState,
     ) -> Result<(), anyhow::Error> {
-        println!("listen daemon start");
         let demodulate_config = &self.demodulate_config;
         let payload_len = demodulate_config.payload_bits_length;
 
@@ -413,10 +419,20 @@ impl Demodulation2 {
 
         let mut last_frame_index = 0;
 
+        println!("listen daemon start");
         while let Some(data) = input_stream.next().await {
-            if let Ok(_) = state_rx.try_recv() {
-                println!("switched");
-                demodulate_state.switch();
+            if let Ok(signal) = state_rx.try_recv() {
+                match signal {
+                    SwitchSignal::STOP_SIGNAL => {
+                        demodulate_state = demodulate_state.stop();
+                    }
+                    SwitchSignal::RESUME_SIGNAL => {
+                        demodulate_state = demodulate_state.resume();
+                    }
+                    SwitchSignal::SWITCH_SIGNAL => {
+                        demodulate_state.switch();
+                    }
+                }
             }
 
             if demodulate_state == DemodulationState::Stop {
