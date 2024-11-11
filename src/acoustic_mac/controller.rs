@@ -15,11 +15,11 @@ use cpal::SupportedStreamConfig;
 use futures::StreamExt;
 use std::result::Result::Ok;
 use std::time::{Duration, Instant};
-use tokio::sync::watch;
 use tokio::{
     sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
     time::timeout,
 };
+use tokio::{sync::watch, time::error::Elapsed};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 use super::{
@@ -31,10 +31,10 @@ use rand::{rngs::StdRng, Rng, SeedableRng};
 const MAX_SEND: u64 = 3;
 const ACK_WAIT_TIME: u64 = 200;
 const BACKOFF_SLOT_TIME: u64 = 95;
-const CHECK_RECEIVE_TIME: u64 = 5;
+const BACKOFF_MAX_FACTOR: u64 = 8;
 
 const DETECT_SIGNAL: Byte = 1;
-const ENERGE_LIMIT: f32 = 0.0001;
+const ENERGE_LIMIT: f32 = 0.005;
 
 #[derive(PartialEq)]
 enum TimerType {
@@ -68,6 +68,11 @@ impl RecordTimer {
 
         self.duration = match timer_type {
             TimerType::BACKOFF => {
+                let factor = if factor > BACKOFF_MAX_FACTOR {
+                    BACKOFF_MAX_FACTOR
+                } else {
+                    factor
+                };
                 let slot_times: u64 = self.rng.gen_range(0..=factor);
                 Duration::from_millis(BACKOFF_SLOT_TIME * slot_times)
             }
@@ -132,6 +137,7 @@ impl MacController {
         let main_task = tokio::spawn(async move {
             let mut received: Vec<Byte> = vec![];
             let mut retry_times: u64 = 0;
+            let mut resend_times: u64 = 0;
             let ack_frame = sender.generate_ack_frame(dest);
             let send_frame = sender.generate_data_frames(send_data, dest);
             let mut cur_send_frame: usize = 0;
@@ -154,6 +160,7 @@ impl MacController {
                                 send_padding = false;
                             } else if send_frame.len() >= cur_send_frame {
                                 retry_times = 0;
+                                resend_times = 0;
                                 println!("send frame {} success", cur_send_frame);
                                 timer.start(TimerType::BACKOFF, retry_times);
                             }
@@ -228,7 +235,8 @@ impl MacController {
                                     "[MacController]: busy channel, send frame {} failed, set backoff",
                                     cur_send_frame
                                 );
-                                timer.start(TimerType::BACKOFF, retry_times);
+                                resend_times += 1;
+                                timer.start(TimerType::BACKOFF, retry_times + resend_times);
                             }
                         }
                         _ => {}
