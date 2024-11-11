@@ -134,10 +134,8 @@ pub async fn obj_2_send() -> Result<u32> {
     let mut data: Vec<u8> = vec![];
     file.read_to_end(&mut data)?;
 
-    // println!("init");
     let mut mac_controller = MacController::new(CONFIG_FILE, SENDER_ADDRESS);
     let mut tmp = vec![];
-    // println!("mac init complete");
     let _ = mac_controller
         .task(&mut tmp, 0, data, RECEIVER_ADDRESS)
         .await;
