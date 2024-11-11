@@ -158,7 +158,7 @@ pub async fn obj_2_recv() -> Result<u32> {
 
     let mut decoded_data = vec![];
     let mut mac_controller = MacController::new(CONFIG_FILE, RECEIVER_ADDRESS);
-    let task_handle = mac_controller
+    let _ = mac_controller
         .task(&mut decoded_data, RECEIVE_BYTE_NUM, vec![], SENDER_ADDRESS)
         .await;
 
@@ -279,9 +279,7 @@ pub async fn pa2(sel: i32, additional_type: &str) -> Result<u32> {
                 }
             },
             "recv" => match obj_2_recv().await {
-                Ok(_) => {
-                    process::exit(9);
-                }
+                Ok(_) => {}
                 Err(e) => {
                     println!("Error: {}", e);
                 }
