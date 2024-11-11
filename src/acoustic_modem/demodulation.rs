@@ -473,7 +473,6 @@ impl Demodulation2 {
                     let window = &tmp_buffer.as_slices().0[i..i + demodulate_config.preamble_len];
                     let dot_product = dot_product(window, &demodulate_config.preamble);
                     if dot_product > local_max && dot_product > power_lim_preamble {
-                        // println!("detected");
                         local_max = dot_product;
                         // println!("local max: {}", local_max);
                         start_index = i + 1;
