@@ -616,7 +616,7 @@ fn decode(input_data: Vec<Bit>) -> Result<(Vec<Byte>, usize), Error> {
             return Err(Error::msg("[Demodulation]: !!! Length wrong"));
         }
 
-        println!("[Demodulation]: received right data");
+        // println!("[Demodulation]: received right data");
         Ok((
             compressed_data[phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING / 8
                 ..(phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING + length) / 8]
