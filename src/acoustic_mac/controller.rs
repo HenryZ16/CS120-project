@@ -153,9 +153,10 @@ impl MacController {
                             cur_frame += 1;
                             if cur_frame == send_frame.len() {
                                 send_padding = false;
+                            } else if send_frame.len() >= cur_frame {
+                                retry_times = 0;
+                                timer.start(TimerType::BACKOFF, retry_times);
                             }
-                            retry_times = 0;
-                            timer.start(TimerType::BACKOFF, retry_times);
                         } else {
                             received.extend_from_slice(MACFrame::get_payload(&data));
                             if received.len() >= receive_byte_num {
