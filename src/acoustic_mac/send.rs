@@ -69,9 +69,7 @@ impl MacSender {
     }
 
     pub fn generate_ack_frame(&mut self, dest: u8) -> MACFrame {
-        let mut frame = MACFrame::new(dest, self.address, mac_frame::MACType::Ack, vec![]);
-        frame.set_frame_id(self.inc_frame_id());
-        frame
+        MACFrame::new(dest, self.address, mac_frame::MACType::Ack, vec![])
     }
 
     // we need modulator to determine the ofdm carrier cnt, then the length of the frame
