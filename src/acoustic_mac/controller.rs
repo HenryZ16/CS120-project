@@ -146,11 +146,11 @@ impl MacController {
             }
             while send_padding || recv_padding {
                 if let Ok(data) = decoded_data_rx.try_recv() {
-                    println!("[MacController]: received decoded data");
+                    // println!("[MacController]: received decoded data");
                     // check data type
                     if mac_frame::MACFrame::get_dst(&data) == mac_address {
                         if mac_frame::MACFrame::get_type(&data) == MACType::Ack {
-                            println!("[MacController]: received ACK, set backoff");
+                            // println!("[MacController]: received ACK, set backoff");
                             cur_send_frame += 1;
                             if cur_send_frame == send_frame.len() {
                                 send_padding = false;
@@ -159,29 +159,26 @@ impl MacController {
                                 timer.start(TimerType::BACKOFF, retry_times);
                             }
                         } else {
+                            MacController::send_frame(
+                                &demodulate_status_tx,
+                                &mut detector,
+                                &mut sender,
+                                &ack_frame,
+                                false,
+                            )
+                            .await;
                             if (cur_recv_frame & 0xFF) as u8 == MACFrame::get_frame_id(&data) {
+                                println!("[MacController]: received frame id: {}", cur_recv_frame);
                                 cur_recv_frame += 1;
                                 received.extend_from_slice(MACFrame::get_payload(&data));
                                 if received.len() >= receive_byte_num {
                                     recv_padding = false;
                                 }
                                 // println!("received: {:?}", received);
-
-                                if MacController::send_frame(
-                                    &demodulate_status_tx,
-                                    &mut detector,
-                                    &mut sender,
-                                    &ack_frame,
-                                    false,
-                                )
-                                .await
-                                {
-                                    println!("[MacController]: received data and send ACK");
-                                }
                             } else {
                                 println!(
                                     "[MacController]: duplicated data of frame id: {}",
-                                    cur_recv_frame
+                                    cur_recv_frame - 1
                                 );
                             }
                         }
@@ -224,10 +221,10 @@ impl MacController {
                             )
                             .await
                             {
-                                println!(
-                                    "[MacController]: send frame {} successfully",
-                                    cur_send_frame
-                                );
+                                // println!(
+                                //     "[MacController]: send frame {} successfully",
+                                //     cur_send_frame
+                                // );
                                 timer.start(TimerType::ACK, retry_times);
                             } else {
                                 println!(
@@ -279,7 +276,7 @@ impl MacController {
         to_send_frame: &MACFrame,
         to_detect: bool,
     ) -> bool {
-        println!("start send");
+        // println!("start send");
         // demodulator close
         let _ = demodulate_status_tx.send(SwitchSignal::StopSignal);
 
