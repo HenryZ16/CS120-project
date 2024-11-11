@@ -28,9 +28,9 @@ use super::{
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
-const MAX_SEND: u64 = 8;
-const ACK_WAIT_TIME: u64 = 75;
-const BACKOFF_SLOT_TIME: u64 = 90;
+const MAX_SEND: u64 = 3;
+const ACK_WAIT_TIME: u64 = 150;
+const BACKOFF_SLOT_TIME: u64 = 95;
 const CHECK_RECEIVE_TIME: u64 = 5;
 
 const DETECT_SIGNAL: Byte = 1;
@@ -146,16 +146,15 @@ impl MacController {
             }
             while send_padding || recv_padding {
                 if let Ok(data) = decoded_data_rx.try_recv() {
-                    println!("[MacController]: received decoded data");
                     // check data type
                     if mac_frame::MACFrame::get_dst(&data) == mac_address {
                         if mac_frame::MACFrame::get_type(&data) == MACType::Ack {
-                            println!("[MacController]: received ACK, set backoff");
                             cur_send_frame += 1;
                             if cur_send_frame == send_frame.len() {
                                 send_padding = false;
                             } else if send_frame.len() >= cur_send_frame {
                                 retry_times = 0;
+                                println!("send frame {} success", cur_send_frame);
                                 timer.start(TimerType::BACKOFF, retry_times);
                             }
                         } else {
@@ -165,25 +164,20 @@ impl MacController {
                                 if received.len() >= receive_byte_num {
                                     recv_padding = false;
                                 }
-                                // println!("received: {:?}", received);
-
-                                if MacController::send_frame(
-                                    &demodulate_status_tx,
-                                    &mut detector,
-                                    &mut sender,
-                                    &ack_frame,
-                                    false,
-                                )
-                                .await
-                                {
-                                    println!("[MacController]: received data and send ACK");
-                                }
                             } else {
                                 println!(
                                     "[MacController]: duplicated data of frame id: {}",
                                     cur_recv_frame
                                 );
                             }
+                            MacController::send_frame(
+                                &demodulate_status_tx,
+                                &mut detector,
+                                &mut sender,
+                                &ack_frame,
+                                false,
+                            )
+                            .await;
                         }
                     } else {
                         println!(
@@ -196,19 +190,13 @@ impl MacController {
                 if timer.is_timeout() {
                     match timer.timer_type {
                         TimerType::ACK => {
-                            println!("[MacController]: ACK timeout times: {}", retry_times);
+                            println!(
+                                "[MacController]: ACK timeout times: {} on frame {}",
+                                retry_times, cur_send_frame
+                            );
                             retry_times += 1;
                             if retry_times >= MAX_SEND {
                                 return Err(Error::msg("link error"));
-
-                                // performance
-                                // retry_times = 0;
-                                // timer.start(TimerType::BACKOFF, retry_times);
-                                // cur_frame += 1;
-                                // if cur_frame == send_frame.len() {
-                                //     return Err(Error::msg("link error"));
-                                // }
-                                // continue;
                             }
 
                             timer.start(TimerType::BACKOFF, retry_times);
@@ -224,10 +212,6 @@ impl MacController {
                             )
                             .await
                             {
-                                println!(
-                                    "[MacController]: send frame {} successfully",
-                                    cur_send_frame
-                                );
                                 timer.start(TimerType::ACK, retry_times);
                             } else {
                                 println!(
@@ -249,7 +233,6 @@ impl MacController {
             _ = _listen_task => {vec![]}
             Ok(data) = main_task => {
                 if let Ok(data) = data{
-                    println!("return successfully");
                     data
                 }
                 else
@@ -260,7 +243,7 @@ impl MacController {
             }
         };
         receive_output.extend(handle.iter());
-        println!("[MacController]: task end");
+        println!("[MacController] task end");
         Ok(())
     }
 
@@ -279,7 +262,6 @@ impl MacController {
         to_send_frame: &MACFrame,
         to_detect: bool,
     ) -> bool {
-        println!("start send");
         // demodulator close
         let _ = demodulate_status_tx.send(SwitchSignal::StopSignal);
 
