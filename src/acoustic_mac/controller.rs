@@ -125,8 +125,8 @@ impl MacController {
         // setup timer
         let mut timer = RecordTimer::new();
 
-        let mut send_padding: bool = true;
-        let mut recv_padding: bool = true;
+        let mut send_padding: bool = false;
+        let mut recv_padding: bool = false;
         let mac_address = self.mac_address;
         println!("set up time: {:?}", start.elapsed());
         let main_task = tokio::spawn(async move {
@@ -138,19 +138,12 @@ impl MacController {
             let mut cur_frame: usize = 0;
             if send_frame.len() > 0 {
                 timer.start(TimerType::BACKOFF, retry_times);
-                // send_padding = true;
+                send_padding = true;
+            }
+            if receive_byte_num > 0 {
+                recv_padding = true;
             }
             while send_padding || recv_padding {
-                // let _ = MacController::send_frame(
-                //     &demodulate_status_tx,
-                //     &mut detector,
-                //     &mut sender,
-                //     &ack_frame,
-                //     true,
-                // )
-                // .await;
-                // println!("wait task trigger");
-                // println!("channel is closed: {}", decoded_data_rx.is_closed());
                 if let Ok(data) = decoded_data_rx.try_recv() {
                     println!("[MacController]: received decoded data");
                     // check data type
@@ -168,7 +161,7 @@ impl MacController {
                             if received.len() >= receive_byte_num {
                                 recv_padding = false;
                             }
-                            println!("received: {:?}", received);
+                            // println!("received: {:?}", received);
 
                             if MacController::send_frame(
                                 &demodulate_status_tx,
@@ -215,8 +208,8 @@ impl MacController {
                                 &demodulate_status_tx,
                                 &mut detector,
                                 &mut sender,
-                                // &send_frame[cur_frame],
-                                &ack_frame,
+                                &send_frame[cur_frame],
+                                // &ack_frame,
                                 false,
                             )
                             .await
