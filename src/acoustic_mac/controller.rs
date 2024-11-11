@@ -28,9 +28,9 @@ use super::{
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
-const MAX_SEND: u64 = 3;
-const ACK_WAIT_TIME: u64 = 200;
-const BACKOFF_SLOT_TIME: u64 = 95;
+const MAX_SEND: u64 = 6;
+const ACK_WAIT_TIME: u64 = 120;
+const BACKOFF_SLOT_TIME: u64 = 110;
 const BACKOFF_MAX_FACTOR: u64 = 8;
 
 const DETECT_SIGNAL: Byte = 1;
@@ -354,10 +354,7 @@ impl MacDetector {
         loop {
             tokio::select! {
                 _ = request_rx.recv() => {
-                    if sample.len() == 0{
-                        sample = sample_stream.next().await.unwrap();
-                    }
-                    let _ = result_tx.send(mem::replace(&mut sample, vec![]));
+                    let _ = result_tx.send(sample_stream.next().await.unwrap());
                 }
 
                 Some(data) = sample_stream.next() =>{
