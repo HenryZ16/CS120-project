@@ -31,7 +31,7 @@ use rand::{rngs::StdRng, Rng, SeedableRng};
 const MAX_SEND: u64 = 6;
 const ACK_WAIT_TIME: u64 = 120;
 const BACKOFF_SLOT_TIME: u64 = 113;
-const BACKOFF_MAX_FACTOR: u64 = 8;
+const BACKOFF_MAX_FACTOR: u64 = 10;
 
 const DETECT_SIGNAL: Byte = 1;
 const ENERGE_LIMIT: f32 = 0.005;
@@ -63,7 +63,7 @@ impl RecordTimer {
     }
 
     // arg: duration in ms
-    fn start(&mut self, timer_type: TimerType, factor: u64) {
+    fn start(&mut self, timer_type: TimerType, factor: u64, continue_sends: u64) {
         self.start_instant = Instant::now();
 
         self.duration = match timer_type {
@@ -74,7 +74,9 @@ impl RecordTimer {
                     factor
                 };
                 let slot_times: u64 = self.rng.gen_range(0..=factor + 2);
-                Duration::from_millis(BACKOFF_SLOT_TIME * slot_times)
+                Duration::from_millis(
+                    BACKOFF_SLOT_TIME * slot_times * ((continue_sends > 4) as u64 + 1),
+                )
             }
             TimerType::ACK => Duration::from_millis(ACK_WAIT_TIME),
             _ => Duration::from_micros(1),
@@ -138,13 +140,14 @@ impl MacController {
             let mut received: Vec<Byte> = vec![];
             let mut retry_times: u64 = 0;
             let mut resend_times: u64 = 0;
+            let mut continue_sends: u64 = 0;
             let ack_frame = sender.generate_ack_frame(dest);
             let send_frame = sender.generate_data_frames(send_data, dest);
             let mut cur_send_frame: usize = 0;
             let mut cur_recv_frame: usize = 0;
 
             if send_frame.len() > 0 {
-                timer.start(TimerType::BACKOFF, retry_times);
+                timer.start(TimerType::BACKOFF, retry_times, continue_sends);
                 send_padding = true;
             }
             if receive_byte_num > 0 {
@@ -161,8 +164,9 @@ impl MacController {
                             } else if send_frame.len() >= cur_send_frame {
                                 retry_times = 0;
                                 resend_times = 0;
+                                continue_sends += 1;
                                 println!("send frame {} success", cur_send_frame);
-                                timer.start(TimerType::BACKOFF, retry_times);
+                                timer.start(TimerType::BACKOFF, retry_times, continue_sends);
                             }
                         } else {
                             MacController::send_frame(
@@ -176,6 +180,7 @@ impl MacController {
                             if (cur_recv_frame & 0xFF) as u8 == MACFrame::get_frame_id(&data) {
                                 println!("[MacController]: received frame id: {}", cur_recv_frame);
                                 cur_recv_frame += 1;
+                                continue_sends = 0;
                                 received.extend_from_slice(MACFrame::get_payload(&data));
                                 if received.len() >= receive_byte_num {
                                     recv_padding = false;
@@ -216,7 +221,7 @@ impl MacController {
                                 // continue;
                             }
 
-                            timer.start(TimerType::BACKOFF, retry_times);
+                            timer.start(TimerType::BACKOFF, retry_times, continue_sends);
                         }
                         TimerType::BACKOFF => {
                             if MacController::send_frame(
@@ -229,14 +234,18 @@ impl MacController {
                             )
                             .await
                             {
-                                timer.start(TimerType::ACK, retry_times);
+                                timer.start(TimerType::ACK, retry_times, continue_sends);
                             } else {
                                 println!(
                                     "[MacController]: busy channel, send frame {} failed, set backoff",
                                     cur_send_frame
                                 );
                                 resend_times += 1;
-                                timer.start(TimerType::BACKOFF, retry_times + resend_times);
+                                timer.start(
+                                    TimerType::BACKOFF,
+                                    retry_times + resend_times,
+                                    continue_sends,
+                                );
                             }
                         }
                         _ => {}
