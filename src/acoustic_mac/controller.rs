@@ -29,7 +29,7 @@ use rand::{rngs::StdRng, Rng, SeedableRng};
 
 const MAX_SEND: u64 = 8;
 const ACK_WAIT_TIME: u64 = 1000;
-const BACKOFF_SLOT_TIME: u64 = 85;
+const BACKOFF_SLOT_TIME: u64 = 1000;
 const CHECK_RECEIVE_TIME: u64 = 5;
 
 #[derive(PartialEq)]
@@ -189,16 +189,16 @@ impl MacController {
                             println!("[MacController]: ACK timeout times: {}", retry_times);
                             retry_times += 1;
                             if retry_times >= MAX_SEND {
-                                return Err(Error::msg("link error"));
+                                // return Err(Error::msg("link error"));
 
                                 // performance
-                                // retry_times = 0;
-                                // timer.start(TimerType::BACKOFF, retry_times);
-                                // cur_frame += 1;
-                                // if cur_frame == send_frame.len() {
-                                //     return Err(Error::msg("link error"));
-                                // }
-                                // continue;
+                                retry_times = 0;
+                                timer.start(TimerType::BACKOFF, retry_times);
+                                cur_frame += 1;
+                                if cur_frame == send_frame.len() {
+                                    return Err(Error::msg("link error"));
+                                }
+                                continue;
                             }
 
                             timer.start(TimerType::BACKOFF, retry_times);

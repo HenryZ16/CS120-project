@@ -231,7 +231,6 @@ where
     pub fn new(device: &Device, config: SupportedStreamConfig) -> Self {
         let device = device.clone();
         let (sender, mut receiver) = mpsc::unbounded_channel::<(AudioTrack<I>, Sender<()>)>();
-
         task::spawn_blocking(move || {
             while let Some((track, sender)) = receiver.blocking_recv() {
                 let (_stream, handle) =
@@ -240,6 +239,7 @@ where
                 sink.append(track);
                 sink.sleep_until_end();
                 sender.send(()).unwrap();
+                std::thread::sleep(Duration::from_millis(15));
             }
         });
 

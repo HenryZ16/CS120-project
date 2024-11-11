@@ -44,7 +44,6 @@ impl MacSender {
 
     pub async fn send_frame(&mut self, frame: &MACFrame) {
         let bits = frame.get_whole_frame_bits();
-        // println!("[MacSender::send_frame] bits: {:?}", bits);
         self.modulator
             .send_single_ofdm_frame(bits.clone(), bits.len() as isize * 8)
             .await;
