@@ -34,7 +34,7 @@ const BACKOFF_SLOT_TIME: u64 = 95;
 const CHECK_RECEIVE_TIME: u64 = 5;
 
 const DETECT_SIGNAL: Byte = 1;
-const ENERGE_LIMIT: f32 = 0.3;
+const ENERGE_LIMIT: f32 = 0.0001;
 
 #[derive(PartialEq)]
 enum TimerType {
@@ -198,6 +198,15 @@ impl MacController {
                             retry_times += 1;
                             if retry_times >= MAX_SEND {
                                 return Err(Error::msg("link error"));
+
+                                // for test
+                                // retry_times = 0;
+                                // timer.start(TimerType::BACKOFF, retry_times);
+                                // cur_send_frame += 1;
+                                // if cur_send_frame == send_frame.len() {
+                                //     return Err(Error::msg("link error"));
+                                // }
+                                // continue;
                             }
 
                             timer.start(TimerType::BACKOFF, retry_times);
@@ -209,7 +218,7 @@ impl MacController {
                                 &mut sender,
                                 &send_frame[cur_send_frame],
                                 // &ack_frame,
-                                false,
+                                true,
                             )
                             .await
                             {
@@ -337,9 +346,9 @@ impl MacDetector {
         loop {
             tokio::select! {
                 _ = request_rx.recv() => {
-                    // if sample.len() == 0{
-                    //     sample = sample_stream.next().await.unwrap();
-                    // }
+                    if sample.len() == 0{
+                        sample = sample_stream.next().await.unwrap();
+                    }
                     let _ = result_tx.send(mem::replace(&mut sample, vec![]));
                 }
 

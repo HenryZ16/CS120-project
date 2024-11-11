@@ -15,8 +15,13 @@ use tokio::time::timeout;
 use tokio::time::{self, Duration};
 const CONFIG_FILE: &str = "configuration/pa2.yml";
 
+const RECEIVE_BYTE_NUM: usize = 6250;
+
 const SENDER_ADDRESS: MacAddress = 1;
 const RECEIVER_ADDRESS: MacAddress = 2;
+
+const NODE_0_ADDRESS: MacAddress = 1;
+const NODE_1_ADDRESS: MacAddress = 2;
 
 pub async fn obj_1_mac_send() -> Result<u32> {
     let address = 0x33;
@@ -35,6 +40,7 @@ pub async fn obj_1_mac_send() -> Result<u32> {
     let frames = sender.generate_data_frames(data, dest);
     for frame in &frames {
         sender.send_frame(frame).await;
+        sleep(Duration::from_secs(1)).await;
     }
     //sender.send_frame(&frames[0]).await;
 
@@ -153,7 +159,7 @@ pub async fn obj_2_recv() -> Result<u32> {
     let mut decoded_data = vec![];
     let mut mac_controller = MacController::new(CONFIG_FILE, RECEIVER_ADDRESS);
     let task_handle = mac_controller
-        .task(&mut decoded_data, 6250, vec![], SENDER_ADDRESS)
+        .task(&mut decoded_data, RECEIVE_BYTE_NUM, vec![], SENDER_ADDRESS)
         .await;
 
     // let _handle = timeout(Duration::from_secs(20), task_handle).await;
@@ -165,6 +171,45 @@ pub async fn obj_2_recv() -> Result<u32> {
         "[pa2-obj2-receive] Total elapsed time: {:?}",
         t_start.elapsed()
     );
+    Ok(0)
+}
+
+pub async fn obj_3(node_name: bool) -> Result<u32> {
+    let t_start = Instant::now();
+
+    let mut decoded_data = vec![];
+    let mut mac_controller = MacController::new(
+        CONFIG_FILE,
+        if node_name == false {
+            NODE_0_ADDRESS
+        } else {
+            NODE_1_ADDRESS
+        },
+    );
+    // read data from testset/data.bin
+    let mut file = File::open("testset/data.bin")?;
+    let mut data: Vec<u8> = vec![];
+    file.read_to_end(&mut data)?;
+
+    let _task_handle = mac_controller
+        .task(
+            &mut decoded_data,
+            RECEIVE_BYTE_NUM,
+            data,
+            if node_name == true {
+                NODE_0_ADDRESS
+            } else {
+                NODE_1_ADDRESS
+            },
+        )
+        .await;
+
+    let mut file = File::create("testset/output.txt").unwrap();
+    // file.write_all(&decoded_data).unwrap();
+    file.write_all(&mut decoded_data).unwrap();
+
+    println!("[pa2-obj3] Total elapsed time: {:?}", t_start.elapsed());
+
     Ok(0)
 }
 
@@ -241,9 +286,32 @@ pub async fn pa2(sel: i32, additional_type: &str) -> Result<u32> {
                     println!("Error: {}", e);
                 }
             },
-            _ => {}
+            _ => {
+                println!("Unsupported function.");
+            }
         }
         println!("Objective 2 end")
+    }
+
+    if sel == 0 || sel == 3 {
+        println!("Objective 3 start");
+        match additional_type {
+            "node0" => match obj_3(false).await {
+                Ok(_) => {}
+                Err(e) => {
+                    println!("Error: {}", e);
+                }
+            },
+            "node1" => match obj_3(true).await {
+                Ok(_) => {}
+                Err(e) => {
+                    println!("Error: {}", e);
+                }
+            },
+            _ => {
+                println!("Unsupported function.");
+            }
+        }
     }
 
     return Ok(0);
