@@ -131,11 +131,12 @@ impl MacController {
         println!("set up time: {:?}", start.elapsed());
         let main_task = tokio::spawn(async move {
             let mut received: Vec<Byte> = vec![];
-            // let mut decode_stream = UnboundedReceiverStream::new(decoded_data_rx);
             let mut retry_times: u64 = 0;
             let ack_frame = sender.generate_ack_frame(dest);
             let send_frame = sender.generate_data_frames(send_data, dest);
-            let mut cur_frame: usize = 0;
+            let mut cur_send_frame: usize = 0;
+            let mut cur_recv_frame: usize = 0;
+
             if send_frame.len() > 0 {
                 timer.start(TimerType::BACKOFF, retry_times);
                 send_padding = true;
@@ -150,30 +151,38 @@ impl MacController {
                     if mac_frame::MACFrame::get_dst(&data) == mac_address {
                         if mac_frame::MACFrame::get_type(&data) == MACType::Ack {
                             println!("[MacController]: received ACK, set backoff");
-                            cur_frame += 1;
-                            if cur_frame == send_frame.len() {
+                            cur_send_frame += 1;
+                            if cur_send_frame == send_frame.len() {
                                 send_padding = false;
-                            } else if send_frame.len() >= cur_frame {
+                            } else if send_frame.len() >= cur_send_frame {
                                 retry_times = 0;
                                 timer.start(TimerType::BACKOFF, retry_times);
                             }
                         } else {
-                            received.extend_from_slice(MACFrame::get_payload(&data));
-                            if received.len() >= receive_byte_num {
-                                recv_padding = false;
-                            }
-                            // println!("received: {:?}", received);
+                            if (cur_recv_frame & 0xFF) as u8 == MACFrame::get_frame_id(&data) {
+                                cur_recv_frame += 1;
+                                received.extend_from_slice(MACFrame::get_payload(&data));
+                                if received.len() >= receive_byte_num {
+                                    recv_padding = false;
+                                }
+                                // println!("received: {:?}", received);
 
-                            if MacController::send_frame(
-                                &demodulate_status_tx,
-                                &mut detector,
-                                &mut sender,
-                                &ack_frame,
-                                false,
-                            )
-                            .await
-                            {
-                                println!("[MacController]: received data and send ACK");
+                                if MacController::send_frame(
+                                    &demodulate_status_tx,
+                                    &mut detector,
+                                    &mut sender,
+                                    &ack_frame,
+                                    false,
+                                )
+                                .await
+                                {
+                                    println!("[MacController]: received data and send ACK");
+                                }
+                            } else {
+                                println!(
+                                    "[MacController]: duplicated data of frame id: {}",
+                                    cur_recv_frame
+                                );
                             }
                         }
                     } else {
@@ -209,18 +218,21 @@ impl MacController {
                                 &demodulate_status_tx,
                                 &mut detector,
                                 &mut sender,
-                                &send_frame[cur_frame],
+                                &send_frame[cur_send_frame],
                                 // &ack_frame,
                                 false,
                             )
                             .await
                             {
-                                println!("[MacController]: send frame {} successfully", cur_frame);
+                                println!(
+                                    "[MacController]: send frame {} successfully",
+                                    cur_send_frame
+                                );
                                 timer.start(TimerType::ACK, retry_times);
                             } else {
                                 println!(
                                     "[MacController]: send frame {} failed, set backoff",
-                                    cur_frame
+                                    cur_send_frame
                                 );
                                 timer.start(TimerType::BACKOFF, retry_times);
                             }

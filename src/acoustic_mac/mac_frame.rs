@@ -1,5 +1,7 @@
+use plotters::data;
+
 use crate::utils::{Bit, Byte};
-use std::vec;
+use std::{io::Bytes, vec};
 
 // Frame:: [dest][src][type][payload]
 pub type MacAddress = Byte;
@@ -53,8 +55,8 @@ impl MACFrame {
         return res;
     }
 
-    pub fn get_frame_id(&self) -> Byte {
-        self.frame_id
+    pub fn get_frame_id(data: &[Byte]) -> Byte {
+        data[0]
     }
 
     pub fn set_frame_id(&mut self, frame_id: Byte) {
@@ -62,18 +64,18 @@ impl MACFrame {
     }
 
     pub fn get_dst(data: &[Byte]) -> MacAddress {
-        data[0]
-    }
-
-    pub fn get_src(data: &[Byte]) -> MacAddress {
         data[1]
     }
 
+    pub fn get_src(data: &[Byte]) -> MacAddress {
+        data[2]
+    }
+
     pub fn get_type(data: &[Byte]) -> MACType {
-        u8_2_mactype(data[2])
+        u8_2_mactype(data[3])
     }
 
     pub fn get_payload(data: &[Byte]) -> &[Byte] {
-        &data[3..data.len()]
+        &data[4..data.len()]
     }
 }
