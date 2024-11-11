@@ -179,14 +179,6 @@ impl MacController {
                                     cur_recv_frame - 1
                                 );
                             }
-                            MacController::send_frame(
-                                &demodulate_status_tx,
-                                &mut detector,
-                                &mut sender,
-                                &ack_frame,
-                                false,
-                            )
-                            .await;
                         }
                     } else {
                         println!(
