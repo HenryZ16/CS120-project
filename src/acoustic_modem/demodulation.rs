@@ -477,9 +477,9 @@ impl Demodulation2 {
                 for i in 0..tmp_buffer_len - demodulate_config.preamble_len - 1 {
                     let window = &tmp_buffer.as_slices().0[i..i + demodulate_config.preamble_len];
                     let dot_product = dot_product(window, &demodulate_config.preamble);
-                    if dot_product > 20.0 {
-                        println!("preamble dot product: {}", dot_product);
-                    }
+                    // if dot_product > 20.0 {
+                    //     println!("preamble dot product: {}", dot_product);
+                    // }
                     if dot_product > local_max && dot_product > power_lim_preamble {
                         local_max = dot_product;
                         // println!("local max: {}", local_max);
