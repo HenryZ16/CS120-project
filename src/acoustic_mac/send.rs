@@ -22,7 +22,10 @@ impl MacSender {
         let config = PhyLayerGenerator::new_from_yaml(config_file);
         let (cpal_device, cpal_config) =
             crate::utils::get_audio_device_and_config(config.get_sample_rate());
-        let modulator = config.gen_modulator(cpal_device, cpal_config);
+        let mut modulator = config.gen_modulator(cpal_device, cpal_config);
+
+        // warm up
+        futures::executor::block_on(modulator.send_modulated_signal(vec![0.0; 10]));
 
         Self {
             modulator,
