@@ -225,7 +225,7 @@ impl MacController {
                                 timer.start(TimerType::ACK, retry_times);
                             } else {
                                 println!(
-                                    "[MacController]: send frame {} failed, set backoff",
+                                    "[MacController]: busy channel, send frame {} failed, set backoff",
                                     cur_send_frame
                                 );
                                 timer.start(TimerType::BACKOFF, retry_times);
