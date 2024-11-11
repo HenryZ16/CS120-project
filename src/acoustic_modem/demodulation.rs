@@ -438,15 +438,15 @@ impl Demodulation2 {
         let mut input_stream = self.input_config.create_input_stream();
         println!("listen daemon start");
         while let Some(data) = input_stream.next().await {
-            if demodulate_state == DemodulationState::Stop {
-                continue;
-            }
             if let Ok(signal) = state_rx.try_recv() {
                 match signal {
                     SwitchSignal::StopSignal => {
-                        tmp_buffer.clear();
-                        start_index = 0;
-                        demodulate_state = demodulate_state.stop();
+                        if demodulate_state != DemodulationState::Stop {
+                            tmp_buffer.clear();
+                            tmp_buffer_len = 0;
+                            start_index = 0;
+                            demodulate_state = demodulate_state.stop();
+                        }
                     }
                     SwitchSignal::ResumeSignal => {
                         demodulate_state = demodulate_state.resume();
@@ -455,6 +455,9 @@ impl Demodulation2 {
                         demodulate_state.switch();
                     }
                 }
+            }
+            if demodulate_state == DemodulationState::Stop {
+                continue;
             }
 
             // println!("data len: {}", data.len());
@@ -472,7 +475,6 @@ impl Demodulation2 {
                     let window = &tmp_buffer.as_slices().0[i..i + demodulate_config.preamble_len];
                     let dot_product = dot_product(window, &demodulate_config.preamble);
                     if dot_product > local_max && dot_product > power_lim_preamble {
-                        // println!("detected");
                         local_max = dot_product;
                         // println!("local max: {}", local_max);
                         start_index = i + 1;
