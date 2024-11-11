@@ -190,16 +190,16 @@ impl MacController {
                             println!("[MacController]: ACK timeout times: {}", retry_times);
                             retry_times += 1;
                             if retry_times >= MAX_SEND {
-                                // return Err(Error::msg("link error"));
+                                return Err(Error::msg("link error"));
 
                                 // performance
-                                retry_times = 0;
-                                timer.start(TimerType::BACKOFF, retry_times);
-                                cur_frame += 1;
-                                if cur_frame == send_frame.len() {
-                                    return Err(Error::msg("link error"));
-                                }
-                                continue;
+                                // retry_times = 0;
+                                // timer.start(TimerType::BACKOFF, retry_times);
+                                // cur_frame += 1;
+                                // if cur_frame == send_frame.len() {
+                                //     return Err(Error::msg("link error"));
+                                // }
+                                // continue;
                             }
 
                             timer.start(TimerType::BACKOFF, retry_times);

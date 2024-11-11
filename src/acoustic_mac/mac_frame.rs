@@ -4,6 +4,7 @@ use std::vec;
 // Frame:: [dest][src][type][payload]
 pub type MacAddress = Byte;
 pub struct MACFrame {
+    frame_id: Byte,
     dest: MacAddress,
     src: MacAddress,
     mac_type: Byte,
@@ -33,6 +34,7 @@ pub fn u8_2_mactype(byte: Byte) -> MACType {
 impl MACFrame {
     pub fn new(dest: Byte, src: Byte, mac_type: MACType, payload: Vec<Byte>) -> Self {
         MACFrame {
+            frame_id: 0,
             dest,
             src,
             mac_type: mactype_2_u8(mac_type),
@@ -41,7 +43,7 @@ impl MACFrame {
     }
 
     pub fn get_whole_frame_bits(&self) -> Vec<Byte> {
-        let mut res = vec![];
+        let mut res = vec![self.frame_id];
 
         res.push(self.dest);
         res.push(self.src);
@@ -49,6 +51,14 @@ impl MACFrame {
         res.extend(self.payload.clone());
 
         return res;
+    }
+
+    pub fn get_frame_id(&self) -> Byte {
+        self.frame_id
+    }
+
+    pub fn set_frame_id(&mut self, frame_id: Byte) {
+        self.frame_id = frame_id;
     }
 
     pub fn get_dst(data: &[Byte]) -> MacAddress {
