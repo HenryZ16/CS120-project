@@ -438,23 +438,24 @@ impl Demodulation2 {
         let mut input_stream = self.input_config.create_input_stream();
         println!("listen daemon start");
         while let Some(data) = input_stream.next().await {
-            if demodulate_state == DemodulationState::Stop {
-                continue;
-            }
             if let Ok(signal) = state_rx.try_recv() {
                 match signal {
                     SwitchSignal::StopSignal => {
-                        tmp_buffer.clear();
-                        start_index = 0;
                         demodulate_state = demodulate_state.stop();
                     }
                     SwitchSignal::ResumeSignal => {
+                        tmp_buffer.clear();
+                        tmp_buffer_len = 0;
+                        start_index = usize::MAX;
                         demodulate_state = demodulate_state.resume();
                     }
                     SwitchSignal::SwitchSignal => {
                         demodulate_state.switch();
                     }
                 }
+            }
+            if demodulate_state == DemodulationState::Stop {
+                continue;
             }
 
             // println!("data len: {}", data.len());

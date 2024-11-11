@@ -155,9 +155,11 @@ pub async fn obj_2_recv() -> Result<u32> {
 
     let mut decoded_data = vec![];
     let mut mac_controller = MacController::new(CONFIG_FILE, RECEIVER_ADDRESS);
-    let task_handle = mac_controller.task(&mut decoded_data, 6250, vec![], SENDER_ADDRESS);
+    let task_handle = mac_controller
+        .task(&mut decoded_data, 6250, vec![], SENDER_ADDRESS)
+        .await;
 
-    let _handle = timeout(Duration::from_secs(20), task_handle).await;
+    // let _handle = timeout(Duration::from_secs(20), task_handle).await;
     let mut file = File::create("testset/output.txt").unwrap();
     // file.write_all(&decoded_data).unwrap();
     file.write_all(&mut decoded_data).unwrap();

@@ -127,7 +127,7 @@ impl MacController {
         println!("set up time: {:?}", start.elapsed());
         let main_task = tokio::spawn(async move {
             let mut received: Vec<Byte> = vec![];
-            let mut decode_stream = UnboundedReceiverStream::new(decoded_data_rx);
+            // let mut decode_stream = UnboundedReceiverStream::new(decoded_data_rx);
             let mut retry_times: u64 = 0;
             let ack_frame = sender.generate_ack_frame(dest);
             let send_frame = sender.generate_data_frames(send_data, dest);
@@ -145,12 +145,7 @@ impl MacController {
                 //     false,
                 // )
                 // .await;
-                if let Ok(Some(data)) = timeout(
-                    Duration::from_millis(CHECK_RECEIVE_TIME),
-                    decode_stream.next(),
-                )
-                .await
-                {
+                if let Ok(data) = decoded_data_rx.try_recv() {
                     println!("[MacController]: received decoded data");
                     // check data type
                     if mac_frame::MACFrame::get_dst(&data) == mac_address {
@@ -168,15 +163,17 @@ impl MacController {
                                 recv_padding = false;
                             }
 
-                            println!("[MacController]: received data and send ACK");
-                            MacController::send_frame(
+                            if MacController::send_frame(
                                 &demodulate_status_tx,
                                 &mut detector,
                                 &mut sender,
                                 &ack_frame,
-                                false,
+                                true,
                             )
-                            .await;
+                            .await
+                            {
+                                println!("[MacController]: received data and send ACK");
+                            }
                         }
                     } else {
                         println!(
