@@ -35,7 +35,7 @@ pub async fn obj_1_mac_send() -> Result<u32> {
     let frames = sender.generate_data_frames(data, dest);
     for frame in &frames {
         sender.send_frame(frame).await;
-        println!("\n");
+        // println!("\n");
     }
     //sender.send_frame(&frames[0]).await;
 
@@ -116,7 +116,7 @@ pub async fn obj_1_recv_file() -> Result<u32> {
 
     let mut decoded_data = vec![];
     let handle = demodulator.listening(&mut decoded_data);
-    let handle = time::timeout(Duration::from_secs(10), handle);
+    // let handle = time::timeout(Duration::from_secs(10), handle);
     println!("[pa1-obj3-receive] Start");
     let _ = handle.await;
     let mut file = File::create("testset/output.txt").unwrap();

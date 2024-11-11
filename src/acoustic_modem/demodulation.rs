@@ -432,22 +432,26 @@ impl Demodulation2 {
         let mut tmp_bits_data = vec![Vec::with_capacity(payload_len); carrier_num];
 
         let mut is_reboot = false;
+        let mut input_stream: InputAudioStream = self.input_config.create_input_stream();
 
-        let mut last_frame_index = 0;
-
-        let mut input_stream = self.input_config.create_input_stream();
         println!("listen daemon start");
         while let Some(data) = input_stream.next().await {
+            // println!("demodulation running");
             if let Ok(signal) = state_rx.try_recv() {
                 match signal {
                     SwitchSignal::StopSignal => {
-                        demodulate_state = demodulate_state.stop();
-                    }
-                    SwitchSignal::ResumeSignal => {
+                        // println!("Stop signal");
                         tmp_buffer.clear();
                         tmp_buffer_len = 0;
                         start_index = usize::MAX;
                         local_max = 0.0;
+                        demodulate_state = demodulate_state.stop();
+                        tmp_bits_data = vec![Vec::with_capacity(payload_len); carrier_num];
+                        is_reboot = false;
+                        continue;
+                    }
+                    SwitchSignal::ResumeSignal => {
+                        // println!("Resume signal");
                         demodulate_state = demodulate_state.resume();
                     }
                     SwitchSignal::SwitchSignal => {
@@ -473,6 +477,9 @@ impl Demodulation2 {
                 for i in 0..tmp_buffer_len - demodulate_config.preamble_len - 1 {
                     let window = &tmp_buffer.as_slices().0[i..i + demodulate_config.preamble_len];
                     let dot_product = dot_product(window, &demodulate_config.preamble);
+                    if dot_product > 20.0 {
+                        println!("preamble dot product: {}", dot_product);
+                    }
                     if dot_product > local_max && dot_product > power_lim_preamble {
                         local_max = dot_product;
                         // println!("local max: {}", local_max);
@@ -483,16 +490,8 @@ impl Demodulation2 {
                         && i - start_index > demodulate_config.preamble_len
                         && local_max > power_lim_preamble
                     {
-                        // if ((last_frame_index + start_index) as isize
-                        //     - modulation::OFDM_FRAME_DISTANCE as isize)
-                        //     .abs()
-                        //     > 10
-                        // {
-                        //     println!("last frame distance: {}", last_frame_index + start_index);
-                        // }
                         start_index += demodulate_config.preamble_len - 1;
                         demodulate_state = demodulate_state.next();
-                        // println!("detected preamble");
                         // println!(
                         //     "start index: {}, tmp buffer len: {}, max: {}",
                         //     start_index, tmp_buffer_len, local_max
@@ -536,7 +535,6 @@ impl Demodulation2 {
             if tmp_bits_data[0].len() >= payload_len {
                 is_reboot = true;
                 demodulate_state = demodulate_state.next();
-                last_frame_index = 0;
                 let mut to_send: Vec<Byte> = vec![];
                 for k in 0..carrier_num {
                     // println!("data: {:?}", tmp_bits_data[k]);
@@ -569,9 +567,6 @@ impl Demodulation2 {
             } else {
                 start_index
             };
-            if !is_reboot {
-                last_frame_index += pop_times;
-            }
             for _ in 0..pop_times {
                 tmp_buffer.pop_front();
             }
@@ -603,7 +598,7 @@ fn decode(input_data: Vec<Bit>) -> Result<(Vec<Byte>, usize), Error> {
         let compressed_data = read_data_2_compressed_u8(input_data);
         if !PHYFrame::check_crc(&compressed_data) {
             // println!("wrong data: {:?}", compressed_data);
-            return Err(Error::msg("[Demodulation]: CRC wrong"));
+            return Err(Error::msg("[Demodulation]: !!! CRC wrong"));
         }
 
         let mut length = 0;
@@ -618,7 +613,7 @@ fn decode(input_data: Vec<Bit>) -> Result<(Vec<Byte>, usize), Error> {
                 phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING
             }
         {
-            return Err(Error::msg("[Demodulation]: Length wrong"));
+            return Err(Error::msg("[Demodulation]: !!! Length wrong"));
         }
 
         println!("[Demodulation]: received right data");
