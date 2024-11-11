@@ -1,4 +1,4 @@
-use std::{mem, vec};
+use std::{mem, u32, u64, vec};
 
 use crate::{
     acoustic_mac::mac_frame::{self, MACFrame},
@@ -15,6 +15,7 @@ use cpal::SupportedStreamConfig;
 use futures::StreamExt;
 use std::result::Result::Ok;
 use std::time::{Duration, Instant};
+use tokio::sync::watch;
 use tokio::{
     sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
     time::timeout,
@@ -31,6 +32,9 @@ const MAX_SEND: u64 = 8;
 const ACK_WAIT_TIME: u64 = 1000;
 const BACKOFF_SLOT_TIME: u64 = 1000;
 const CHECK_RECEIVE_TIME: u64 = 5;
+
+const DETECT_SIGNAL: Byte = 1;
+const ENERGE_LIMIT: f32 = 0.3;
 
 #[derive(PartialEq)]
 enum TimerType {
@@ -52,7 +56,7 @@ impl RecordTimer {
 
         Self {
             start_instant,
-            duration: Duration::new(0, 0),
+            duration: Duration::new(u64::MAX, 0),
             timer_type: TimerType::None,
             rng,
         }
@@ -142,9 +146,11 @@ impl MacController {
                 //     &mut detector,
                 //     &mut sender,
                 //     &ack_frame,
-                //     false,
+                //     true,
                 // )
                 // .await;
+                // println!("wait task trigger");
+                // println!("channel is closed: {}", decoded_data_rx.is_closed());
                 if let Ok(data) = decoded_data_rx.try_recv() {
                     println!("[MacController]: received decoded data");
                     // check data type
@@ -162,13 +168,14 @@ impl MacController {
                             if received.len() >= receive_byte_num {
                                 recv_padding = false;
                             }
+                            println!("received: {:?}", received);
 
                             if MacController::send_frame(
                                 &demodulate_status_tx,
                                 &mut detector,
                                 &mut sender,
                                 &ack_frame,
-                                true,
+                                false,
                             )
                             .await
                             {
@@ -208,7 +215,8 @@ impl MacController {
                                 &demodulate_status_tx,
                                 &mut detector,
                                 &mut sender,
-                                &send_frame[cur_frame],
+                                // &send_frame[cur_frame],
+                                &ack_frame,
                                 false,
                             )
                             .await
@@ -265,6 +273,7 @@ impl MacController {
         to_send_frame: &MACFrame,
         to_detect: bool,
     ) -> bool {
+        println!("start send");
         // demodulator close
         let _ = demodulate_status_tx.send(SwitchSignal::StopSignal);
 
@@ -287,17 +296,15 @@ impl MacController {
     }
 }
 
-const DETECT_SIGNAL: Byte = 1;
-const ENERGE_LIMIT: f32 = 0.001;
 pub struct MacDetector {
     request_tx: UnboundedSender<Byte>,
-    result_rx: UnboundedReceiver<Vec<f32>>,
+    result_rx: watch::Receiver<Vec<f32>>,
 }
 
 impl MacDetector {
-    pub async fn new() -> (Self, UnboundedReceiver<Byte>, UnboundedSender<Vec<f32>>) {
+    pub async fn new() -> (Self, UnboundedReceiver<Byte>, watch::Sender<Vec<f32>>) {
         let (request_tx, request_rx) = unbounded_channel::<Byte>();
-        let (result_tx, result_rx) = unbounded_channel();
+        let (result_tx, result_rx) = watch::channel(vec![1e-5 as f32]);
 
         (
             Self {
@@ -313,24 +320,24 @@ impl MacDetector {
         let _ = self.request_tx.send(DETECT_SIGNAL);
         // println!("send request");
         // println!("channel active: {:?}", !self.result_rx.is_closed());
-        self.clear();
-        if let Some(samples) = self.result_rx.recv().await {
-            // println!("data len: {}", samples.len());
-            if calculate_energy(&samples) < ENERGE_LIMIT {
-                return true;
-            }
+        // self.clear();
+        // if let Some(samples) = self.result_rx.borrow() {
+        // println!("data len: {}", samples.len());
+        if calculate_energy((*self.result_rx.borrow()).as_slice()) < ENERGE_LIMIT {
+            return true;
         }
+        // }
 
         return false;
     }
 
-    fn clear(&mut self) {
-        while self.result_rx.try_recv().is_ok() {}
-    }
+    // fn clear(&mut self) {
+    //     while self.result_rx.try_recv().is_ok() {}
+    // }
 
     pub async fn daemon(
         mut request_rx: UnboundedReceiver<Byte>,
-        result_tx: UnboundedSender<Vec<f32>>,
+        result_tx: watch::Sender<Vec<f32>>,
         device: Device,
         config: SupportedStreamConfig,
     ) {
@@ -341,9 +348,9 @@ impl MacDetector {
         loop {
             tokio::select! {
                 _ = request_rx.recv() => {
-                    if sample.len() == 0{
-                        sample = sample_stream.next().await.unwrap();
-                    }
+                    // if sample.len() == 0{
+                    //     sample = sample_stream.next().await.unwrap();
+                    // }
                     let _ = result_tx.send(mem::replace(&mut sample, vec![]));
                 }
 
