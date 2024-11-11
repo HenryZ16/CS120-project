@@ -447,6 +447,7 @@ impl Demodulation2 {
                         tmp_buffer.clear();
                         tmp_buffer_len = 0;
                         start_index = usize::MAX;
+                        local_max = 0.0;
                         demodulate_state = demodulate_state.resume();
                     }
                     SwitchSignal::SwitchSignal => {
