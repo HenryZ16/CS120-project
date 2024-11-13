@@ -309,12 +309,16 @@ where
 
 pub fn show_devices() {
     // show available devices
-    // let host = cpal::host_from_id(cpal::HostId::Asio).expect("failed to initialise ASIO host");
-    let host = cpal::default_host();
+    let host = cpal::host_from_id(cpal::HostId::Asio).expect("failed to initialise ASIO host");
+    // let host = cpal::default_host();
     let devices = host.devices().unwrap();
     println!("Available ASIO devices:");
     for device in devices {
         println!("  {:?}", device.name().unwrap());
+        let support_config = device.supported_input_configs().unwrap();
+        for config in support_config {
+            println!("{:?}", config);
+        }
     }
 }
 
