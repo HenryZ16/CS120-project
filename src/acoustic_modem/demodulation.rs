@@ -655,6 +655,8 @@ fn decode_ack_support(input_data: Vec<Bit>, is_ack: bool) -> Result<(Vec<Byte>, 
     } else {
         let compressed_data = read_data_2_compressed_u8(input_data);
         if !PHYFrame::check_crc(&compressed_data) {
+            println!("wrong data: {:?}", compressed_data);
+
             return Err(Error::msg("[Demodulation]: !!! CRC wrong"));
         }
 

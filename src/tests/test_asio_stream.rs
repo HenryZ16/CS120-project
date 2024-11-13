@@ -1,7 +1,8 @@
-use crate::asio_stream::InputAudioStream;
+use crate::asio_stream::{AudioTrack, InputAudioStream, OutputAudioStream};
 use cpal;
 use cpal::traits::{DeviceTrait, HostTrait};
 use cpal::{SampleRate, SupportedStreamConfig};
+use futures::SinkExt;
 use futures::StreamExt;
 use hound::WavWriter;
 use std::i16;
@@ -65,4 +66,37 @@ async fn test_input_stream() {
     }
     writer.finalize().unwrap();
     println!("diff count: {}", diff_count);
+}
+
+#[tokio::test]
+async fn test_wire_output() {
+    let host = cpal::host_from_id(cpal::HostId::Asio).expect("failed to initialise ASIO host");
+    // let host = cpal::default_host();
+    let device = host.input_devices().expect("failed to find input device");
+    let device = device
+        .into_iter()
+        .next()
+        .expect("no input device available");
+    println!("Input device: {:?}", device.name().unwrap());
+
+    let default_config = device.default_output_config().unwrap();
+    let config = SupportedStreamConfig::new(
+        // default_config.channels(),
+        1,                 // mono
+        SampleRate(48000), // sample rate
+        default_config.buffer_size().clone(),
+        default_config.sample_format(),
+    );
+
+    println!("{:?}", config);
+
+    let mut output_stream: OutputAudioStream<std::vec::IntoIter<f32>> =
+        OutputAudioStream::new(&device, config.clone());
+    output_stream
+        .send(AudioTrack::new(
+            vec![1.0 as f32; 10000].into_iter(),
+            config.clone(),
+        ))
+        .await
+        .unwrap();
 }

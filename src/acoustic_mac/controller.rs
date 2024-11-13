@@ -205,10 +205,7 @@ impl MacController {
                             }
                         }
                     } else {
-                        println!(
-                            "[MacController]: received other macaddress: {}",
-                            mac_frame::MACFrame::get_dst(&data)
-                        );
+                        println!("[MacController]: received other macaddress: {:?}", data);
                     }
                 }
 
