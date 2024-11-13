@@ -67,14 +67,17 @@ impl MacSender {
     pub async fn send_frame(&mut self, frame: &MACFrame) {
         let bits = frame.get_whole_frame_bits();
 
-        if frame.get_self_type() == mac_frame::MACType::Ack {
-            self.modulator
-                .send_mac_ack_frame(bits.try_into().unwrap())
-                .await;
-        } else {
-            self.modulator
-                .send_single_ofdm_frame(bits.clone(), bits.len() as isize * 8)
-                .await;
+        match frame.get_self_type() {
+            mac_frame::MACType::Ack => {
+                self.modulator
+                    .send_mac_ack_frame(bits.try_into().unwrap())
+                    .await;
+            }
+            _ => {
+                self.modulator
+                    .send_single_ofdm_frame(bits.clone(), bits.len() as isize * 8)
+                    .await;
+            }
         }
     }
 
