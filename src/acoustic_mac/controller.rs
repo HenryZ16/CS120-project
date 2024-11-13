@@ -170,11 +170,11 @@ impl MacController {
                                 continue_sends += recv_padding as u64;
                                 println!(
                                     "[MacController]: send frame {} success, time elapsed: {:?}",
-                                    cur_send_frame,
+                                    cur_send_frame - 1,
                                     t_start_send.elapsed()
                                 );
                                 timer.start(TimerType::BACKOFF, retry_times, continue_sends);
-                                println!("[MacController]: timer reset.");
+                                println!("[MacController]: send timer reset.");
                                 t_start_send = Instant::now();
                             }
                         } else {
@@ -198,7 +198,7 @@ impl MacController {
                                 if received.len() >= receive_byte_num {
                                     recv_padding = false;
                                 }
-                                println!("[MacController]: timer reset.");
+                                println!("[MacController]: recv timer reset.");
                                 t_start_recv = Instant::now();
                             } else {
                                 println!(
