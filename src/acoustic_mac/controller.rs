@@ -29,7 +29,7 @@ use super::{
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
 const MAX_SEND: u64 = 6;
-const ACK_WAIT_TIME: u64 = 100;
+const ACK_WAIT_TIME: u64 = 105;
 const BACKOFF_SLOT_TIME: u64 = 50;
 const BACKOFF_MAX_FACTOR: u64 = 10;
 
@@ -73,7 +73,7 @@ impl RecordTimer {
                 } else {
                     factor
                 };
-                let slot_times: u64 = self.rng.gen_range(0..=(factor + 1) * 2);
+                let slot_times: u64 = self.rng.gen_range(1..=(factor + 1) * 2);
                 Duration::from_millis(
                     BACKOFF_SLOT_TIME * slot_times * ((continue_sends > 4) as u64 + 1),
                 )
@@ -165,7 +165,7 @@ impl MacController {
                                 retry_times = 0;
                                 resend_times = 0;
                                 continue_sends += recv_padding as u64;
-                                println!("send frame {} success", cur_send_frame);
+                                println!("[MacController]: send frame {} success", cur_send_frame);
                                 timer.start(TimerType::BACKOFF, retry_times, continue_sends);
                             }
                         } else {
@@ -377,6 +377,6 @@ impl MacDetector {
 fn calculate_energy(samples: &[f32]) -> f32 {
     let sum_of_squares: f32 = samples.iter().map(|&sample| sample * sample).sum();
     let energy = sum_of_squares / samples.len() as f32;
-    println!("avg energy: {}", energy);
+    // println!("avg energy: {}", energy);
     energy
 }
