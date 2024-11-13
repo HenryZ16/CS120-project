@@ -86,6 +86,11 @@ impl Modulator {
         let carrier_cnt = self.get_carrier_cnt();
         assert!(data_bits_len <= carrier_cnt * phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING);
 
+        // warm up
+        let mut modulated_signal: Vec<f32> = (0..500)
+            .map(|x| (std::f64::consts::PI * x as f64 / 6.0).sin() as f32)
+            .collect();
+
         // fill up the payload
         let mut data = data;
         while data.len() * 8 < phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING * carrier_cnt {
@@ -130,7 +135,7 @@ impl Modulator {
             .collect();
 
         // add FSK preamble
-        let mut modulated_signal = phy_frame::gen_preamble(self.sample_rate);
+        modulated_signal.extend(phy_frame::gen_preamble(self.sample_rate));
         modulated_signal.extend(modulated_psk_signal);
         return modulated_signal;
     }
