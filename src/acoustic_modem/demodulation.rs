@@ -474,10 +474,10 @@ impl Demodulation2 {
                     let dot_product_data = dot_product(window, &demodulate_config.preamble);
                     let dot_product_ack = dot_product(window, &ack_preamble);
                     if dot_product_data > 10.0 {
-                        println!("ack dot product: {}", dot_product_ack);
+                        println!("data dot product: {}", dot_product_data);
                     }
                     if dot_product_ack > 10.0 {
-                        println!("data dot product: {}", dot_product_data);
+                        println!("ack dot product: {}", dot_product_ack);
                     }
                     if dot_product_data > local_max && dot_product_data > power_lim_preamble {
                         local_max = dot_product_data;
