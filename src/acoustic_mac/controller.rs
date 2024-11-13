@@ -287,6 +287,7 @@ impl MacController {
         to_send_frame: &MACFrame,
         to_detect: bool,
     ) -> bool {
+        let t_start = Instant::now();
         // demodulator close
         let _ = demodulate_status_tx.send(SwitchSignal::StopSignal);
 
@@ -304,6 +305,7 @@ impl MacController {
 
         // demodulator open
         let _ = demodulate_status_tx.send(SwitchSignal::ResumeSignal);
+        println!("send frame time: {:?}", t_start.elapsed());
 
         is_empty
     }
