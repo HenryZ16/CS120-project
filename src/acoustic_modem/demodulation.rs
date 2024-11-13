@@ -11,6 +11,7 @@ use std::ops::{Add, Mul};
 use std::result::Result::Ok;
 use std::{mem, vec};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+use tokio::time::error::Elapsed;
 
 const ACK_PAYLOAD_BIT_LENGTH: usize = 40;
 
@@ -412,12 +413,13 @@ impl Demodulation2 {
         );
         let mut tmp_buffer_len = tmp_buffer.len();
 
-        let mut local_max_data = 0.0;
-        let mut local_max_ack = 0.0;
+        let mut local_max = 0.0;
+        // let mut local_max_data = 0.0;
+        // let mut local_max_ack = 0.0;
         let mut start_index = usize::MAX;
 
-        let mut start_index_ack = usize::MAX;
-        let mut start_index_data = usize::MAX;
+        // let mut start_index_ack = usize::MAX;
+        // let mut start_index_data = usize::MAX;
 
         let carrier_num = demodulate_config.ref_signal.len();
         let mut actual_carrier_num = 0;
@@ -440,7 +442,7 @@ impl Demodulation2 {
                         tmp_buffer.clear();
                         tmp_buffer_len = 0;
                         start_index = usize::MAX;
-                        local_max_data = 0.0;
+                        local_max = 0.0;
                         demodulate_state = demodulate_state.stop();
                         tmp_bits_data = vec![Vec::with_capacity(payload_len); carrier_num];
                         is_reboot = false;
@@ -474,36 +476,33 @@ impl Demodulation2 {
                     // if dot_product > 20.0 {
                     //     println!("preamble dot product: {}", dot_product);
                     // }
-                    if dot_product_data > local_max_data && dot_product_data > power_lim_preamble {
-                        local_max_data = dot_product_data;
-                        start_index_data = i + 1;
-                    } else if dot_product_ack > local_max_ack
-                        && dot_product_ack > power_lim_preamble
+                    if dot_product_data > local_max && dot_product_data > power_lim_preamble {
+                        local_max = dot_product_data;
+                        println!("data local max: {}", local_max);
+                        start_index = i + 1;
+                        is_ack = false
+                    } else if dot_product_ack > local_max && dot_product_ack > power_lim_preamble {
+                        local_max = dot_product_ack;
+                        println!("ack local max: {}", local_max);
+                        start_index = i + 1;
+                        is_ack = true
+                    } else if start_index != usize::MAX
+                        && i - start_index > demodulate_config.preamble_len / 2
+                        && local_max > power_lim_preamble
                     {
-                        local_max_ack = dot_product_ack;
-                        start_index_ack = i + 1;
-                    } else if start_index_ack != usize::MAX
-                        && i - start_index_ack > demodulate_config.preamble_len
-                        && local_max_ack > power_lim_preamble
-                    {
-                        start_index = start_index_ack + demodulate_config.preamble_len - 1;
+                        start_index = start_index + demodulate_config.preamble_len - 1;
                         demodulate_state = demodulate_state.next();
-                        local_max_data = 0.0;
-                        actual_payload_len = ACK_PAYLOAD_BIT_LENGTH;
-                        actual_carrier_num = 1;
-                        is_ack = true;
-
-                        break;
-                    } else if start_index_data != usize::MAX
-                        && i - start_index_data > demodulate_config.preamble_len / 2
-                        && local_max_data > power_lim_preamble
-                    {
-                        start_index = start_index_data + demodulate_config.preamble_len - 1;
-                        demodulate_state = demodulate_state.next();
-                        local_max_ack = 0.0;
-                        actual_payload_len = demodulate_config.payload_bits_length;
-                        actual_carrier_num = carrier_num;
-                        is_ack = false;
+                        local_max = 0.0;
+                        actual_payload_len = if is_ack {
+                            ACK_PAYLOAD_BIT_LENGTH
+                        } else {
+                            demodulate_config.payload_bits_length
+                        };
+                        actual_carrier_num = if is_ack { 1 } else { carrier_num };
+                        println!(
+                            "start index: {}, tmp buffer len: {}, max: {}",
+                            start_index, tmp_buffer_len, local_max
+                        );
 
                         break;
                     }
@@ -570,11 +569,7 @@ impl Demodulation2 {
             }
 
             let pop_times = if start_index == usize::MAX {
-                if start_index_ack == usize::MAX && start_index_data == usize::MAX {
-                    tmp_buffer_len - demodulate_config.preamble_len + 1
-                } else {
-                    start_index_ack.min(start_index_data)
-                }
+                tmp_buffer_len - demodulate_config.preamble_len + 1
             } else {
                 start_index
             };
@@ -584,8 +579,6 @@ impl Demodulation2 {
 
             start_index = if start_index == usize::MAX || is_reboot {
                 is_reboot = false;
-                start_index_ack = usize::MAX;
-                start_index_data = usize::MAX;
                 usize::MAX
             } else {
                 0
