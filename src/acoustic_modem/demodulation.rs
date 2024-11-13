@@ -428,6 +428,7 @@ impl Demodulation2 {
         let mut input_stream: InputAudioStream = self.input_config.create_input_stream();
 
         let ack_preamble = phy_frame::gen_ack_preamble(self.input_config.config.sample_rate().0);
+        let mut is_ack = false;
 
         println!("listen daemon start");
         while let Some(data) = input_stream.next().await {
@@ -490,6 +491,7 @@ impl Demodulation2 {
                         local_max_data = 0.0;
                         actual_payload_len = ACK_PAYLOAD_BIT_LENGTH;
                         actual_carrier_num = 1;
+                        is_ack = true;
 
                         break;
                     } else if start_index_data != usize::MAX
@@ -501,6 +503,7 @@ impl Demodulation2 {
                         local_max_ack = 0.0;
                         actual_payload_len = demodulate_config.payload_bits_length;
                         actual_carrier_num = carrier_num;
+                        is_ack = false;
 
                         break;
                     }
@@ -538,15 +541,19 @@ impl Demodulation2 {
                 let mut to_send: Vec<Byte> = vec![];
                 for k in 0..actual_carrier_num {
                     // println!("data: {:?}", tmp_bits_data[k]);
-                    let result = decode(mem::replace(
-                        &mut tmp_bits_data[k],
-                        Vec::with_capacity(payload_len),
-                    ));
+                    let result = decode_ack_support(
+                        mem::replace(&mut tmp_bits_data[k], Vec::with_capacity(payload_len)),
+                        is_ack,
+                    );
                     // tmp_bits_data[k].clear();
 
                     match result {
                         Ok((meta_data, _)) => {
-                            to_send.extend(meta_data.iter());
+                            if is_ack {
+                                let _ = output_tx.send(meta_data);
+                            } else {
+                                to_send.extend(meta_data.iter());
+                            }
                         }
                         Err(msg) => {
                             println!("{}", msg);
@@ -555,7 +562,7 @@ impl Demodulation2 {
                         }
                     }
                 }
-                if to_send.len() > 0 {
+                if !is_ack && to_send.len() > 0 {
                     let _ = output_tx.send(to_send);
                 }
                 // println!("tmp bit len: {}", tmp_bits_data.len());
@@ -600,6 +607,46 @@ fn decode(input_data: Vec<Bit>) -> Result<(Vec<Byte>, usize), Error> {
     if ENABLE_ECC {
         let hexbits = u8_2_code_rs_hexbit(read_data_2_compressed_u8(input_data));
         PHYFrame::payload_2_data(hexbits)
+    } else {
+        let compressed_data = read_data_2_compressed_u8(input_data);
+        if !PHYFrame::check_crc(&compressed_data) {
+            // println!("wrong data: {:?}", compressed_data);
+            return Err(Error::msg("[Demodulation]: !!! CRC wrong"));
+        }
+
+        let mut length = 0;
+        for i in 0..phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING / 8 {
+            length <<= 8;
+            length += compressed_data[i] as usize;
+        }
+        if length
+            > if ENABLE_ECC {
+                phy_frame::MAX_FRAME_DATA_LENGTH
+            } else {
+                phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING
+            }
+        {
+            return Err(Error::msg("[Demodulation]: !!! Length wrong"));
+        }
+
+        // println!("[Demodulation]: received right data");
+        Ok((
+            compressed_data[phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING / 8
+                ..(phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING + length) / 8]
+                .to_vec(),
+            length,
+        ))
+    }
+}
+
+fn decode_ack_support(input_data: Vec<Bit>, is_ack: bool) -> Result<(Vec<Byte>, usize), Error> {
+    if is_ack {
+        let compressed_data = read_data_2_compressed_u8(input_data);
+        if !PHYFrame::check_crc(&compressed_data) {
+            return Err(Error::msg("[Demodulation]: !!! ACK CRC wrong"));
+        } else {
+            return Ok((compressed_data, 4));
+        }
     } else {
         let compressed_data = read_data_2_compressed_u8(input_data);
         if !PHYFrame::check_crc(&compressed_data) {
