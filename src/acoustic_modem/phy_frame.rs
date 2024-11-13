@@ -222,7 +222,7 @@ impl SimpleFrame {
 
 pub fn gen_preamble(sample_rate: u32) -> Vec<f32> {
     let start = 2e3;
-    let end = 1e4;
+    let end = 2e4;
     let half_length = 60;
     let dx: f64 = 1.0 / sample_rate as f64;
     let step = (end - start) as f64 / half_length as f64;
