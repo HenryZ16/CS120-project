@@ -400,7 +400,7 @@ impl Demodulation2 {
     ) -> Result<(), anyhow::Error> {
         let demodulate_config = &self.demodulate_config;
         let payload_len = demodulate_config.payload_bits_length;
-        let mut actual_payload_len = 0;
+        let mut actual_payload_len = usize::MAX;
 
         let mut demodulate_state = init_state;
 
@@ -474,6 +474,13 @@ impl Demodulation2 {
                     let window = &tmp_buffer.as_slices().0[i..i + demodulate_config.preamble_len];
                     let dot_product_data = dot_product(window, &demodulate_config.preamble);
                     let dot_product_ack = dot_product(window, &ack_preamble);
+                    // if dot_product_ack > 30.0 {
+                    //     println!("ack preamble: {}", dot_product_ack);
+                    // }
+                    // if dot_product_data > 30.0 {
+                    //     println!("data preamble: {}", dot_product_data);
+                    // }
+
                     let mut dot_product = 0.0;
                     if dot_product_ack > dot_product_data {
                         is_ack = true;
@@ -482,11 +489,13 @@ impl Demodulation2 {
                         is_ack = false;
                         dot_product = dot_product_data;
                     }
+
                     if dot_product > local_max && dot_product > power_lim_preamble {
                         local_max = dot_product;
+                        // println!("get local max");
                         start_index = i + 1;
                         is_ack_max = is_ack;
-                        println!("local max: {}", local_max);
+                        // println!("local max: {}", local_max);
                     } else if start_index != usize::MAX
                         && i - start_index > demodulate_config.preamble_len
                         && local_max > power_lim_preamble
@@ -510,6 +519,7 @@ impl Demodulation2 {
                     }
                 }
                 // println!("start index: {}", start_index);
+                // println!("detect preamble block state: {:?}", demodulate_state);
             }
 
             if demodulate_state == DemodulationState::RecvFrame {
@@ -525,6 +535,7 @@ impl Demodulation2 {
                 while tmp_buffer_len - start_index >= demodulate_config.ref_signal_len[0]
                     && tmp_bits_data[0].len() < actual_payload_len
                 {
+                    // println!("get data");
                     let window = &tmp_buffer.as_slices().0
                         [start_index..start_index + demodulate_config.ref_signal_len[0]];
                     for k in 0..actual_carrier_num {
@@ -536,7 +547,9 @@ impl Demodulation2 {
                 }
             }
 
-            if tmp_bits_data[0].len() >= actual_payload_len {
+            if tmp_bits_data[0].len() >= actual_payload_len
+                && demodulate_state == DemodulationState::RecvFrame
+            {
                 is_reboot = true;
                 demodulate_state = demodulate_state.next();
                 let mut to_send: Vec<Byte> = vec![];
@@ -638,6 +651,7 @@ fn decode_ack_support(input_data: Vec<Bit>, is_ack: bool) -> Result<(Vec<Byte>, 
     if is_ack {
         let compressed_data = read_data_2_compressed_u8(input_data);
         if !PHYFrame::check_crc(&compressed_data) {
+            println!("wrong data: {:?}", compressed_data);
             return Err(Error::msg("[Demodulation]: !!! ACK CRC wrong"));
         } else {
             return Ok((compressed_data, 4));
@@ -645,7 +659,6 @@ fn decode_ack_support(input_data: Vec<Bit>, is_ack: bool) -> Result<(Vec<Byte>, 
     } else {
         let compressed_data = read_data_2_compressed_u8(input_data);
         if !PHYFrame::check_crc(&compressed_data) {
-            // println!("wrong data: {:?}", compressed_data);
             return Err(Error::msg("[Demodulation]: !!! CRC wrong"));
         }
 

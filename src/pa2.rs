@@ -8,8 +8,10 @@ use anyhow::{Error, Result};
 use std::fs::File;
 use std::io::Read;
 use std::io::Write;
+use std::time::Duration;
 use std::time::Instant;
 use std::vec;
+use tokio::time::sleep;
 const CONFIG_FILE: &str = "configuration/pa2.yml";
 
 const RECEIVE_BYTE_NUM: usize = 6250;
@@ -177,6 +179,7 @@ async fn obj2_ack() -> Result<u32> {
     let instant = Instant::now();
     while instant.elapsed().as_secs() < 10 {
         sender.send_frame(&ack_frame).await;
+        // sleep(Duration::from_millis(200)).await;
     }
 
     Ok(0)
