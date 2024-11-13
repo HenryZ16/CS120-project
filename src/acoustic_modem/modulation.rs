@@ -421,6 +421,22 @@ impl Modulator {
         // tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
     }
 
+    // [id, dest, src, type]
+    pub async fn send_mac_ack_frame(&mut self, data: [Byte; 4]) {
+        let crc_data = PHYFrame::add_crc(data.to_vec());
+        let decompressed_data = utils::read_compressed_u8_2_data(crc_data);
+        let modulated_psk_signal = self.modulate(&decompressed_data, 1);
+        let mut modulated_signal = phy_frame::gen_ack_preamble(self.sample_rate);
+        modulated_signal.extend(modulated_psk_signal);
+        self.output_stream
+            .send(AudioTrack::new(
+                modulated_signal.into_iter(),
+                self.config.clone(),
+            ))
+            .await
+            .unwrap();
+    }
+
     // [Preamble : 8][Payload : 36 x 6 = 216]
     // for each frame:
     //   - split the data into 96 bits for each frame

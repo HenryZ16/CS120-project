@@ -66,9 +66,16 @@ impl MacSender {
 
     pub async fn send_frame(&mut self, frame: &MACFrame) {
         let bits = frame.get_whole_frame_bits();
-        self.modulator
-            .send_single_ofdm_frame(bits.clone(), bits.len() as isize * 8)
-            .await;
+
+        if frame.get_self_type() == mac_frame::MACType::Ack {
+            self.modulator
+                .send_mac_ack_frame(bits.try_into().unwrap())
+                .await;
+        } else {
+            self.modulator
+                .send_single_ofdm_frame(bits.clone(), bits.len() as isize * 8)
+                .await;
+        }
     }
 
     pub fn generate_ack_frame(&mut self, dest: u8) -> MACFrame {
