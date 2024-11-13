@@ -40,7 +40,6 @@ pub async fn obj_1_mac_send() -> Result<u32> {
     let frames = sender.generate_data_frames(data, dest);
     for frame in &frames {
         sender.send_frame(frame).await;
-        sleep(Duration::from_secs(1)).await;
     }
     //sender.send_frame(&frames[0]).await;
 
