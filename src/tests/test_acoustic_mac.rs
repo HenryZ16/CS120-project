@@ -1,5 +1,9 @@
 use crate::{
-    acoustic_mac::{controller::MacDetector, receive},
+    acoustic_mac::{
+        controller::MacDetector,
+        receive,
+        send::{self, MacSender},
+    },
     utils::get_audio_device_and_config,
 };
 use std::fs::File;
@@ -49,4 +53,15 @@ async fn test_detector() {
         _ = detector_daemon => {Err(())}
         _ = detect_task => {Ok(())}
     };
+}
+
+#[tokio::test]
+async fn test_send_ack() {
+    let mut sender = MacSender::new("configuration/pa2.yml", 2);
+    let ack_frame = sender.generate_ack_frame(1);
+
+    let instant = Instant::now();
+    while instant.elapsed().as_secs() < 10 {
+        sender.send_frame(&ack_frame).await;
+    }
 }

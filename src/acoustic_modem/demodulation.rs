@@ -492,6 +492,10 @@ impl Demodulation2 {
                     {
                         start_index = start_index + demodulate_config.preamble_len - 1;
                         demodulate_state = demodulate_state.next();
+                        println!(
+                            "start index: {}, tmp buffer len: {}, max: {}",
+                            start_index, tmp_buffer_len, local_max
+                        );
                         local_max = 0.0;
                         actual_payload_len = if is_ack {
                             ACK_PAYLOAD_BIT_LENGTH
@@ -499,10 +503,6 @@ impl Demodulation2 {
                             demodulate_config.payload_bits_length
                         };
                         actual_carrier_num = if is_ack { 1 } else { carrier_num };
-                        println!(
-                            "start index: {}, tmp buffer len: {}, max: {}",
-                            start_index, tmp_buffer_len, local_max
-                        );
 
                         break;
                     }
@@ -534,7 +534,7 @@ impl Demodulation2 {
                 }
             }
 
-            if tmp_bits_data[0].len() >= payload_len {
+            if tmp_bits_data[0].len() >= actual_payload_len {
                 is_reboot = true;
                 demodulate_state = demodulate_state.next();
                 let mut to_send: Vec<Byte> = vec![];
@@ -548,11 +548,11 @@ impl Demodulation2 {
 
                     match result {
                         Ok((meta_data, _)) => {
-                            if is_ack {
-                                let _ = output_tx.send(meta_data);
-                            } else {
-                                to_send.extend(meta_data.iter());
-                            }
+                            // if is_ack {
+                            // let _ = output_tx.send(meta_data);
+                            // } else {
+                            to_send.extend(meta_data.iter());
+                            // }
                         }
                         Err(msg) => {
                             println!("{}", msg);
@@ -561,7 +561,7 @@ impl Demodulation2 {
                         }
                     }
                 }
-                if !is_ack && to_send.len() > 0 {
+                if to_send.len() > 0 {
                     let _ = output_tx.send(to_send);
                 }
                 // println!("tmp bit len: {}", tmp_bits_data.len());
