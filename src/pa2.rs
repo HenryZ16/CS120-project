@@ -179,7 +179,7 @@ async fn obj2_ack() -> Result<u32> {
     let instant = Instant::now();
     while instant.elapsed().as_secs() < 10 {
         sender.send_frame(&ack_frame).await;
-        // sleep(Duration::from_millis(200)).await;
+        tokio::time::sleep(Duration::from_millis(100)).await;
     }
 
     Ok(0)
