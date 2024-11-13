@@ -431,6 +431,7 @@ impl Demodulation2 {
 
         let ack_preamble = phy_frame::gen_ack_preamble(self.input_config.config.sample_rate().0);
         let mut is_ack = false;
+        let mut is_ack_max = false;
 
         println!("listen daemon start");
         while let Some(data) = input_stream.next().await {
@@ -473,40 +474,38 @@ impl Demodulation2 {
                     let window = &tmp_buffer.as_slices().0[i..i + demodulate_config.preamble_len];
                     let dot_product_data = dot_product(window, &demodulate_config.preamble);
                     let dot_product_ack = dot_product(window, &ack_preamble);
-                    if dot_product_data > 10.0 {
-                        println!("data dot product: {}", dot_product_data);
+                    let mut dot_product = 0.0;
+                    if dot_product_ack > dot_product_data {
+                        is_ack = true;
+                        dot_product = dot_product_ack;
+                    } else {
+                        is_ack = false;
+                        dot_product = dot_product_data;
                     }
-                    if dot_product_ack > 10.0 {
-                        println!("ack dot product: {}", dot_product_ack);
-                    }
-                    if dot_product_data > local_max && dot_product_data > power_lim_preamble {
-                        local_max = dot_product_data;
-                        println!("data local max: {}", local_max);
+                    if dot_product > local_max && dot_product > power_lim_preamble {
+                        local_max = dot_product;
                         start_index = i + 1;
-                        is_ack = false
-                    } else if dot_product_ack > local_max && dot_product_ack > power_lim_preamble {
-                        local_max = dot_product_ack;
-                        println!("ack local max: {}", local_max);
-                        start_index = i + 1;
-                        is_ack = true
+                        is_ack_max = is_ack;
+                        println!("local max: {}", local_max);
                     } else if start_index != usize::MAX
-                        && i - start_index > demodulate_config.preamble_len / 2
+                        && i - start_index > demodulate_config.preamble_len
                         && local_max > power_lim_preamble
                     {
-                        start_index = start_index + demodulate_config.preamble_len - 1;
+                        start_index += demodulate_config.preamble_len - 1;
                         demodulate_state = demodulate_state.next();
+                        // println!("detected preamble");
                         println!(
                             "start index: {}, tmp buffer len: {}, max: {}",
                             start_index, tmp_buffer_len, local_max
                         );
                         local_max = 0.0;
-                        actual_payload_len = if is_ack {
+                        actual_carrier_num = if is_ack_max { 1 } else { carrier_num };
+                        actual_payload_len = if is_ack_max {
                             ACK_PAYLOAD_BIT_LENGTH
                         } else {
-                            demodulate_config.payload_bits_length
+                            payload_len
                         };
-                        actual_carrier_num = if is_ack { 1 } else { carrier_num };
-
+                        // println!("debug vec: {:?}", debug_vec);
                         break;
                     }
                 }
