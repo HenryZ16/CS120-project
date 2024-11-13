@@ -137,8 +137,6 @@ impl MacController {
         let mac_address = self.mac_address;
         println!("set up time: {:?}", start.elapsed());
         let main_task = tokio::spawn(async move {
-            let mut t_start = Instant::now();
-
             let mut received: Vec<Byte> = vec![];
             let mut retry_times: u64 = 0;
             let mut resend_times: u64 = 0;
@@ -156,13 +154,9 @@ impl MacController {
                 recv_padding = true;
             }
 
-            println!(
-                "[MacController]: start main_task time: {:?}, timer reset.",
-                t_start.elapsed()
-            );
+            let mut t_start_send = Instant::now();
+            let mut t_start_recv = Instant::now();
             while send_padding || recv_padding {
-                println!("[MacController]: timer reset.");
-                t_start = Instant::now();
                 if let Ok(data) = decoded_data_rx.try_recv() {
                     // check data type
                     if mac_frame::MACFrame::get_dst(&data) == mac_address {
@@ -177,9 +171,11 @@ impl MacController {
                                 println!(
                                     "[MacController]: send frame {} success, time elapsed: {:?}",
                                     cur_send_frame,
-                                    t_start.elapsed()
+                                    t_start_send.elapsed()
                                 );
                                 timer.start(TimerType::BACKOFF, retry_times, continue_sends);
+                                println!("[MacController]: timer reset.");
+                                t_start_send = Instant::now();
                             }
                         } else {
                             MacController::send_frame(
@@ -194,7 +190,7 @@ impl MacController {
                                 println!(
                                     "[MacController]: received frame id: {}, time elapsed: {:?}",
                                     cur_recv_frame,
-                                    t_start.elapsed()
+                                    t_start_recv.elapsed()
                                 );
                                 cur_recv_frame += 1;
                                 continue_sends = 0;
@@ -202,6 +198,8 @@ impl MacController {
                                 if received.len() >= receive_byte_num {
                                     recv_padding = false;
                                 }
+                                println!("[MacController]: timer reset.");
+                                t_start_recv = Instant::now();
                             } else {
                                 println!(
                                     "[MacController]: duplicated data of frame id: {}",
