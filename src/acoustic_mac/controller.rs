@@ -30,7 +30,7 @@ use rand::{rngs::StdRng, Rng, SeedableRng};
 
 const MAX_SEND: u64 = 6;
 const ACK_WAIT_TIME: u64 = 105;
-const BACKOFF_SLOT_TIME: u64 = 50;
+const BACKOFF_SLOT_TIME: u64 = 60;
 const BACKOFF_MAX_FACTOR: u64 = 10;
 
 const DETECT_SIGNAL: Byte = 1;
@@ -137,6 +137,8 @@ impl MacController {
         let mac_address = self.mac_address;
         println!("set up time: {:?}", start.elapsed());
         let main_task = tokio::spawn(async move {
+            let mut t_start = Instant::now();
+
             let mut received: Vec<Byte> = vec![];
             let mut retry_times: u64 = 0;
             let mut resend_times: u64 = 0;
@@ -153,7 +155,14 @@ impl MacController {
             if receive_byte_num > 0 {
                 recv_padding = true;
             }
+
+            println!(
+                "[MacController]: start main_task time: {:?}, timer reset.",
+                t_start.elapsed()
+            );
             while send_padding || recv_padding {
+                println!("[MacController]: timer reset.");
+                t_start = Instant::now();
                 if let Ok(data) = decoded_data_rx.try_recv() {
                     // check data type
                     if mac_frame::MACFrame::get_dst(&data) == mac_address {
@@ -165,7 +174,11 @@ impl MacController {
                                 retry_times = 0;
                                 resend_times = 0;
                                 continue_sends += recv_padding as u64;
-                                println!("[MacController]: send frame {} success", cur_send_frame);
+                                println!(
+                                    "[MacController]: send frame {} success, time elapsed: {:?}",
+                                    cur_send_frame,
+                                    t_start.elapsed()
+                                );
                                 timer.start(TimerType::BACKOFF, retry_times, continue_sends);
                             }
                         } else {
@@ -178,7 +191,11 @@ impl MacController {
                             )
                             .await;
                             if (cur_recv_frame & 0xFF) as u8 == MACFrame::get_frame_id(&data) {
-                                println!("[MacController]: received frame id: {}", cur_recv_frame);
+                                println!(
+                                    "[MacController]: received frame id: {}, time elapsed: {:?}",
+                                    cur_recv_frame,
+                                    t_start.elapsed()
+                                );
                                 cur_recv_frame += 1;
                                 continue_sends = 0;
                                 received.extend_from_slice(MACFrame::get_payload(&data));
