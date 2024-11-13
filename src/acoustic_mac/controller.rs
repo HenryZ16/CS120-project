@@ -75,7 +75,8 @@ impl RecordTimer {
                 };
                 let slot_times: u64 = self.rng.gen_range(1..=(factor + 1) * 2);
                 Duration::from_millis(
-                    BACKOFF_SLOT_TIME * slot_times * ((continue_sends > 4) as u64 + 1),
+                    // BACKOFF_SLOT_TIME * slot_times * ((continue_sends > 4) as u64 + 1),
+                    BACKOFF_SLOT_TIME * slot_times,
                 )
             }
             TimerType::ACK => Duration::from_millis(ACK_WAIT_TIME),
