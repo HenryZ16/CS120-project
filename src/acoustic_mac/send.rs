@@ -1,4 +1,5 @@
 use cpal::{Device, SupportedStreamConfig};
+use futures::lock::MutexLockFuture;
 
 use crate::{
     acoustic_mac::mac_frame::{self, MACFrame},
@@ -22,7 +23,10 @@ impl MacSender {
         let config = PhyLayerGenerator::new_from_yaml(config_file);
         let (cpal_device, cpal_config) =
             crate::utils::get_audio_device_and_config(config.get_sample_rate());
-        let modulator = config.gen_modulator(cpal_device, cpal_config);
+        let mut modulator = config.gen_modulator(cpal_device, cpal_config);
+
+        // warm up: reduce the first send time of frame
+        futures::executor::block_on(modulator.send_modulated_signal(vec![0.0; 10]));
 
         Self {
             modulator,
@@ -37,7 +41,10 @@ impl MacSender {
         device: Device,
         config: SupportedStreamConfig,
     ) -> Self {
-        let modulator = generator.gen_modulator(device, config);
+        let mut modulator = generator.gen_modulator(device, config);
+
+        // warm up: reduce the first send time of frame
+        futures::executor::block_on(modulator.send_modulated_signal(vec![0.0; 10]));
 
         Self {
             modulator,
