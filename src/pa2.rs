@@ -1,5 +1,6 @@
 use crate::acoustic_mac::controller::MacController;
 use crate::acoustic_mac::mac_frame::MacAddress;
+use crate::acoustic_mac::send::MacSender;
 use crate::acoustic_modem::generator::PhyLayerGenerator;
 use crate::asio_stream::read_wav_and_play;
 use crate::utils::get_audio_device_and_config;
@@ -169,6 +170,17 @@ pub async fn obj_2_recv() -> Result<u32> {
     Ok(0)
 }
 
+async fn obj2_ack() -> Result<u32> {
+    let mut sender = MacSender::new("configuration/pa2.yml", 2);
+    let ack_frame = sender.generate_ack_frame(1);
+
+    let instant = Instant::now();
+    while instant.elapsed().as_secs() < 10 {
+        sender.send_frame(&ack_frame).await;
+    }
+
+    Ok(0)
+}
 pub async fn obj_3(node_name: bool) -> Result<u32> {
     let t_start = Instant::now();
 
@@ -274,6 +286,12 @@ pub async fn pa2(sel: i32, additional_type: &str) -> Result<u32> {
                 }
             },
             "recv" => match obj_2_recv().await {
+                Ok(_) => {}
+                Err(e) => {
+                    println!("Error: {}", e);
+                }
+            },
+            "ack" => match obj2_ack().await {
                 Ok(_) => {}
                 Err(e) => {
                     println!("Error: {}", e);
