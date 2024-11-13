@@ -200,7 +200,7 @@ impl MacController {
                     }
                 }
 
-                if timer.is_timeout() {
+                if send_padding && timer.is_timeout() {
                     match timer.timer_type {
                         TimerType::ACK => {
                             println!(
