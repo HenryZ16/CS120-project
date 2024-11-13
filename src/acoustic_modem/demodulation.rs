@@ -506,6 +506,11 @@ impl Demodulation2 {
                             payload_len
                         };
                         // println!("debug vec: {:?}", debug_vec);
+                        if is_ack_max {
+                            println!("detect ack preamble");
+                        } else {
+                            println!("detect data preamble");
+                        }
                         break;
                     }
                 }

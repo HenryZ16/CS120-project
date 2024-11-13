@@ -221,8 +221,8 @@ impl SimpleFrame {
 }
 
 pub fn gen_preamble(sample_rate: u32) -> Vec<f32> {
-    let start = 1e3;
-    let end = 5e3;
+    let start = 2e3;
+    let end = 1e4;
     let half_length = 60;
     let dx: f64 = 1.0 / sample_rate as f64;
     let step = (end - start) as f64 / half_length as f64;
@@ -244,26 +244,8 @@ pub fn gen_preamble(sample_rate: u32) -> Vec<f32> {
 }
 
 pub fn gen_ack_preamble(sample_rate: u32) -> Vec<f32> {
-    let start = 5e3;
-    let end = 1e4;
-    let half_length = 60;
-    let dx: f64 = 1.0 / sample_rate as f64;
-    let step = (end - start) as f64 / half_length as f64;
-    let mut fp: Vec<f64> = (0..half_length).map(|i| start + i as f64 * step).collect();
-    let fp_rev: Vec<f64> = fp.clone().into_iter().rev().collect();
-    fp.pop();
-    fp.extend(fp_rev);
-
-    let mut res = vec![];
-
-    res.push(0.0);
-    for i in 1..fp.len() {
-        let trap_area = (fp[i] + fp[i - 1]) * dx / 2.0;
-        res.push(res[i - 1] + trap_area);
-    }
-    res.into_iter()
-        .map(|x| (2.0 * std::f64::consts::PI * x).sin() as f32)
-        .collect()
+    let preamble = gen_preamble(sample_rate);
+    preamble.iter().map(|x| -x).collect()
 }
 
 pub fn usize_length_2_hexbits_length(length: usize) -> Vec<Hexbit> {
