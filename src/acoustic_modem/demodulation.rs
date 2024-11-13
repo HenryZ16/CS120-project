@@ -474,14 +474,13 @@ impl Demodulation2 {
                     let window = &tmp_buffer.as_slices().0[i..i + demodulate_config.preamble_len];
                     let dot_product_data = dot_product(window, &demodulate_config.preamble);
                     let dot_product_ack = dot_product(window, &ack_preamble);
-                    let mut dot_product = 0.0;
-                    if dot_product_ack > dot_product_data {
+                    let dot_product = if dot_product_ack > dot_product_data {
                         is_ack = true;
-                        dot_product = dot_product_ack;
+                        dot_product_ack
                     } else {
                         is_ack = false;
-                        dot_product = dot_product_data;
-                    }
+                        dot_product_data
+                    };
                     if dot_product > local_max && dot_product > power_lim_preamble {
                         local_max = dot_product;
                         start_index = i + 1;
