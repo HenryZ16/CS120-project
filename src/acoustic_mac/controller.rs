@@ -29,8 +29,8 @@ use super::{
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
 const MAX_SEND: u64 = 6;
-const ACK_WAIT_TIME: u64 = 100;
-const BACKOFF_SLOT_TIME: u64 = 89;
+const ACK_WAIT_TIME: u64 = 120;
+const BACKOFF_SLOT_TIME: u64 = 30;
 const BACKOFF_MAX_FACTOR: u64 = 10;
 
 const DETECT_SIGNAL: Byte = 1;
@@ -377,6 +377,6 @@ impl MacDetector {
 fn calculate_energy(samples: &[f32]) -> f32 {
     let sum_of_squares: f32 = samples.iter().map(|&sample| sample * sample).sum();
     let energy = sum_of_squares / samples.len() as f32;
-    println!("avg energy: {}", energy);
+    // println!("avg energy: {}", energy);
     energy
 }
