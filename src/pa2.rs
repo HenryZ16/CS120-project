@@ -23,10 +23,10 @@ const NODE_0_ADDRESS: MacAddress = 1;
 const NODE_1_ADDRESS: MacAddress = 2;
 
 pub async fn obj_1_mac_send() -> Result<u32> {
-    let address = 0x33;
+    let address = SENDER_ADDRESS;
     let t_start = std::time::Instant::now();
 
-    let dest: u8 = 0x01;
+    let dest: u8 = RECEIVER_ADDRESS;
     let mut sender = crate::acoustic_mac::send::MacSender::new(CONFIG_FILE, address);
 
     // read data from testset/data.bin
