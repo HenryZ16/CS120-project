@@ -1,6 +1,7 @@
 use crate::acoustic_mac::controller::MacController;
 use crate::acoustic_mac::mac_frame::MacAddress;
 use crate::acoustic_modem::generator::PhyLayerGenerator;
+use crate::acoustic_modem::phy_frame;
 use crate::asio_stream::read_wav_and_play;
 use crate::utils::get_audio_device_and_config;
 use anyhow::{Error, Result};
@@ -24,10 +25,10 @@ const NODE_0_ADDRESS: MacAddress = 1;
 const NODE_1_ADDRESS: MacAddress = 2;
 
 pub async fn obj_1_mac_send() -> Result<u32> {
-    let address = 0x33;
+    let address = SENDER_ADDRESS;
     let t_start = std::time::Instant::now();
 
-    let dest: u8 = 0x01;
+    let dest: u8 = RECEIVER_ADDRESS;
     let mut sender = crate::acoustic_mac::send::MacSender::new(CONFIG_FILE, address);
 
     // read data from testset/data.bin
@@ -312,4 +313,29 @@ pub async fn pa2(sel: i32, additional_type: &str) -> Result<u32> {
     }
 
     return Ok(0);
+}
+
+#[tokio::test]
+async fn test_digital_communication() {
+    use rand::Rng;
+    let config = PhyLayerGenerator::new_from_yaml(CONFIG_FILE);
+    let (cpal_device, cpal_config) =
+        crate::utils::get_audio_device_and_config(config.get_sample_rate());
+    let mut modulator = config.gen_modulator(cpal_device, cpal_config);
+    let mut rng = rand::thread_rng();
+    let sign: Vec<Vec<f32>> = vec![
+        vec![-1.0, -0.5, 0.0, 0.5, 1.0],
+        vec![1.0, 0.5, 0.0, -0.5, -1.0],
+    ];
+    let mut data = vec![];
+    let mut modulated_signal = phy_frame::gen_preamble(192000);
+    for _ in 0..10000 {
+        data.push(rng.gen_range(0..=1));
+    }
+    println!("data: {:?}", data);
+    for i in 0..data.len() {
+        modulated_signal.extend(sign[data[i]].clone());
+    }
+
+    modulator.send_modulated_signal(modulated_signal).await;
 }
