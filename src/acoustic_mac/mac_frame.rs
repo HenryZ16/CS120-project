@@ -1,7 +1,5 @@
-use plotters::data;
-
-use crate::utils::{Bit, Byte};
-use std::{io::Bytes, vec};
+use crate::utils::Byte;
+use std::vec;
 
 // Frame:: [dest][src][type][payload]
 pub type MacAddress = Byte;

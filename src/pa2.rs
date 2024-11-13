@@ -7,12 +7,8 @@ use anyhow::{Error, Result};
 use std::fs::File;
 use std::io::Read;
 use std::io::Write;
-use std::process;
 use std::time::Instant;
 use std::vec;
-use tokio::time::sleep;
-use tokio::time::timeout;
-use tokio::time::{self, Duration};
 const CONFIG_FILE: &str = "configuration/pa2.yml";
 
 const RECEIVE_BYTE_NUM: usize = 6250;

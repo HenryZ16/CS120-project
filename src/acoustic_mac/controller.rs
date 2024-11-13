@@ -1,4 +1,4 @@
-use std::{mem, u32, u64, vec};
+use std::{u32, u64, vec};
 
 use crate::{
     acoustic_mac::mac_frame::{self, MACFrame},
@@ -15,12 +15,8 @@ use cpal::SupportedStreamConfig;
 use futures::StreamExt;
 use std::result::Result::Ok;
 use std::time::{Duration, Instant};
-use tokio::{
-    sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
-    time::timeout,
-};
-use tokio::{sync::watch, time::error::Elapsed};
-use tokio_stream::wrappers::UnboundedReceiverStream;
+use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
+use tokio::sync::watch;
 
 use super::{
     mac_frame::{MACType, MacAddress},
