@@ -121,7 +121,7 @@ pub async fn obj_1_recv_file() -> Result<u32> {
 
     let mut decoded_data = vec![];
     let handle = demodulator.listening(&mut decoded_data);
-    // let handle = time::timeout(Duration::from_secs(10), handle);
+    let handle = time::timeout(Duration::from_secs(5), handle);
     println!("[pa1-obj3-receive] Start");
     let _ = handle.await;
     let mut file = File::create("testset/output.txt").unwrap();
