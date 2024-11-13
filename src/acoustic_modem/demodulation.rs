@@ -12,15 +12,13 @@ use std::result::Result::Ok;
 use std::{mem, vec};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
+const ACK_PAYLOAD_BIT_LENGTH: usize = 40;
+
 pub enum SwitchSignal {
     StopSignal,
     ResumeSignal,
-    SwitchSignal,
 }
 
-// pub const SWITCH_SIGNAL: SwitchSignal = 2;
-// pub const STOP_SIGNAL: SwitchSignal = 0;
-// pub const RESUME_SIGNAL: SwitchSignal = 1;
 struct InputStreamConfig {
     config: SupportedStreamConfig,
     device: Device,
@@ -32,10 +30,6 @@ impl InputStreamConfig {
     }
 
     fn create_input_stream(&self) -> InputAudioStream {
-        // println!("create input stream");
-        // println!("config: {:?}", self.config);
-        // println!("device: {:?}", self.device.name());
-
         InputAudioStream::new(&self.device, self.config.clone())
     }
 }
@@ -46,7 +40,6 @@ struct DemodulationConfig {
     preamble_len: usize,
     preamble: Vec<f32>,
     payload_bits_length: usize,
-    data_bits_length: usize,
     lowest_power_limit: f32,
 }
 
@@ -59,7 +52,6 @@ impl DemodulationConfig {
         ref_signal: Vec<Vec<f32>>,
         ref_signal_len: Vec<usize>,
         payload_bits_length: usize,
-        data_bits_length: usize,
         lowest_power_limit: f32,
     ) -> Self {
         let preamble = phy_frame::gen_preamble(sample_rate);
@@ -70,7 +62,6 @@ impl DemodulationConfig {
             preamble_len: preamble.len(),
             preamble,
             payload_bits_length,
-            data_bits_length,
             lowest_power_limit,
         }
     }
@@ -147,7 +138,6 @@ impl Demodulation2 {
         redundent_times: usize,
         enable_ofdm: bool,
         payload_bits_length: usize,
-        data_bits_length: usize,
         lowest_power_limit: f32,
     ) -> Self {
         let host = cpal::host_from_id(cpal::HostId::Asio).expect("failed to initialise ASIO host");
@@ -174,7 +164,6 @@ impl Demodulation2 {
             redundent_times,
             enable_ofdm,
             payload_bits_length,
-            data_bits_length,
             lowest_power_limit,
             device,
             config,
@@ -187,7 +176,6 @@ impl Demodulation2 {
         redundent_times: usize,
         enable_ofdm: bool,
         payload_bits_length: usize,
-        data_bits_length: usize,
         lowest_power_limit: f32,
         device: Device,
         config: SupportedStreamConfig,
@@ -223,7 +211,6 @@ impl Demodulation2 {
             ref_signal,
             ref_signal_len,
             payload_bits_length,
-            data_bits_length,
             lowest_power_limit,
         );
 
@@ -412,6 +399,7 @@ impl Demodulation2 {
     ) -> Result<(), anyhow::Error> {
         let demodulate_config = &self.demodulate_config;
         let payload_len = demodulate_config.payload_bits_length;
+        let mut actual_payload_len = 0;
 
         let mut demodulate_state = init_state;
 
@@ -424,15 +412,22 @@ impl Demodulation2 {
         );
         let mut tmp_buffer_len = tmp_buffer.len();
 
-        let mut local_max = 0.0;
+        let mut local_max_data = 0.0;
+        let mut local_max_ack = 0.0;
         let mut start_index = usize::MAX;
 
+        let mut start_index_ack = usize::MAX;
+        let mut start_index_data = usize::MAX;
+
         let carrier_num = demodulate_config.ref_signal.len();
+        let mut actual_carrier_num = 0;
         // println!("low bound {}", power_lim_preamble);
         let mut tmp_bits_data = vec![Vec::with_capacity(payload_len); carrier_num];
 
         let mut is_reboot = false;
         let mut input_stream: InputAudioStream = self.input_config.create_input_stream();
+
+        let ack_preamble = phy_frame::gen_ack_preamble(self.input_config.config.sample_rate().0);
 
         println!("listen daemon start");
         while let Some(data) = input_stream.next().await {
@@ -444,7 +439,7 @@ impl Demodulation2 {
                         tmp_buffer.clear();
                         tmp_buffer_len = 0;
                         start_index = usize::MAX;
-                        local_max = 0.0;
+                        local_max_data = 0.0;
                         demodulate_state = demodulate_state.stop();
                         tmp_bits_data = vec![Vec::with_capacity(payload_len); carrier_num];
                         is_reboot = false;
@@ -453,9 +448,6 @@ impl Demodulation2 {
                     SwitchSignal::ResumeSignal => {
                         // println!("Resume signal");
                         demodulate_state = demodulate_state.resume();
-                    }
-                    SwitchSignal::SwitchSignal => {
-                        demodulate_state.switch();
                     }
                 }
             }
@@ -476,27 +468,40 @@ impl Demodulation2 {
                 tmp_buffer.make_contiguous();
                 for i in 0..tmp_buffer_len - demodulate_config.preamble_len - 1 {
                     let window = &tmp_buffer.as_slices().0[i..i + demodulate_config.preamble_len];
-                    let dot_product = dot_product(window, &demodulate_config.preamble);
+                    let dot_product_data = dot_product(window, &demodulate_config.preamble);
+                    let dot_product_ack = dot_product(window, &ack_preamble);
                     // if dot_product > 20.0 {
                     //     println!("preamble dot product: {}", dot_product);
                     // }
-                    if dot_product > local_max && dot_product > power_lim_preamble {
-                        local_max = dot_product;
-                        // println!("local max: {}", local_max);
-                        start_index = i + 1;
-                        // debug_vec.clear();
-                        // debug_vec.extend(window);
-                    } else if start_index != usize::MAX
-                        && i - start_index > demodulate_config.preamble_len
-                        && local_max > power_lim_preamble
+                    if dot_product_data > local_max_data && dot_product_data > power_lim_preamble {
+                        local_max_data = dot_product_data;
+                        start_index_data = i + 1;
+                    } else if dot_product_ack > local_max_ack
+                        && dot_product_ack > power_lim_preamble
                     {
-                        start_index += demodulate_config.preamble_len - 1;
+                        local_max_ack = dot_product_ack;
+                        start_index_ack = i + 1;
+                    } else if start_index_ack != usize::MAX
+                        && i - start_index_ack > demodulate_config.preamble_len
+                        && local_max_ack > power_lim_preamble
+                    {
+                        start_index = start_index_ack + demodulate_config.preamble_len - 1;
                         demodulate_state = demodulate_state.next();
-                        // println!(
-                        //     "start index: {}, tmp buffer len: {}, max: {}",
-                        //     start_index, tmp_buffer_len, local_max
-                        // );
-                        local_max = 0.0;
+                        local_max_data = 0.0;
+                        actual_payload_len = ACK_PAYLOAD_BIT_LENGTH;
+                        actual_carrier_num = 1;
+
+                        break;
+                    } else if start_index_data != usize::MAX
+                        && i - start_index_data > demodulate_config.preamble_len / 2
+                        && local_max_data > power_lim_preamble
+                    {
+                        start_index = start_index_data + demodulate_config.preamble_len - 1;
+                        demodulate_state = demodulate_state.next();
+                        local_max_ack = 0.0;
+                        actual_payload_len = demodulate_config.payload_bits_length;
+                        actual_carrier_num = carrier_num;
+
                         break;
                     }
                 }
@@ -514,18 +519,13 @@ impl Demodulation2 {
                 // println!("start index: {}, tmp_buffer_len: {}", start_index, tmp_buffer_len);
 
                 while tmp_buffer_len - start_index >= demodulate_config.ref_signal_len[0]
-                    && tmp_bits_data[0].len() < payload_len
+                    && tmp_bits_data[0].len() < actual_payload_len
                 {
                     let window = &tmp_buffer.as_slices().0
                         [start_index..start_index + demodulate_config.ref_signal_len[0]];
-                    for k in 0..carrier_num {
+                    for k in 0..actual_carrier_num {
                         let dot_product =
                             dot_product(window, &self.demodulate_config.ref_signal[k]);
-                        // debug_vec.extend(
-                        //     &tmp_buffer.as_slices().0
-                        //         [start_index..start_index + demodulate_config.ref_signal_len[k]],
-                        // );
-
                         tmp_bits_data[k].push(if dot_product >= 0.0 { 0 } else { 1 });
                     }
                     start_index += demodulate_config.ref_signal_len[0];
@@ -536,7 +536,7 @@ impl Demodulation2 {
                 is_reboot = true;
                 demodulate_state = demodulate_state.next();
                 let mut to_send: Vec<Byte> = vec![];
-                for k in 0..carrier_num {
+                for k in 0..actual_carrier_num {
                     // println!("data: {:?}", tmp_bits_data[k]);
                     let result = decode(mem::replace(
                         &mut tmp_bits_data[k],
@@ -563,7 +563,11 @@ impl Demodulation2 {
             }
 
             let pop_times = if start_index == usize::MAX {
-                tmp_buffer_len - demodulate_config.preamble_len + 1
+                if start_index_ack == usize::MAX && start_index_data == usize::MAX {
+                    tmp_buffer_len - demodulate_config.preamble_len + 1
+                } else {
+                    start_index_ack.min(start_index_data)
+                }
             } else {
                 start_index
             };
@@ -573,6 +577,8 @@ impl Demodulation2 {
 
             start_index = if start_index == usize::MAX || is_reboot {
                 is_reboot = false;
+                start_index_ack = usize::MAX;
+                start_index_data = usize::MAX;
                 usize::MAX
             } else {
                 0

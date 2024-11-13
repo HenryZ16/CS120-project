@@ -246,7 +246,7 @@ pub fn gen_preamble(sample_rate: u32) -> Vec<f32> {
 pub fn gen_ack_preamble(sample_rate: u32) -> Vec<f32> {
     let start = 1e4;
     let end = 2e3;
-    let half_length = 20;
+    let half_length = 60;
     let dx: f64 = 1.0 / sample_rate as f64;
     let step = (end - start) as f64 / half_length as f64;
     let mut fp: Vec<f64> = (0..half_length).map(|i| start + i as f64 * step).collect();

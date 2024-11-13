@@ -1,9 +1,9 @@
-use std::{time::Duration, vec};
+use std::vec;
 
 use crate::{
     acoustic_mac::mac_frame::{MACFrame, MACType, MacAddress},
     acoustic_modem::{
-        demodulation::{Demodulation2, DemodulationState, SwitchSignal},
+        demodulation::{Demodulation2, DemodulationState},
         generator::PhyLayerGenerator,
     },
     utils::Byte,
@@ -11,7 +11,6 @@ use crate::{
 use core::result::Result::Ok;
 use cpal::{Device, SupportedStreamConfig};
 use tokio::sync::mpsc::unbounded_channel;
-use tokio_util::io::ReaderStream;
 
 pub struct MacReceiver {
     demodulator: Demodulation2,
@@ -27,7 +26,7 @@ impl MacReceiver {
 
     pub async fn receive_bytes(&mut self, byte_num: usize, self_mac: MacAddress) -> Vec<Byte> {
         let (decoded_data_tx, mut decoded_data_rx) = unbounded_channel();
-        let (status_tx, status_rx) = unbounded_channel();
+        let (_status_tx, status_rx) = unbounded_channel();
         let listen_task = self.demodulator.listening_daemon(
             decoded_data_tx,
             status_rx,

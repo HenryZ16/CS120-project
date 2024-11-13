@@ -2,11 +2,7 @@ use cpal::{Device, SupportedStreamConfig};
 
 use crate::{
     acoustic_mac::mac_frame::{self, MACFrame},
-    acoustic_modem::{
-        generator::{self, PhyLayerGenerator},
-        modulation::Modulator,
-        phy_frame,
-    },
+    acoustic_modem::{generator::PhyLayerGenerator, modulation::Modulator, phy_frame},
     utils::Byte,
 };
 use std::vec;

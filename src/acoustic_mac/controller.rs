@@ -370,7 +370,7 @@ impl MacDetector {
     ) {
         // println!("run daemon setup");
         let mut sample_stream = InputAudioStream::new(&device, config);
-        let mut sample = vec![];
+        let mut _sample = vec![];
         println!("detector daemon start");
         loop {
             tokio::select! {
@@ -379,7 +379,7 @@ impl MacDetector {
                 }
 
                 Some(data) = sample_stream.next() =>{
-                    sample = data;
+                    _sample = data;
                 }
             }
         }

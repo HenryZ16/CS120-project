@@ -63,7 +63,6 @@ impl PhyLayerGenerator {
             self.redundent_times,
             self.enable_ofdm,
             self.payload_bits_length,
-            self.data_bits_length,
             self.lowest_power_limit,
             device,
             config,
