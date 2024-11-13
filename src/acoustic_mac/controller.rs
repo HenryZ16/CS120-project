@@ -73,7 +73,7 @@ impl RecordTimer {
                 } else {
                     factor
                 };
-                let slot_times: u64 = self.rng.gen_range(0..=factor + 2);
+                let slot_times: u64 = 2_u64.pow(self.rng.gen_range(0..=factor + 2) as u32);
                 Duration::from_millis(
                     BACKOFF_SLOT_TIME * slot_times * ((continue_sends > 4) as u64 + 1),
                 )
