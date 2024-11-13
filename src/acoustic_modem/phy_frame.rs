@@ -8,7 +8,7 @@ use code_rs::coding::reed_solomon;
 pub const MAX_FRAME_DATA_LENGTH: usize = 72;
 pub const FRAME_PAYLOAD_LENGTH: usize = 144;
 pub const FRAME_LENGTH_LENGTH: usize = 12;
-pub const MAX_FRAME_DATA_LENGTH_NO_ENCODING: usize = 384;
+pub const MAX_FRAME_DATA_LENGTH_NO_ENCODING: usize = 488;
 pub const FRAME_LENGTH_LENGTH_NO_ENCODING: usize = 16;
 pub const FRAME_CRC_LENGTH_NO_ENCODING: usize = 8;
 
@@ -238,7 +238,6 @@ pub fn gen_preamble(sample_rate: u32) -> Vec<f32> {
         let trap_area = (fp[i] + fp[i - 1]) * dx / 2.0;
         res.push(res[i - 1] + trap_area);
     }
-    res.extend(vec![0.0; 30]);
     res.into_iter()
         .map(|x| (2.0 * std::f64::consts::PI * x).sin() as f32)
         .collect()
