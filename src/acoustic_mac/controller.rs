@@ -29,8 +29,8 @@ use super::{
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
 const MAX_SEND: u64 = 6;
-const ACK_WAIT_TIME: u64 = 120;
-const BACKOFF_SLOT_TIME: u64 = 113;
+const ACK_WAIT_TIME: u64 = 100;
+const BACKOFF_SLOT_TIME: u64 = 90;
 const BACKOFF_MAX_FACTOR: u64 = 10;
 
 const DETECT_SIGNAL: Byte = 1;
@@ -161,7 +161,7 @@ impl MacController {
                             cur_send_frame += 1;
                             if cur_send_frame == send_frame.len() {
                                 send_padding = false;
-                            } else if send_frame.len() >= cur_send_frame {
+                            } else if send_frame.len() > cur_send_frame {
                                 retry_times = 0;
                                 resend_times = 0;
                                 continue_sends += 1;
