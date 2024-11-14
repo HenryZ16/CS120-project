@@ -93,7 +93,7 @@ impl Modulator {
         //     .collect();
 
         // fill up the payload
-        // let mut data = data;
+        let mut data = data;
         let mut data_bits_len = data_bits_len;
         // while data.len() * 8 < phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING * carrier_cnt {
         //     data.push(0);
@@ -101,29 +101,36 @@ impl Modulator {
 
         // modulate the data for each carrier
         let mut modulated_psk_signal: Vec<f32> = vec![];
-        let mut last_len = 0;
+        let mut max_len = 0;
         for i in 0..carrier_cnt {
             let (payload, phy_len) = if data_bits_len > 0 {
+                // start, end: ptr to decompressed u8
                 let data_start = i * phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING;
                 let data_end = if data_bits_len >= phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING {
                     (i + 1) * phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING
                 } else {
                     data.len() * 8
                 };
+                let mut real_end = data_end;
+                while real_end - data_start < max_len {
+                    data.push(0);
+                    real_end += 8;
+                }
 
                 (
-                    data[(data_start >> 3)..(data_end >> 3)].to_vec(),
+                    data[(data_start >> 3)..(real_end >> 3)].to_vec(),
                     data_end - data_start,
                 )
             } else {
-                (vec![0; last_len], 0)
+                (vec![0; max_len], 0)
             };
             data_bits_len -= phy_len;
-            last_len = phy_len;
+            max_len = if phy_len > max_len { phy_len } else { max_len };
 
             // println!(
-            //     "[bits_2_wave_single_ofdm_frame_no_ecc] phy_len: {}",
-            //     phy_len
+            //     "[bits_2_wave_single_ofdm_frame_no_ecc] phy_len: {}, payload.len(): {:?}",
+            //     phy_len,
+            //     payload.len()
             // );
             let frame = phy_frame::PHYFrame::new_no_encoding(phy_len, payload);
             let frame_bits = PHYFrame::add_crc(frame.1);
