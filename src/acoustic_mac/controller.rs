@@ -28,8 +28,8 @@ use super::{
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
 const MAX_SEND: u64 = 8;
-const ACK_WAIT_TIME: u64 = 100;
-const BACKOFF_SLOT_TIME: u64 = 80;
+const ACK_WAIT_TIME: u64 = 60;
+const BACKOFF_SLOT_TIME: u64 = 70;
 const BACKOFF_MAX_FACTOR: u64 = 12;
 
 const DETECT_SIGNAL: Byte = 1;
@@ -156,7 +156,7 @@ impl MacController {
                 if let Ok(data) = decoded_data_rx.try_recv() {
                     // check data type
                     if mac_frame::MACFrame::get_dst(&data) == mac_address {
-                        println!("[Controller]: received data: {:?}", data);
+                        // println!("[Controller]: received data: {:?}", data);
                         if mac_frame::MACFrame::get_type(&data) == MACType::Ack {
                             cur_send_frame += 1;
                             if cur_send_frame == send_frame.len() {

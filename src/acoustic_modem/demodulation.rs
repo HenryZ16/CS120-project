@@ -574,15 +574,15 @@ impl Demodulation2 {
                             + phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
                             + phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING
                     };
-                    println!("payload_len: {}", payload_len);
+                    // println!("payload_len: {}", payload_len);
                 }
 
                 if tmp_bits_data[0].len() >= payload_len {
                     is_reboot = true;
                     let mut to_send: Vec<Byte> = vec![];
-                    println!("decoding payload len: {}", payload_len);
+                    // println!("decoding payload len: {}", payload_len);
                     for k in 0..carrier_num {
-                        println!("decoded length: {:?}", length);
+                        // println!("decoded length: {:?}", length);
                         let compressed_data = read_data_2_compressed_u8(
                             tmp_bits_data[k][0..(phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
                                 + phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING
