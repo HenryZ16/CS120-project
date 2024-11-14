@@ -76,6 +76,7 @@ impl Modulator {
             .unwrap();
     }
 
+    // data: compressed
     // data_bits_len: the total bits cnt of the data
     pub async fn bits_2_wave_single_ofdm_frame_no_ecc(
         &mut self,
@@ -104,14 +105,14 @@ impl Modulator {
             if data_bits_len == 0 {
                 break;
             }
-            let data_start = i * phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING / 8;
+            let data_start = i * phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING;
             let data_end = if data_bits_len >= phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING {
-                (i + 1) * phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING / 8
+                (i + 1) * phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING
             } else {
                 data.len()
             };
-            let payload = data[data_start..data_end].to_vec();
-            let phy_len = (data_end - data_start) * 8;
+            let payload = data[(data_start >> 3)..(data_end >> 3)].to_vec();
+            let phy_len = data_end - data_start;
             data_bits_len -= phy_len;
 
             // println!(
