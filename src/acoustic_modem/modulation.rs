@@ -82,8 +82,6 @@ impl Modulator {
         data: Vec<Byte>,
         data_bits_len: usize,
     ) -> Vec<f32> {
-        let mut data_bits_len = data_bits_len;
-
         // let data_bits_len = data_bits_len as usize;
         let carrier_cnt = self.get_carrier_cnt();
         assert!(data_bits_len <= carrier_cnt * phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING);
@@ -94,25 +92,27 @@ impl Modulator {
         //     .collect();
 
         // fill up the payload
-        let mut data = data;
-        while data.len() * 8 < phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING * carrier_cnt {
-            data.push(0);
-        }
+        // let mut data = data;
+        let mut data_bits_len = data_bits_len;
+        // while data.len() * 8 < phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING * carrier_cnt {
+        //     data.push(0);
+        // }
 
         // modulate the data for each carrier
         let mut modulated_psk_signal: Vec<f32> = vec![];
         for i in 0..carrier_cnt {
+            if data_bits_len == 0 {
+                break;
+            }
             let data_start = i * phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING / 8;
-            let data_end = (i + 1) * phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING / 8;
-            let payload = data[data_start..data_end].to_vec();
-            let phy_len = if data_bits_len >= (i + 1) * phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING
-            {
-                phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING
+            let data_end = if data_bits_len >= phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING {
+                (i + 1) * phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING / 8
             } else {
-                let prev_data_bits_len = data_bits_len;
-                data_bits_len = 0;
-                prev_data_bits_len % phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING
+                data.len()
             };
+            let payload = data[data_start..data_end].to_vec();
+            let phy_len = data_end - data_start;
+            data_bits_len -= phy_len * 8;
 
             // println!(
             //     "[bits_2_wave_single_ofdm_frame_no_ecc] phy_len: {}",

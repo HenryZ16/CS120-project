@@ -34,11 +34,11 @@ impl PHYFrame {
         payload.push((length >> 8) as u8);
         payload.push((length & 0xff) as u8);
         payload.extend(data);
-        while payload.len()
-            < (MAX_FRAME_DATA_LENGTH_NO_ENCODING + FRAME_LENGTH_LENGTH_NO_ENCODING) / 8
-        {
-            payload.push(0);
-        }
+        // while payload.len()
+        //     < (MAX_FRAME_DATA_LENGTH_NO_ENCODING + FRAME_LENGTH_LENGTH_NO_ENCODING) / 8
+        // {
+        //     payload.push(0);
+        // }
 
         (length, payload)
     }
