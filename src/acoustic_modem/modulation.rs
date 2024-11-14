@@ -111,7 +111,7 @@ impl Modulator {
                 data.len()
             };
             let payload = data[data_start..data_end].to_vec();
-            let phy_len = data_end - data_start;
+            let phy_len = (data_end - data_start) * 8;
             data_bits_len -= phy_len * 8;
 
             // println!(
