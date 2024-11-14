@@ -156,6 +156,7 @@ impl MacController {
                 if let Ok(data) = decoded_data_rx.try_recv() {
                     // check data type
                     if mac_frame::MACFrame::get_dst(&data) == mac_address {
+                        println!("[Controller]: received data: {:?}", data);
                         if mac_frame::MACFrame::get_type(&data) == MACType::Ack {
                             cur_send_frame += 1;
                             if cur_send_frame == send_frame.len() {
