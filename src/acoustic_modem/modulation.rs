@@ -102,17 +102,20 @@ impl Modulator {
         // modulate the data for each carrier
         let mut modulated_psk_signal: Vec<f32> = vec![];
         for i in 0..carrier_cnt {
-            if data_bits_len == 0 {
-                break;
-            }
-            let data_start = i * phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING;
-            let data_end = if data_bits_len >= phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING {
-                (i + 1) * phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING
+            let (payload, phy_len) = if data_bits_len > 0 {
+                let data_start = i * phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING;
+                let data_end = if data_bits_len >= phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING {
+                    (i + 1) * phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING
+                } else {
+                    data.len() * 8
+                };
+                (
+                    data[(data_start >> 3)..(data_end >> 3)].to_vec(),
+                    data_end - data_start,
+                )
             } else {
-                data.len() * 8
+                (vec![], 0)
             };
-            let payload = data[(data_start >> 3)..(data_end >> 3)].to_vec();
-            let phy_len = data_end - data_start;
             data_bits_len -= phy_len;
 
             // println!(
