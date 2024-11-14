@@ -454,6 +454,7 @@ impl Demodulation2 {
                                 carrier_num
                             ];
                         is_reboot = false;
+                        input_stream.fresh();
                         continue;
                     }
                     SwitchSignal::ResumeSignal => {
@@ -466,6 +467,7 @@ impl Demodulation2 {
                 }
             }
             if demodulate_state == DemodulationState::Stop {
+                input_stream.fresh();
                 continue;
             }
 

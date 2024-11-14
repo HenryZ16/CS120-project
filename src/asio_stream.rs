@@ -178,6 +178,10 @@ impl InputAudioStream {
         };
         return Self { stream, receiver };
     }
+
+    pub fn fresh(&mut self) {
+        while let Ok(_) = self.receiver.try_recv() {}
+    }
 }
 
 impl Stream for InputAudioStream {
