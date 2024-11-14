@@ -82,6 +82,8 @@ impl Modulator {
         data: Vec<Byte>,
         data_bits_len: usize,
     ) -> Vec<f32> {
+        let mut data_bits_len = data_bits_len;
+
         // let data_bits_len = data_bits_len as usize;
         let carrier_cnt = self.get_carrier_cnt();
         assert!(data_bits_len <= carrier_cnt * phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING);
@@ -107,7 +109,9 @@ impl Modulator {
             {
                 phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING
             } else {
-                data_bits_len % phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING
+                let prev_data_bits_len = data_bits_len;
+                data_bits_len = 0;
+                prev_data_bits_len % phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING
             };
 
             // println!(
