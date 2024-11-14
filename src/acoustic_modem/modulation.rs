@@ -109,7 +109,7 @@ impl Modulator {
             let data_end = if data_bits_len >= phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING {
                 (i + 1) * phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING
             } else {
-                data.len()
+                data.len() * 8
             };
             let payload = data[(data_start >> 3)..(data_end >> 3)].to_vec();
             let phy_len = data_end - data_start;
