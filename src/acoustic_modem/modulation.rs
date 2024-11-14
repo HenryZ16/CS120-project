@@ -112,7 +112,7 @@ impl Modulator {
             };
             let payload = data[data_start..data_end].to_vec();
             let phy_len = (data_end - data_start) * 8;
-            data_bits_len -= phy_len * 8;
+            data_bits_len -= phy_len;
 
             // println!(
             //     "[bits_2_wave_single_ofdm_frame_no_ecc] phy_len: {}",
