@@ -151,6 +151,8 @@ impl MacController {
             if receive_byte_num > 0 {
                 recv_padding = true;
             }
+
+            let mut t_rtt_start = Instant::now();
             while send_padding || recv_padding {
                 if let Ok(data) = decoded_data_rx.try_recv() {
                     // check data type
@@ -163,7 +165,11 @@ impl MacController {
                                 retry_times = 0;
                                 resend_times = 0;
                                 continue_sends += 1;
-                                println!("send frame {} success", cur_send_frame);
+                                println!(
+                                    "send frame {} success, RTT: {:?}",
+                                    cur_send_frame,
+                                    t_rtt_start.elapsed()
+                                );
                                 timer.start(TimerType::BACKOFF, retry_times, continue_sends);
                             }
                         } else {
@@ -222,6 +228,7 @@ impl MacController {
                             timer.start(TimerType::BACKOFF, retry_times, continue_sends);
                         }
                         TimerType::BACKOFF => {
+                            t_rtt_start = Instant::now();
                             if MacController::send_frame(
                                 &demodulate_status_tx,
                                 &mut detector,
@@ -297,12 +304,10 @@ impl MacController {
         } else {
             true
         };
-        let t_start = Instant::now();
         if is_empty {
             // send the frame
             sender.send_frame(to_send_frame).await;
         }
-        println!("send frame time: {:?}", t_start.elapsed());
 
         // demodulator open
         let _ = demodulate_status_tx.send(SwitchSignal::ResumeSignal);

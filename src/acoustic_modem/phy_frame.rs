@@ -8,7 +8,7 @@ use code_rs::coding::reed_solomon;
 pub const MAX_FRAME_DATA_LENGTH: usize = 72;
 pub const FRAME_PAYLOAD_LENGTH: usize = 144;
 pub const FRAME_LENGTH_LENGTH: usize = 12;
-pub const MAX_FRAME_DATA_LENGTH_NO_ENCODING: usize = 488;
+pub const MAX_FRAME_DATA_LENGTH_NO_ENCODING: usize = 384;
 pub const FRAME_LENGTH_LENGTH_NO_ENCODING: usize = 16;
 pub const FRAME_CRC_LENGTH_NO_ENCODING: usize = 8;
 
@@ -46,14 +46,14 @@ impl PHYFrame {
     // make sure that there's no crc in the data
     pub fn add_crc(data: Vec<Byte>) -> Vec<Byte> {
         assert_eq!(FRAME_CRC_LENGTH_NO_ENCODING, 8);
-        let mut crc = 0;
+        let mut res: Vec<Byte> = vec![0];
+        res.extend(data.clone());
+
         // to make it simple, just xor all the bytes
-        for &byte in &data {
-            crc ^= byte;
+        for byte in data {
+            res[0] ^= byte;
         }
 
-        let mut res = data;
-        res.push(crc);
         res
     }
 
