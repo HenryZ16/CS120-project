@@ -411,7 +411,7 @@ impl Demodulation2 {
         init_state: DemodulationState,
     ) -> Result<(), anyhow::Error> {
         let demodulate_config = &self.demodulate_config;
-        let mut payload_len = demodulate_config.payload_bits_length;
+        let mut payload_len = usize::MAX;
 
         let mut demodulate_state = init_state;
 
@@ -429,7 +429,8 @@ impl Demodulation2 {
 
         let carrier_num = demodulate_config.ref_signal.len();
         // println!("low bound {}", power_lim_preamble);
-        let mut tmp_bits_data = vec![Vec::with_capacity(payload_len); carrier_num];
+        let mut tmp_bits_data =
+            vec![Vec::with_capacity(demodulate_config.payload_bits_length); carrier_num];
         let mut length = vec![usize::MAX; carrier_num];
 
         let mut is_reboot = false;
@@ -447,7 +448,11 @@ impl Demodulation2 {
                         start_index = usize::MAX;
                         local_max = 0.0;
                         demodulate_state = demodulate_state.stop();
-                        tmp_bits_data = vec![Vec::with_capacity(payload_len); carrier_num];
+                        tmp_bits_data =
+                            vec![
+                                Vec::with_capacity(demodulate_config.payload_bits_length);
+                                carrier_num
+                            ];
                         is_reboot = false;
                         continue;
                     }
@@ -531,11 +536,14 @@ impl Demodulation2 {
                     }
                     start_index += demodulate_config.ref_signal_len[0];
                 }
-                if tmp_bits_data[0].len()
-                    > phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
-                        + phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING
+                if payload_len == usize::MAX
+                    && tmp_bits_data[0].len()
+                        > phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
+                            + phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING
                 {
                     for k in 0..carrier_num {
+                        // println!("tmp bits: {:?}", tmp_bits_data[k]);
+                        length[k] = 0;
                         for &bit in &tmp_bits_data[k][phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
                             ..phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
                                 + phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING]
@@ -556,13 +564,23 @@ impl Demodulation2 {
                             break;
                         }
                     }
-                    payload_len = *length.iter().max().unwrap();
+                    let max_length = *length.iter().max().unwrap();
+                    payload_len = if max_length == usize::MAX {
+                        usize::MAX
+                    } else {
+                        max_length
+                            + phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
+                            + phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING
+                    };
+                    // println!("payload_len: {}", payload_len);
                 }
 
                 if tmp_bits_data[0].len() >= payload_len {
                     is_reboot = true;
                     let mut to_send: Vec<Byte> = vec![];
+                    // println!("decoding payload len: {}", payload_len);
                     for k in 0..carrier_num {
+                        // println!("decoded length: {:?}", length);
                         let compressed_data = read_data_2_compressed_u8(
                             tmp_bits_data[k][0..(phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
                                 + phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING
@@ -583,6 +601,7 @@ impl Demodulation2 {
                     }
                     if to_send.len() > 0 {
                         let _ = output_tx.send(to_send);
+                        // println!("received data");
                     }
                     // println!("tmp bit len: {}", tmp_bits_data.len());
                     // println!("reboot");
@@ -599,8 +618,12 @@ impl Demodulation2 {
             }
 
             start_index = if start_index == usize::MAX || is_reboot {
+                payload_len = usize::MAX;
                 demodulate_state = demodulate_state.resume();
                 is_reboot = false;
+                for k in 0..carrier_num {
+                    tmp_bits_data[k].clear();
+                }
                 length = vec![usize::MAX; carrier_num];
                 usize::MAX
             } else {

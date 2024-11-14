@@ -16,12 +16,14 @@ pub struct MACFrame {
 pub enum MACType {
     Data,
     Ack,
+    Unknown,
 }
 
 pub fn mactype_2_u8(mac_type: MACType) -> Byte {
     match mac_type {
         MACType::Data => 0,
         MACType::Ack => 1,
+        MACType::Unknown => 2,
     }
 }
 
@@ -29,7 +31,7 @@ pub fn u8_2_mactype(byte: Byte) -> MACType {
     match byte {
         0 => MACType::Data,
         1 => MACType::Ack,
-        _ => panic!("Invalid MACType"),
+        _ => MACType::Unknown,
     }
 }
 
