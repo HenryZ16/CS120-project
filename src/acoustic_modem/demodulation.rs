@@ -411,7 +411,7 @@ impl Demodulation2 {
         init_state: DemodulationState,
     ) -> Result<(), anyhow::Error> {
         let demodulate_config = &self.demodulate_config;
-        let payload_len = demodulate_config.payload_bits_length;
+        let mut payload_len = demodulate_config.payload_bits_length;
 
         let mut demodulate_state = init_state;
 
@@ -430,6 +430,7 @@ impl Demodulation2 {
         let carrier_num = demodulate_config.ref_signal.len();
         // println!("low bound {}", power_lim_preamble);
         let mut tmp_bits_data = vec![Vec::with_capacity(payload_len); carrier_num];
+        let mut length = vec![usize::MAX; carrier_num];
 
         let mut is_reboot = false;
         let mut input_stream: InputAudioStream = self.input_config.create_input_stream();
@@ -530,36 +531,62 @@ impl Demodulation2 {
                     }
                     start_index += demodulate_config.ref_signal_len[0];
                 }
-            }
-
-            if tmp_bits_data[0].len() >= payload_len {
-                is_reboot = true;
-                demodulate_state = demodulate_state.next();
-                let mut to_send: Vec<Byte> = vec![];
-                for k in 0..carrier_num {
-                    // println!("data: {:?}", tmp_bits_data[k]);
-                    let result = decode(mem::replace(
-                        &mut tmp_bits_data[k],
-                        Vec::with_capacity(payload_len),
-                    ));
-                    // tmp_bits_data[k].clear();
-
-                    match result {
-                        Ok((meta_data, _)) => {
-                            to_send.extend(meta_data.iter());
+                if tmp_bits_data[0].len()
+                    > phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
+                        + phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING
+                {
+                    for k in 0..carrier_num {
+                        for &bit in &tmp_bits_data[k][phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
+                            ..phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
+                                + phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING]
+                        {
+                            length[k] <<= 1;
+                            length[k] += bit as usize;
                         }
-                        Err(msg) => {
-                            println!("{}", msg);
-                            to_send.clear();
+                        if length[k]
+                            > if ENABLE_ECC {
+                                phy_frame::MAX_FRAME_DATA_LENGTH
+                            } else {
+                                phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING
+                            }
+                        {
+                            println!("[Demodulation]: !!! length wrong");
+                            length[k] = usize::MAX;
+                            is_reboot = true;
                             break;
                         }
                     }
+                    payload_len = *length.iter().max().unwrap();
                 }
-                if to_send.len() > 0 {
-                    let _ = output_tx.send(to_send);
+
+                if tmp_bits_data[0].len() >= payload_len {
+                    is_reboot = true;
+                    let mut to_send: Vec<Byte> = vec![];
+                    for k in 0..carrier_num {
+                        let compressed_data = read_data_2_compressed_u8(
+                            tmp_bits_data[k][0..(phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
+                                + phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING
+                                + length[k])]
+                                .to_vec(),
+                        );
+                        if !PHYFrame::check_crc(&compressed_data) {
+                            println!("[Demodulation]: !!! CRC wrong");
+                            to_send.clear();
+                            break;
+                        } else {
+                            to_send.extend_from_slice(
+                                &compressed_data[(phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
+                                    + phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING)
+                                    ..compressed_data.len()],
+                            );
+                        }
+                    }
+                    if to_send.len() > 0 {
+                        let _ = output_tx.send(to_send);
+                    }
+                    // println!("tmp bit len: {}", tmp_bits_data.len());
+                    // println!("reboot");
                 }
-                // println!("tmp bit len: {}", tmp_bits_data.len());
-                // println!("reboot");
             }
 
             let pop_times = if start_index == usize::MAX {
@@ -572,7 +599,9 @@ impl Demodulation2 {
             }
 
             start_index = if start_index == usize::MAX || is_reboot {
+                demodulate_state = demodulate_state.resume();
                 is_reboot = false;
+                length = vec![usize::MAX; carrier_num];
                 usize::MAX
             } else {
                 0
