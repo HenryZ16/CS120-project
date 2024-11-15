@@ -34,4 +34,5 @@ The length of our PHY Frame is 1064, where each part is:
 
 We appreciate the guides and public repositories below:
 - [Rust ASIO Guide](https://acm.shanghaitech.edu.cn/rust-asio/00_introduction.html)
-- all of the dependencies in `Carro.toml`
+- [rathernet](https://github.com/profetia/rathernet)
+- all of the dependencies in `Cargo.toml`
