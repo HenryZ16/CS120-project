@@ -156,7 +156,7 @@ impl Modulator {
             //     payload.len(),
             //     i
             // );
-            let frame = phy_frame::PHYFrame::new_no_encoding(phy_len, payload);
+            let frame = phy_frame::PHYFrame::new_no_encoding(phy_len * 8, payload);
             let frame_bits = PHYFrame::add_crc(frame.1);
             // println!(
             //     "[bits_2_wave_single_ofdm_frame_no_ecc] frame_bits.len(): {}, frame_bits: {:?}",
