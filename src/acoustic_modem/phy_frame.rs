@@ -8,7 +8,7 @@ use code_rs::coding::reed_solomon;
 pub const MAX_FRAME_DATA_LENGTH: usize = 72;
 pub const FRAME_PAYLOAD_LENGTH: usize = 144;
 pub const FRAME_LENGTH_LENGTH: usize = 12;
-pub const MAX_FRAME_DATA_LENGTH_NO_ENCODING: usize = 288;
+pub const MAX_FRAME_DATA_LENGTH_NO_ENCODING: usize = 440;
 pub const FRAME_LENGTH_LENGTH_NO_ENCODING: usize = 16;
 pub const FRAME_CRC_LENGTH_NO_ENCODING: usize = 8;
 

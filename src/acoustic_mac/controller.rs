@@ -74,9 +74,9 @@ impl RecordTimer {
                     1 << factor
                 };
                 let mut slot_times: u64 = self.rng.gen_range(0..=factor);
-                // if continue_sends > 4 {
-                //     slot_times *= 2;
-                // }
+                if continue_sends > 4 {
+                    slot_times *= 2;
+                }
                 Duration::from_millis(BACKOFF_SLOT_TIME * slot_times)
             }
             TimerType::ACK => Duration::from_millis(ACK_WAIT_TIME),
@@ -237,7 +237,7 @@ impl MacController {
                                 // continue;
                             }
 
-                            timer.start(TimerType::BACKOFF, resend_times, continue_sends);
+                            timer.start(TimerType::BACKOFF, 0, continue_sends);
                         }
                         TimerType::BACKOFF => {
                             t_rtt_start = Instant::now();
