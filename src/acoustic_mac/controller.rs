@@ -27,10 +27,10 @@ use super::{
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
-const MAX_SEND: u64 = 14;
-const ACK_WAIT_TIME: u64 = 40;
-const BACKOFF_SLOT_TIME: u64 = 50;
-const BACKOFF_MAX_FACTOR: u64 = 20;
+const MAX_SEND: u64 = 23;
+const ACK_WAIT_TIME: u64 = 30;
+const BACKOFF_SLOT_TIME: u64 = 23;
+const BACKOFF_MAX_FACTOR: u64 = 12;
 
 const DETECT_SIGNAL: Byte = 1;
 const ENERGE_LIMIT: f32 = 0.005;
@@ -72,7 +72,10 @@ impl RecordTimer {
                 } else {
                     factor
                 };
-                let slot_times: u64 = self.rng.gen_range(0..=factor + 2);
+                let mut slot_times: u64 = self.rng.gen_range(0..=factor + 2);
+                if continue_sends > 4 {
+                    slot_times *= 2;
+                }
                 Duration::from_millis(BACKOFF_SLOT_TIME * slot_times)
             }
             TimerType::ACK => Duration::from_millis(ACK_WAIT_TIME),
@@ -146,6 +149,7 @@ impl MacController {
             if send_frame.len() > 0 {
                 timer.start(TimerType::BACKOFF, retry_times, continue_sends);
                 send_padding = true;
+                println!("frames to send: {}", send_frame.len());
             }
             if receive_byte_num > 0 {
                 recv_padding = true;
@@ -382,6 +386,6 @@ impl MacDetector {
 fn calculate_energy(samples: &[f32]) -> f32 {
     let sum_of_squares: f32 = samples.iter().map(|&sample| sample * sample).sum();
     let energy = sum_of_squares / samples.len() as f32;
-    // println!("avg energy: {}", energy);
+    println!("avg energy: {}", energy);
     energy
 }
