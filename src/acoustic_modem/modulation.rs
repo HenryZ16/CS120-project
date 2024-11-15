@@ -102,46 +102,70 @@ impl Modulator {
         // modulate the data for each carrier
         let mut modulated_psk_signal: Vec<f32> = vec![];
         let mut max_len = 0;
+        let mut payload_slice = vec![];
+
+        // payload slice to fit in 3 carriers
         for i in 0..carrier_cnt {
-            let (payload, phy_len) = if data_bits_len > 0 {
-                // start, end: ptr to decompressed u8
-                let data_start = i * phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING;
-                let data_end = if data_bits_len >= phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING {
-                    (i + 1) * phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING
+            if i == 0 {
+                // (max_frame_len / 8 - 3) / 2
+                if data.len() > ((phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING >> 3) - 3) >> 1 {
+                    let data_slice: Vec<Byte> = data
+                        .drain(0..(((phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING >> 3) - 3) >> 1))
+                        .collect();
+                    payload_slice.push(data_slice);
                 } else {
-                    data.len() * 8
-                };
-                let mut real_end = data_end;
-                while real_end - data_start < max_len {
-                    data.push(0);
-                    real_end += 8;
+                    payload_slice.push(data.clone());
+                    data.clear();
                 }
-
-                (
-                    data[(data_start >> 3)..(real_end >> 3)].to_vec(),
-                    data_end - data_start,
-                )
+                if (payload_slice[i].len() << 1) + 3 > max_len {
+                    max_len = (payload_slice[i].len() << 1) + 3
+                }
             } else {
-                (vec![0; max_len], 0)
-            };
-            data_bits_len -= phy_len;
-            max_len = if phy_len > max_len { phy_len } else { max_len };
+                if data.len() > phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING >> 3 {
+                    let data_slice: Vec<Byte> = data
+                        .drain(0..phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING >> 3)
+                        .collect();
+                    payload_slice.push(data_slice);
+                } else {
+                    payload_slice.push(data.clone());
+                    data.clear();
+                }
+                if payload_slice[i].len() > max_len {
+                    max_len = payload_slice[i].len()
+                }
+            }
+        }
 
-            // println!(
-            //     "[bits_2_wave_single_ofdm_frame_no_ecc] phy_len: {}, payload.len(): {:?} for carrier {}",
-            //     phy_len,
-            //     payload.len(),
-            //     i
-            // );
+        for i in 0..carrier_cnt {
+            // fill up zeros if payload_slice[i].len() < max_len or payload_slice[0].len() < max_len >> 1
+            let phy_len = payload_slice[i].len();
+            if i == 0 {
+                while (payload_slice[i].len() << 1) + 3 < max_len {
+                    payload_slice[i].push(0);
+                }
+            } else {
+                while payload_slice[i].len() < max_len {
+                    payload_slice[i].push(0);
+                }
+            }
+            let payload = payload_slice[i].clone();
+
+            println!(
+                "[bits_2_wave_single_ofdm_frame_no_ecc] phy_len: {}, payload.len(): {:?} for carrier {}",
+                phy_len,
+                payload.len(),
+                i
+            );
             let frame = phy_frame::PHYFrame::new_no_encoding(phy_len, payload);
             let frame_bits = PHYFrame::add_crc(frame.1);
-            // println!(
-            //     "[bits_2_wave_single_ofdm_frame_no_ecc] frame_bits: {:?}",
-            //     frame_bits
-            // );
+            println!(
+                "[bits_2_wave_single_ofdm_frame_no_ecc] frame_bits.len(): {}, frame_bits: {:?}",
+                frame_bits.len(),
+                frame_bits
+            );
             let decompressed_data = utils::read_compressed_u8_2_data(frame_bits);
             modulated_psk_signal = if i == 0 {
-                self.modulate(&decompressed_data, i)
+                self.modulate(&decompressed_data, 0)
             } else {
                 let modulated_psk_signal_i = self.modulate(&decompressed_data, i);
                 modulated_psk_signal
@@ -512,17 +536,17 @@ impl Modulator {
     }
 
     // translate the bits into modulated signal
-    pub fn modulate(&self, bits: &Vec<u8>, carrrier_freq_id: usize) -> Vec<f32> {
+    pub fn modulate(&self, bits: &Vec<u8>, carrier_freq_id: usize) -> Vec<f32> {
         // println!("output: {:?}, length: {}", bits, bits.len());
-
         let mut modulated_signal = vec![];
         // redundant periods for each bit
-        let sample_cnt_each_bit =
-            self.sample_rate * self.redundant_periods as u32 / self.carrier_freq[1];
+        let chose_carrier_freq_id = if carrier_freq_id >= 1 { 1 } else { 0 };
+        let sample_cnt_each_bit = self.sample_rate * self.redundant_periods as u32
+            / self.carrier_freq[chose_carrier_freq_id];
         let mut bit_id = 0;
         while bit_id < bits.len() {
             let bit = bits[bit_id];
-            let freq = self.carrier_freq[carrrier_freq_id];
+            let freq = self.carrier_freq[carrier_freq_id];
             for i in 0..sample_cnt_each_bit {
                 let sample = (if bit == 0 {
                     1.0
@@ -530,20 +554,12 @@ impl Modulator {
                     -1.0
                 } else {
                     0.0
-                }) * if carrrier_freq_id == 0 {
-                    (2.0 * std::f64::consts::PI
-                        * freq as f64
-                        * (i + bit_id as u32 * sample_cnt_each_bit) as f64
-                        / self.sample_rate as f64)
-                        .sin()
-                        .abs()
-                } else {
-                    (2.0 * std::f64::consts::PI
-                        * freq as f64
-                        * (i + bit_id as u32 * sample_cnt_each_bit) as f64
-                        / self.sample_rate as f64)
-                        .sin()
-                };
+                }) * (2.0
+                    * std::f64::consts::PI
+                    * freq as f64
+                    * (i + bit_id as u32 * sample_cnt_each_bit) as f64
+                    / self.sample_rate as f64)
+                    .sin();
                 modulated_signal.push(sample as f32);
             }
             bit_id += 1;

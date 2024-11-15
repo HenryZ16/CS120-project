@@ -27,7 +27,7 @@ use super::{
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
-const MAX_SEND: u64 = 30;
+const MAX_SEND: u64 = 60;
 const ACK_WAIT_TIME: u64 = 30;
 const BACKOFF_SLOT_TIME: u64 = 85;
 const BACKOFF_MAX_FACTOR: u64 = 6;
