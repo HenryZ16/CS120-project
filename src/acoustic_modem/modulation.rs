@@ -150,19 +150,19 @@ impl Modulator {
             }
             let payload = payload_slice[i].clone();
 
-            println!(
-                "[bits_2_wave_single_ofdm_frame_no_ecc] phy_len: {}, payload.len(): {:?} for carrier {}",
-                phy_len,
-                payload.len(),
-                i
-            );
+            // println!(
+            //     "[bits_2_wave_single_ofdm_frame_no_ecc] phy_len: {}, payload.len(): {:?} for carrier {}",
+            //     phy_len,
+            //     payload.len(),
+            //     i
+            // );
             let frame = phy_frame::PHYFrame::new_no_encoding(phy_len, payload);
             let frame_bits = PHYFrame::add_crc(frame.1);
-            println!(
-                "[bits_2_wave_single_ofdm_frame_no_ecc] frame_bits.len(): {}, frame_bits: {:?}",
-                frame_bits.len(),
-                frame_bits
-            );
+            // println!(
+            //     "[bits_2_wave_single_ofdm_frame_no_ecc] frame_bits.len(): {}, frame_bits: {:?}",
+            //     frame_bits.len(),
+            //     frame_bits
+            // );
             let decompressed_data = utils::read_compressed_u8_2_data(frame_bits);
             modulated_psk_signal = if i == 0 {
                 self.modulate(&decompressed_data, 0)

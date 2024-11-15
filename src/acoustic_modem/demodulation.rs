@@ -551,7 +551,7 @@ impl Demodulation2 {
                             + phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING
                 {
                     for k in 0..carrier_num {
-                        // println!("tmp bits: {:?}", tmp_bits_data[k]);
+                        println!("tmp bits: {:?}", tmp_bits_data[k]);
                         length[k] = 0;
                         for &bit in &tmp_bits_data[k][phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
                             ..phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
@@ -577,6 +577,8 @@ impl Demodulation2 {
                         }
                     }
                     let max_length = *length.iter().max().unwrap();
+                    println!("length: {:?}", length);
+                    // println!("max length: {}", max_length);
                     payload_len = if max_length == usize::MAX {
                         usize::MAX
                     } else {
@@ -584,16 +586,18 @@ impl Demodulation2 {
                             + phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
                             + phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING
                     };
+                    // if length[0] == 416 {
                     length[0] /= 2;
+                    // }
                     // println!("payload_len: {}", payload_len);
                 }
 
-                if tmp_bits_data[1].len() >= payload_len {
+                if tmp_bits_data[1].len() / 2 >= payload_len {
                     is_reboot = true;
                     let mut to_send: Vec<Byte> = vec![];
-                    // println!("decoding payload len: {}", payload_len);
+                    println!("decoding payload len: {}", payload_len);
                     for k in 0..carrier_num {
-                        // println!("decoded length: {:?}", length);
+                        println!("decoded length: {:?}", length);
                         if length[k] == 0 {
                             break;
                         }
@@ -605,8 +609,9 @@ impl Demodulation2 {
                         );
                         if !PHYFrame::check_crc(&compressed_data) {
                             println!("[Demodulation]: !!! CRC wrong at frame: {}", k);
+                            println!("data: {:?}", compressed_data);
                             to_send.clear();
-                            break;
+                            // break;
                         } else {
                             to_send.extend_from_slice(
                                 &compressed_data[(phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
