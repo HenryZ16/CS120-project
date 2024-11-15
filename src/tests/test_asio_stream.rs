@@ -20,8 +20,8 @@ async fn test_input_stream() {
     let default_config = device.default_input_config().unwrap();
     let config = SupportedStreamConfig::new(
         // default_config.channels(),
-        1,                  // mono
-        SampleRate(192000), // sample rate
+        1,                 // mono
+        SampleRate(48000), // sample rate
         default_config.buffer_size().clone(),
         default_config.sample_format(),
     );
@@ -36,7 +36,7 @@ async fn test_input_stream() {
     // let mut data2: Vec<f32> = Vec::with_capacity(64000);
 
     println!("start listening");
-    for _ in 0..4500 {
+    for _ in 0..2500 {
         let result = input1.next().await.unwrap();
         data1.extend(result.iter());
     }
@@ -44,7 +44,7 @@ async fn test_input_stream() {
     // 将data1写入WAV文件
     let spec = hound::WavSpec {
         channels: 1,
-        sample_rate: 192000,
+        sample_rate: 48000,
         bits_per_sample: 32,
         sample_format: hound::SampleFormat::Float,
     };

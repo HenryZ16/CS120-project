@@ -201,6 +201,7 @@ impl Demodulation2 {
         let mut ref_signal = Vec::new();
         let mut ref_signal_len = Vec::new();
         let ref_len = (sample_rate / carrier_freq[1]) as usize * redundent_times;
+        println!("ref len:{}", ref_len);
 
         for i in 0..carrier_freq.len() {
             let carrier = carrier_freq.get(i).unwrap();
@@ -500,10 +501,10 @@ impl Demodulation2 {
                     {
                         start_index += demodulate_config.preamble_len - 1;
                         demodulate_state = demodulate_state.next();
-                        // println!(
-                        //     "start index: {}, tmp buffer len: {}, max: {}",
-                        //     start_index, tmp_buffer_len, local_max
-                        // );
+                        println!(
+                            "start index: {}, tmp buffer len: {}, max: {}",
+                            start_index, tmp_buffer_len, local_max
+                        );
                         local_max = 0.0;
                         break;
                     }
@@ -544,7 +545,7 @@ impl Demodulation2 {
                             + phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING
                 {
                     for k in 0..carrier_num {
-                        // println!("tmp bits: {:?}", tmp_bits_data[k]);
+                        println!("tmp bits: {:?}", tmp_bits_data[k]);
                         length[k] = 0;
                         for &bit in &tmp_bits_data[k][phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
                             ..phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
