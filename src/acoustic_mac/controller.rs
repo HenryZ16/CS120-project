@@ -143,7 +143,7 @@ impl MacController {
             let mut resend_times: u64 = 0;
             let mut continue_sends: u64 = 0;
             let ack_frame = sender.generate_ack_frame(dest);
-            let send_frame = sender.generate_data_frames(send_data, dest);
+            let send_frame = sender.generate_digital_data_frames(send_data, dest);
             let tmp = sender.generate_ack_frame(u8::MAX);
             sender.send_frame(&tmp).await;
             let mut cur_send_frame: usize = 0;

@@ -1,4 +1,5 @@
 use crate::acoustic_modem::modulation::{self, ENABLE_ECC};
+use crate::acoustic_modem::phy_frame::MAX_DIGITAL_FRAME_DATA_LENGTH;
 use crate::acoustic_modem::phy_frame::{self, PHYFrame};
 use crate::asio_stream::InputAudioStream;
 use crate::utils::{read_data_2_compressed_u8, u8_2_code_rs_hexbit, Bit, Byte};
@@ -428,7 +429,6 @@ impl Demodulation2 {
         let mut local_max = 0.0;
         let mut start_index = usize::MAX;
 
-        let carrier_num = 1;
         let ref_signal = vec![-1.0, 1.0];
         let ref_signal_len = ref_signal.len();
         let mut tmp_bits_data: Vec<u8> = Vec::with_capacity(demodulate_config.payload_bits_length);
@@ -449,7 +449,7 @@ impl Demodulation2 {
                         start_index = usize::MAX;
                         local_max = 0.0;
                         demodulate_state = demodulate_state.stop();
-                        tmp_bits_data = Vec::with_capacity(demodulate_config.payload_bits_length);
+                        tmp_bits_data.clear();
                         is_reboot = false;
                         input_stream.fresh();
                         continue;
@@ -571,6 +571,8 @@ impl Demodulation2 {
                         break;
                     }
                     let compressed_data = read_data_2_compressed_u8(tmp_bits_data);
+                    tmp_bits_data = Vec::with_capacity(demodulate_config.payload_bits_length);
+
                     if !PHYFrame::check_crc(&compressed_data) {
                         println!("[Demodulation]: !!! CRC wrong at frame");
                         println!("data: {:?}", compressed_data);
@@ -603,7 +605,6 @@ impl Demodulation2 {
                 payload_len = usize::MAX;
                 demodulate_state = demodulate_state.resume();
                 is_reboot = false;
-                tmp_bits_data = Vec::with_capacity(demodulate_config.payload_bits_length);
                 length = usize::MAX;
                 usize::MAX
             } else {
