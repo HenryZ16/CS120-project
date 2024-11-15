@@ -27,10 +27,10 @@ use super::{
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
-const MAX_SEND: u64 = 25;
-const ACK_WAIT_TIME: u64 = 40;
-const BACKOFF_SLOT_TIME: u64 = 15;
-const BACKOFF_MAX_FACTOR: u64 = 10;
+const MAX_SEND: u64 = 30;
+const ACK_WAIT_TIME: u64 = 30;
+const BACKOFF_SLOT_TIME: u64 = 112;
+const BACKOFF_MAX_FACTOR: u64 = 6;
 
 const DETECT_SIGNAL: Byte = 1;
 const ENERGE_LIMIT: f32 = 0.005;
@@ -74,7 +74,7 @@ impl RecordTimer {
                 };
                 let mut slot_times: u64 = self.rng.gen_range(0..=factor + 2);
                 if continue_sends > 4 {
-                    slot_times *= 3;
+                    slot_times *= 2;
                 }
                 Duration::from_millis(BACKOFF_SLOT_TIME * slot_times)
             }
@@ -173,21 +173,23 @@ impl MacController {
                                 continue_sends += 1;
                                 println!(
                                     "send frame {} success, RTT: {:?}",
-                                    cur_send_frame,
+                                    cur_send_frame - 1,
                                     t_rtt_start.elapsed()
                                 );
                                 timer.start(TimerType::BACKOFF, retry_times, continue_sends);
                             }
                         } else {
-                            MacController::send_frame(
-                                &demodulate_status_tx,
-                                &mut detector,
-                                &mut sender,
-                                &ack_frame,
-                                false,
-                            )
-                            .await;
                             if (cur_recv_frame & 0xFF) as u8 == MACFrame::get_frame_id(&data) {
+                                for i in 0..5 {
+                                    MacController::send_frame(
+                                        &demodulate_status_tx,
+                                        &mut detector,
+                                        &mut sender,
+                                        &ack_frame,
+                                        false,
+                                    )
+                                    .await;
+                                }
                                 println!("[MacController]: received frame id: {}", cur_recv_frame);
                                 cur_recv_frame += 1;
                                 continue_sends = 0;
