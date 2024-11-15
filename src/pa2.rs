@@ -38,7 +38,7 @@ pub async fn obj_1_mac_send() -> Result<u32> {
     println!("[pa2-obj1-send] Elapsed time: {:?}", t_start.elapsed());
 
     // send
-    let frames = sender.generate_data_frames(data, dest);
+    let frames = sender.generate_digital_data_frames(data, dest);
     for frame in &frames {
         sender.send_frame(frame).await;
     }
@@ -323,13 +323,11 @@ async fn test_digital_communication() {
         crate::utils::get_audio_device_and_config(config.get_sample_rate());
     let mut modulator = config.gen_modulator(cpal_device, cpal_config);
     let mut rng = rand::thread_rng();
-    let sign: Vec<Vec<f32>> = vec![
-        vec![-1.0, -0.5, 0.0, 0.5, 1.0],
-        vec![1.0, 0.5, 0.0, -0.5, -1.0],
-    ];
+    let sign: Vec<Vec<f32>> = vec![vec![-0.5, 0.5], vec![0.5, -0.5]];
     let mut data = vec![];
-    let mut modulated_signal = phy_frame::gen_preamble(192000);
-    for _ in 0..10000 {
+    let mut modulated_signal = phy_frame::gen_preamble(48000);
+    modulated_signal.extend(vec![0.0; 30]);
+    for _ in 0..100 {
         data.push(rng.gen_range(0..=1));
     }
     println!("data: {:?}", data);
