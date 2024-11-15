@@ -44,7 +44,7 @@ impl MacSender {
         let mut modulator = generator.gen_modulator(device, config);
 
         // warm up: reduce the first send time of frame
-        futures::executor::block_on(modulator.send_modulated_signal(vec![0.0; 10]));
+        // futures::executor::block_on(modulator.send_modulated_signal(vec![0.0; 10]));
 
         Self {
             modulator,

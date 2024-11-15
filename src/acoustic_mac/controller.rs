@@ -73,9 +73,9 @@ impl RecordTimer {
                     factor
                 };
                 let mut slot_times: u64 = self.rng.gen_range(0..=factor + 2);
-                if continue_sends > 4 {
-                    slot_times *= 2;
-                }
+                // if continue_sends > 4 {
+                //     slot_times *= 2;
+                // }
                 Duration::from_millis(BACKOFF_SLOT_TIME * slot_times)
             }
             TimerType::ACK => Duration::from_millis(ACK_WAIT_TIME),
@@ -143,6 +143,8 @@ impl MacController {
             let mut continue_sends: u64 = 0;
             let ack_frame = sender.generate_ack_frame(dest);
             let send_frame = sender.generate_data_frames(send_data, dest);
+            let tmp = sender.generate_ack_frame(u8::MAX);
+            sender.send_frame(&tmp).await;
             let mut cur_send_frame: usize = 0;
             let mut cur_recv_frame: usize = 0;
 
@@ -229,7 +231,11 @@ impl MacController {
                                 // continue;
                             }
 
-                            timer.start(TimerType::BACKOFF, retry_times, continue_sends);
+                            timer.start(
+                                TimerType::BACKOFF,
+                                retry_times + resend_times,
+                                continue_sends,
+                            );
                         }
                         TimerType::BACKOFF => {
                             t_rtt_start = Instant::now();
@@ -244,6 +250,7 @@ impl MacController {
                             .await
                             {
                                 timer.start(TimerType::ACK, retry_times, continue_sends);
+                                // println!("send a frame: {:?}", t_rtt_start.elapsed());
                             } else {
                                 println!(
                                     "[MacController]: busy channel, send frame {} failed, set backoff",
@@ -386,6 +393,6 @@ impl MacDetector {
 fn calculate_energy(samples: &[f32]) -> f32 {
     let sum_of_squares: f32 = samples.iter().map(|&sample| sample * sample).sum();
     let energy = sum_of_squares / samples.len() as f32;
-    println!("avg energy: {}", energy);
+    // println!("avg energy: {}", energy);
     energy
 }
