@@ -128,12 +128,17 @@ impl Modulator {
             max_len = if phy_len > max_len { phy_len } else { max_len };
 
             // println!(
-            //     "[bits_2_wave_single_ofdm_frame_no_ecc] phy_len: {}, payload.len(): {:?}",
+            //     "[bits_2_wave_single_ofdm_frame_no_ecc] phy_len: {}, payload.len(): {:?} for carrier {}",
             //     phy_len,
-            //     payload.len()
+            //     payload.len(),
+            //     i
             // );
             let frame = phy_frame::PHYFrame::new_no_encoding(phy_len, payload);
             let frame_bits = PHYFrame::add_crc(frame.1);
+            // println!(
+            //     "[bits_2_wave_single_ofdm_frame_no_ecc] frame_bits: {:?}",
+            //     frame_bits
+            // );
             let decompressed_data = utils::read_compressed_u8_2_data(frame_bits);
             modulated_psk_signal = if i == 0 {
                 self.modulate(&decompressed_data, i)
@@ -525,12 +530,20 @@ impl Modulator {
                     -1.0
                 } else {
                     0.0
-                }) * (2.0
-                    * std::f64::consts::PI
-                    * freq as f64
-                    * (i + bit_id as u32 * sample_cnt_each_bit) as f64
-                    / self.sample_rate as f64)
-                    .sin();
+                }) * if carrrier_freq_id == 0 {
+                    (2.0 * std::f64::consts::PI
+                        * freq as f64
+                        * (i + bit_id as u32 * sample_cnt_each_bit) as f64
+                        / self.sample_rate as f64)
+                        .sin()
+                        .abs()
+                } else {
+                    (2.0 * std::f64::consts::PI
+                        * freq as f64
+                        * (i + bit_id as u32 * sample_cnt_each_bit) as f64
+                        / self.sample_rate as f64)
+                        .sin()
+                };
                 modulated_signal.push(sample as f32);
             }
             bit_id += 1;
