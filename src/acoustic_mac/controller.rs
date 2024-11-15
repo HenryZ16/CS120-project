@@ -72,7 +72,7 @@ impl RecordTimer {
                 } else {
                     1 << factor
                 };
-                let mut slot_times: u64 = self.rng.gen_range(0..=factor + 2);
+                let mut slot_times: u64 = self.rng.gen_range(0..=factor);
                 if continue_sends > 4 {
                     slot_times *= 2;
                 }
