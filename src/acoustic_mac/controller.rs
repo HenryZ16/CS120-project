@@ -149,7 +149,7 @@ impl MacController {
             let mut cur_recv_frame: usize = 0;
 
             if send_frame.len() > 0 {
-                timer.start(TimerType::BACKOFF, retry_times, continue_sends);
+                timer.start(TimerType::BACKOFF, 0, continue_sends);
                 send_padding = true;
                 println!("frames to send: {}", send_frame.len());
             }
@@ -176,7 +176,7 @@ impl MacController {
                                     cur_send_frame - 1,
                                     t_rtt_start.elapsed()
                                 );
-                                timer.start(TimerType::BACKOFF, retry_times, continue_sends);
+                                timer.start(TimerType::BACKOFF, 0, continue_sends);
                             }
                         } else {
                             MacController::send_frame(
@@ -233,11 +233,7 @@ impl MacController {
                                 // continue;
                             }
 
-                            timer.start(
-                                TimerType::BACKOFF,
-                                retry_times + resend_times,
-                                continue_sends,
-                            );
+                            timer.start(TimerType::BACKOFF, resend_times, continue_sends);
                         }
                         TimerType::BACKOFF => {
                             t_rtt_start = Instant::now();
@@ -251,7 +247,7 @@ impl MacController {
                             )
                             .await
                             {
-                                timer.start(TimerType::ACK, retry_times, continue_sends);
+                                timer.start(TimerType::ACK, 0, continue_sends);
                                 // println!("send a frame: {:?}", t_rtt_start.elapsed());
                             } else {
                                 println!(
@@ -259,11 +255,7 @@ impl MacController {
                                     cur_send_frame
                                 );
                                 resend_times += 1;
-                                timer.start(
-                                    TimerType::BACKOFF,
-                                    retry_times + resend_times,
-                                    continue_sends,
-                                );
+                                timer.start(TimerType::BACKOFF, resend_times, continue_sends);
                             }
                         }
                         _ => {}
