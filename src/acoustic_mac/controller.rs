@@ -67,10 +67,10 @@ impl RecordTimer {
 
         self.duration = match timer_type {
             TimerType::BACKOFF => {
-                let factor = if factor > BACKOFF_MAX_FACTOR {
+                let factor = if (1 << factor) > BACKOFF_MAX_FACTOR {
                     BACKOFF_MAX_FACTOR
                 } else {
-                    factor
+                    1 << factor
                 };
                 let mut slot_times: u64 = self.rng.gen_range(0..=factor + 2);
                 if continue_sends > 4 {
