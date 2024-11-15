@@ -180,16 +180,16 @@ impl MacController {
                             }
                         } else {
                             if (cur_recv_frame & 0xFF) as u8 == MACFrame::get_frame_id(&data) {
-                                for i in 0..5 {
-                                    MacController::send_frame(
-                                        &demodulate_status_tx,
-                                        &mut detector,
-                                        &mut sender,
-                                        &ack_frame,
-                                        false,
-                                    )
-                                    .await;
-                                }
+                                // for i in 0..5 {
+                                MacController::send_frame(
+                                    &demodulate_status_tx,
+                                    &mut detector,
+                                    &mut sender,
+                                    &ack_frame,
+                                    false,
+                                )
+                                .await;
+                                // }
                                 println!("[MacController]: received frame id: {}", cur_recv_frame);
                                 cur_recv_frame += 1;
                                 continue_sends = 0;
