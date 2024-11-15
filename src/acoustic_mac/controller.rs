@@ -27,10 +27,10 @@ use super::{
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
-const MAX_SEND: u64 = 23;
-const ACK_WAIT_TIME: u64 = 30;
-const BACKOFF_SLOT_TIME: u64 = 23;
-const BACKOFF_MAX_FACTOR: u64 = 12;
+const MAX_SEND: u64 = 25;
+const ACK_WAIT_TIME: u64 = 40;
+const BACKOFF_SLOT_TIME: u64 = 15;
+const BACKOFF_MAX_FACTOR: u64 = 10;
 
 const DETECT_SIGNAL: Byte = 1;
 const ENERGE_LIMIT: f32 = 0.005;
@@ -73,9 +73,9 @@ impl RecordTimer {
                     factor
                 };
                 let mut slot_times: u64 = self.rng.gen_range(0..=factor + 2);
-                // if continue_sends > 4 {
-                //     slot_times *= 2;
-                // }
+                if continue_sends > 4 {
+                    slot_times *= 3;
+                }
                 Duration::from_millis(BACKOFF_SLOT_TIME * slot_times)
             }
             TimerType::ACK => Duration::from_millis(ACK_WAIT_TIME),
