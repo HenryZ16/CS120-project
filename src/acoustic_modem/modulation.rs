@@ -513,7 +513,7 @@ impl Modulator {
         let mut modulated_signal = vec![];
         // redundant periods for each bit
         let sample_cnt_each_bit =
-            self.sample_rate * self.redundant_periods as u32 / self.carrier_freq[0];
+            self.sample_rate * self.redundant_periods as u32 / self.carrier_freq[1];
         let mut bit_id = 0;
         while bit_id < bits.len() {
             let bit = bits[bit_id];
