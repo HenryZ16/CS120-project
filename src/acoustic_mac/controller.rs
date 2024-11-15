@@ -27,10 +27,10 @@ use super::{
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
-const MAX_SEND: u64 = 10;
-const ACK_WAIT_TIME: u64 = 50;
-const BACKOFF_SLOT_TIME: u64 = 85;
-const BACKOFF_MAX_FACTOR: u64 = 12;
+const MAX_SEND: u64 = 14;
+const ACK_WAIT_TIME: u64 = 40;
+const BACKOFF_SLOT_TIME: u64 = 50;
+const BACKOFF_MAX_FACTOR: u64 = 20;
 
 const DETECT_SIGNAL: Byte = 1;
 const ENERGE_LIMIT: f32 = 0.005;
