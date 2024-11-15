@@ -29,8 +29,9 @@ use rand::{rngs::StdRng, Rng, SeedableRng};
 
 const MAX_SEND: u64 = 30;
 const ACK_WAIT_TIME: u64 = 30;
-const BACKOFF_SLOT_TIME: u64 = 83;
+const BACKOFF_SLOT_TIME: u64 = 85;
 const BACKOFF_MAX_FACTOR: u64 = 6;
+const RECV_TIME: u64 = 25;
 
 const DETECT_SIGNAL: Byte = 1;
 const ENERGE_LIMIT: f32 = 0.005;
@@ -159,7 +160,10 @@ impl MacController {
 
             let mut t_rtt_start = Instant::now();
             while send_padding || recv_padding {
-                if let Ok(data) = decoded_data_rx.try_recv() {
+                // if let Ok(data) = decoded_data_rx.try_recv() {
+                if let Ok(Some(data)) =
+                    timeout(Duration::from_millis(RECV_TIME), decoded_data_rx.recv()).await
+                {
                     // check data type
                     if mac_frame::MACFrame::get_dst(&data) == mac_address {
                         // println!("[Controller]: received data: {:?}", data);
