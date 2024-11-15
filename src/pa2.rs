@@ -38,7 +38,7 @@ pub async fn obj_1_mac_send() -> Result<u32> {
     println!("[pa2-obj1-send] Elapsed time: {:?}", t_start.elapsed());
 
     // send
-    let frames = sender.generate_data_frames(data, dest);
+    let frames = sender.generate_digital_data_frames(data, dest);
     for frame in &frames {
         sender.send_frame(frame).await;
     }

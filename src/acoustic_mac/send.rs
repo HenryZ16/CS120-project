@@ -100,4 +100,23 @@ impl MacSender {
 
         frames
     }
+
+    pub fn generate_digital_data_frames(&mut self, data: Vec<Byte>, dest: u8) -> Vec<MACFrame> {
+        let frame_max_length = phy_frame::MAX_DIGITAL_FRAME_DATA_LENGTH;
+        let mut frames: Vec<MACFrame> = vec![];
+        let mut data = data.clone();
+        while data.len() > frame_max_length {
+            let payload: Vec<u8> = data.drain(0..frame_max_length).collect();
+            let mut frame = MACFrame::new(dest, self.address, mac_frame::MACType::Data, payload);
+            frame.set_frame_id(self.inc_frame_id());
+            frames.push(frame);
+        }
+        if !data.is_empty() {
+            let mut frame = MACFrame::new(dest, self.address, mac_frame::MACType::Data, data);
+            frame.set_frame_id(self.inc_frame_id());
+            frames.push(frame);
+        }
+
+        frames
+    }
 }
