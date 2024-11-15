@@ -205,8 +205,8 @@ impl Demodulation2 {
 
         for i in 0..carrier_freq.len() {
             let carrier = carrier_freq.get(i).unwrap();
-            ref_signal_len.push(ref_len);
-            let ref_sin = (0..ref_len)
+            ref_signal_len.push(ref_len * if i == 0 { 2 } else { 1 });
+            let ref_sin = (0..ref_len * if i == 0 { 2 } else { 1 })
                 .map(|t| {
                     (2.0 * std::f32::consts::PI * *carrier as f32 / sample_rate as f32 * t as f32)
                         .sin()
@@ -528,14 +528,20 @@ impl Demodulation2 {
                     let window = &tmp_buffer.as_slices().0
                         [start_index..start_index + demodulate_config.ref_signal_len[0]];
                     for k in 0..carrier_num {
-                        let dot_product =
-                            dot_product(window, &self.demodulate_config.ref_signal[k]);
-                        // debug_vec.extend(
-                        //     &tmp_buffer.as_slices().0
-                        //         [start_index..start_index + demodulate_config.ref_signal_len[k]],
-                        // );
+                        let mut dot_len = 0;
+                        while dot_len < window.len() {
+                            let dot_product = dot_product(
+                                &window[dot_len..dot_len + demodulate_config.ref_signal_len[k]],
+                                &self.demodulate_config.ref_signal[k],
+                            );
+                            dot_len += demodulate_config.ref_signal_len[k];
+                            // debug_vec.extend(
+                            //     &tmp_buffer.as_slices().0
+                            //         [start_index..start_index + demodulate_config.ref_signal_len[k]],
+                            // );
 
-                        tmp_bits_data[k].push(if dot_product >= 0.0 { 0 } else { 1 });
+                            tmp_bits_data[k].push(if dot_product >= 0.0 { 0 } else { 1 });
+                        }
                     }
                     start_index += demodulate_config.ref_signal_len[0];
                 }
@@ -553,6 +559,9 @@ impl Demodulation2 {
                         {
                             length[k] <<= 1;
                             length[k] += bit as usize;
+                        }
+                        if k == 0 {
+                            length[k] *= 2;
                         }
                         if length[k]
                             > if ENABLE_ECC {
@@ -575,10 +584,11 @@ impl Demodulation2 {
                             + phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
                             + phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING
                     };
+                    length[0] /= 2;
                     // println!("payload_len: {}", payload_len);
                 }
 
-                if tmp_bits_data[0].len() >= payload_len {
+                if tmp_bits_data[1].len() >= payload_len {
                     is_reboot = true;
                     let mut to_send: Vec<Byte> = vec![];
                     // println!("decoding payload len: {}", payload_len);
