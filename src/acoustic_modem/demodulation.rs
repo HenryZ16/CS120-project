@@ -501,10 +501,10 @@ impl Demodulation2 {
                     {
                         start_index += demodulate_config.preamble_len - 1;
                         demodulate_state = demodulate_state.next();
-                        println!(
-                            "start index: {}, tmp buffer len: {}, max: {}",
-                            start_index, tmp_buffer_len, local_max
-                        );
+                        // println!(
+                        //     "start index: {}, tmp buffer len: {}, max: {}",
+                        //     start_index, tmp_buffer_len, local_max
+                        // );
                         local_max = 0.0;
                         break;
                     }
@@ -545,7 +545,7 @@ impl Demodulation2 {
                             + phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING
                 {
                     for k in 0..carrier_num {
-                        println!("tmp bits: {:?}", tmp_bits_data[k]);
+                        // println!("tmp bits: {:?}", tmp_bits_data[k]);
                         length[k] = 0;
                         for &bit in &tmp_bits_data[k][phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
                             ..phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
@@ -561,7 +561,7 @@ impl Demodulation2 {
                                 phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING
                             }
                         {
-                            println!("[Demodulation]: !!! length wrong");
+                            println!("[Demodulation]: !!! length wrong at frame: {}", k);
                             length[k] = usize::MAX;
                             is_reboot = true;
                             break;
@@ -584,6 +584,9 @@ impl Demodulation2 {
                     // println!("decoding payload len: {}", payload_len);
                     for k in 0..carrier_num {
                         // println!("decoded length: {:?}", length);
+                        if length[k] == 0 {
+                            break;
+                        }
                         let compressed_data = read_data_2_compressed_u8(
                             tmp_bits_data[k][0..(phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
                                 + phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING
@@ -591,7 +594,7 @@ impl Demodulation2 {
                                 .to_vec(),
                         );
                         if !PHYFrame::check_crc(&compressed_data) {
-                            println!("[Demodulation]: !!! CRC wrong");
+                            println!("[Demodulation]: !!! CRC wrong at frame: {}", k);
                             to_send.clear();
                             break;
                         } else {

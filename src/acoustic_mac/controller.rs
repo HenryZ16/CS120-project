@@ -204,7 +204,11 @@ impl MacController {
                             } else {
                                 println!(
                                     "[MacController]: duplicated data of frame id: {}",
-                                    cur_recv_frame - 1
+                                    if cur_recv_frame == 0 {
+                                        u8::MAX as usize
+                                    } else {
+                                        cur_recv_frame - 1
+                                    }
                                 );
                             }
                         }
