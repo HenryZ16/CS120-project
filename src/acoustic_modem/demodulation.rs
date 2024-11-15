@@ -200,7 +200,7 @@ impl Demodulation2 {
 
         let mut ref_signal = Vec::new();
         let mut ref_signal_len = Vec::new();
-        let ref_len = (sample_rate / carrier_freq[0]) as usize * redundent_times;
+        let ref_len = (sample_rate / carrier_freq[1]) as usize * redundent_times;
 
         for i in 0..carrier_freq.len() {
             let carrier = carrier_freq.get(i).unwrap();
