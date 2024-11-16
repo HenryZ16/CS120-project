@@ -424,7 +424,6 @@ impl Demodulation2 {
                 .preamble_len
                 .max(demodulate_config.ref_signal_len[0]),
         );
-        let mut tmp_buffer_len = tmp_buffer.len();
 
         let mut local_max = 0.0;
         let mut start_index = usize::MAX;
@@ -445,7 +444,6 @@ impl Demodulation2 {
                     SwitchSignal::StopSignal => {
                         // println!("Stop signal");
                         tmp_buffer.clear();
-                        tmp_buffer_len = 0;
                         start_index = usize::MAX;
                         local_max = 0.0;
                         demodulate_state = demodulate_state.stop();
@@ -469,17 +467,16 @@ impl Demodulation2 {
             }
 
             // println!("data len: {}", data.len());
-            tmp_buffer_len += data.len();
             // move_data_into_buffer(data, &mut tmp_buffer, alpha_check, channels, &mut prev);
             for sample in data {
                 tmp_buffer.push_back(sample);
             }
             if demodulate_state == DemodulationState::DetectPreamble {
-                if tmp_buffer_len <= demodulate_config.preamble_len {
+                if tmp_buffer.len() <= demodulate_config.preamble_len {
                     continue;
                 }
                 tmp_buffer.make_contiguous();
-                for i in 0..tmp_buffer_len - demodulate_config.preamble_len - 1 {
+                for i in 0..tmp_buffer.len() - demodulate_config.preamble_len - 1 {
                     let window = &tmp_buffer.as_slices().0[i..i + demodulate_config.preamble_len];
                     let dot_product = dot_product(window, &demodulate_config.preamble);
                     // if dot_product > 20.0 {
@@ -509,26 +506,23 @@ impl Demodulation2 {
             }
 
             if demodulate_state == DemodulationState::RecvFrame {
-                if tmp_buffer_len < start_index || tmp_buffer_len - start_index <= ref_signal_len {
+                if tmp_buffer.len() < start_index
+                    || tmp_buffer.len() - start_index <= ref_signal_len
+                {
                     // println!("tmp buffer is not long enough");
                     continue;
                 }
-                tmp_buffer.make_contiguous();
-                // println!("start index: {}, tmp_buffer_len: {}", start_index, tmp_buffer_len);
+                // tmp_buffer.make_contiguous();
 
-                while tmp_buffer_len - start_index >= ref_signal_len
+                while tmp_buffer.len() - start_index >= ref_signal_len
                     && tmp_bits_data.len() < payload_len
                 {
-                    let window =
-                        &tmp_buffer.as_slices().0[start_index..start_index + ref_signal_len];
-                    let dot_product = dot_product(window, &ref_signal);
-                    // debug_vec.extend(
-                    //     &tmp_buffer.as_slices().0
-                    //         [start_index..start_index + demodulate_config.ref_signal_len[k]],
-                    // );
-
-                    tmp_bits_data.push(if dot_product >= 0.0 { 0 } else { 1 });
-                    start_index += demodulate_config.ref_signal_len[0];
+                    tmp_bits_data.push(if tmp_buffer[start_index] < tmp_buffer[start_index + 1] {
+                        0
+                    } else {
+                        1
+                    });
+                    start_index += ref_signal_len;
                 }
                 if payload_len == usize::MAX
                     && tmp_bits_data.len()
@@ -548,7 +542,7 @@ impl Demodulation2 {
                         println!("[Demodulation]: !!! length wrong at frame");
                         length = usize::MAX;
                         is_reboot = true;
-                        break;
+                        // break;
                     }
                     println!("length: {:?}", length);
                     // println!("max length: {}", max_length);
@@ -593,7 +587,7 @@ impl Demodulation2 {
             }
 
             let pop_times = if start_index == usize::MAX {
-                tmp_buffer_len - demodulate_config.preamble_len + 1
+                tmp_buffer.len() - demodulate_config.preamble_len + 1
             } else {
                 start_index
             };
@@ -610,7 +604,6 @@ impl Demodulation2 {
             } else {
                 0
             };
-            tmp_buffer_len = tmp_buffer.len();
 
             // println!("channel size: {}", output_tx.strong_count());
             // println!("current state: {:?}", demodulate_state);
