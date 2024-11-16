@@ -29,9 +29,9 @@ use rand::{rngs::StdRng, Rng, SeedableRng};
 
 const MAX_SEND: u64 = 60;
 const ACK_WAIT_TIME: u64 = 30;
-const BACKOFF_SLOT_TIME: u64 = 85;
+const BACKOFF_SLOT_TIME: u64 = 90;
 const BACKOFF_MAX_FACTOR: u64 = 6;
-const RECV_TIME: u64 = 25;
+const RECV_TIME: u64 = 33;
 
 const DETECT_SIGNAL: Byte = 1;
 const ENERGE_LIMIT: f32 = 0.005;
@@ -191,7 +191,7 @@ impl MacController {
                                 false,
                             )
                             .await;
-                            if (cur_recv_frame & 0xFF) as u8 == MACFrame::get_frame_id(&data) {
+                            if (cur_recv_frame & 0x3F) as u8 == MACFrame::get_frame_id(&data) {
                                 if data.len() < 5 {
                                     println!("[MacController]: received NONE frame");
                                     continue;
