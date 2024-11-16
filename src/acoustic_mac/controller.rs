@@ -183,14 +183,14 @@ impl MacController {
                                 timer.start(TimerType::BACKOFF, 0, continue_sends);
                             }
                         } else {
-                            // MacController::send_frame(
-                            //     &demodulate_status_tx,
-                            //     &mut detector,
-                            //     &mut sender,
-                            //     &ack_frame,
-                            //     false,
-                            // )
-                            // .await;
+                            MacController::send_frame(
+                                &demodulate_status_tx,
+                                &mut detector,
+                                &mut sender,
+                                &ack_frame,
+                                false,
+                            )
+                            .await;
                             if (cur_recv_frame & 0xFF) as u8 == MACFrame::get_frame_id(&data) {
                                 // for i in 0..5 {
                                 // }
