@@ -71,7 +71,7 @@ impl MacSender {
     pub async fn send_frame(&mut self, frame: &MACFrame) {
         let bits = frame.get_whole_frame_bits();
         self.modulator
-            .send_single_digital_frame(bits.clone(), bits.len() as isize * 8)
+            .send_single_digital_frame(bits.clone(), bits.len() as isize)
             .await;
     }
 
@@ -102,7 +102,7 @@ impl MacSender {
     }
 
     pub fn generate_digital_data_frames(&mut self, data: Vec<Byte>, dest: u8) -> Vec<MACFrame> {
-        let frame_max_length = phy_frame::MAX_DIGITAL_FRAME_DATA_LENGTH;
+        let frame_max_length = phy_frame::MAX_DIGITAL_FRAME_DATA_LENGTH / 8 - 4; // 4 means frame_id, dest, src, type
         let mut frames: Vec<MACFrame> = vec![];
         let mut data = data.clone();
         while data.len() > frame_max_length {
