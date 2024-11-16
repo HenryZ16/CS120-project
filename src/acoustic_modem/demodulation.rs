@@ -598,6 +598,7 @@ impl Demodulation2 {
             start_index = if start_index == usize::MAX || is_reboot {
                 payload_len = usize::MAX;
                 demodulate_state = demodulate_state.resume();
+                tmp_bits_data.clear();
                 is_reboot = false;
                 length = usize::MAX;
                 usize::MAX
