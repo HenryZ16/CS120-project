@@ -92,6 +92,14 @@ impl Modulator {
             vec![(data_bits_len >> 8) as u8, data_bits_len as u8 & MASK_8BIT];
         digital_phy_frame.extend(data);
         let crc_digital_phy_frame = PHYFrame::add_crc(digital_phy_frame);
+        println!(
+            "[bits_2_wave_single_digital_frame_no_ecc] crc_digital_phy_frame.len(): {}",
+            crc_digital_phy_frame.len()
+        );
+        println!(
+            "[bits_2_wave_single_digital_frame_no_ecc] crc_digital_phy_frame: {:?}",
+            crc_digital_phy_frame
+        );
 
         // modulate the data
         let mut modulated_psk_signal = vec![];
@@ -490,7 +498,7 @@ impl Modulator {
     pub async fn send_single_digital_frame(&mut self, data: Vec<Byte>, len: isize) {
         // data here is compressed u8
         let modulated_signal = self
-            .bits_2_wave_single_digital_frame_no_ecc(data, len as usize)
+            .bits_2_wave_single_digital_frame_no_ecc(data, len as usize * 8)
             .await;
 
         self.output_stream
