@@ -83,7 +83,7 @@ impl MacSender {
     // so `generate_data_frames` is put here
     pub fn generate_data_frames(&mut self, data: Vec<Byte>, dest: u8) -> Vec<MACFrame> {
         let frame_max_length =
-            phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING * self.modulator.get_carrier_cnt() / 8 - 4; // 4 means frame_id, dest, src, type
+            phy_frame::MAX_FRAME_DATA_LENGTH_NO_ENCODING * self.modulator.get_carrier_cnt() / 8 - 2; // 4 means frame_id, dest, src, type
         let mut frames: Vec<MACFrame> = vec![];
         let mut data = data.clone();
         while data.len() > frame_max_length {
@@ -102,7 +102,7 @@ impl MacSender {
     }
 
     pub fn generate_digital_data_frames(&mut self, data: Vec<Byte>, dest: u8) -> Vec<MACFrame> {
-        let frame_max_length = phy_frame::MAX_DIGITAL_FRAME_DATA_LENGTH / 8 - 4; // 4 means frame_id, dest, src, type
+        let frame_max_length = phy_frame::MAX_DIGITAL_FRAME_DATA_LENGTH / 8 - 2; // 4 means frame_id, dest, src, type
         let mut frames: Vec<MACFrame> = vec![];
         let mut data = data.clone();
         while data.len() > frame_max_length {

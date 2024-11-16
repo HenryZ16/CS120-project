@@ -3,6 +3,11 @@ use plotters::data;
 use crate::utils::{Bit, Byte};
 use std::{io::Bytes, vec};
 
+pub const DEST_MASK: Byte = 0b11110000;
+pub const SRC_MASK: Byte = 0b00001111;
+pub const ID_MASK: Byte = 0b11111100;
+pub const TYPE_MASK: Byte = 0b00000011;
+
 // Frame:: [dest][src][type][payload]
 pub type MacAddress = Byte;
 pub struct MACFrame {
@@ -46,19 +51,21 @@ impl MACFrame {
         }
     }
 
+    // Frame:: [dest : 7-4][src : 3-0][id : 7-2][type : 1-0][payload]
     pub fn get_whole_frame_bits(&self) -> Vec<Byte> {
-        let mut res = vec![self.frame_id];
+        let byte_0 = ((self.dest << 4) & DEST_MASK) | (self.src & SRC_MASK);
+        let byte_1 = (self.frame_id << 2) & ID_MASK | (self.mac_type & TYPE_MASK);
+        let mut res = vec![];
 
-        res.push(self.dest);
-        res.push(self.src);
-        res.push(self.mac_type);
+        res.push(byte_0);
+        res.push(byte_1);
         res.extend(self.payload.clone());
 
         return res;
     }
 
     pub fn get_frame_id(data: &[Byte]) -> Byte {
-        data[0]
+        (data[1] & ID_MASK) >> 2
     }
 
     pub fn set_frame_id(&mut self, frame_id: Byte) {
@@ -66,18 +73,18 @@ impl MACFrame {
     }
 
     pub fn get_dst(data: &[Byte]) -> MacAddress {
-        data[1]
+        (data[1] & DEST_MASK) >> 4
     }
 
     pub fn get_src(data: &[Byte]) -> MacAddress {
-        data[2]
+        data[2] & SRC_MASK
     }
 
     pub fn get_type(data: &[Byte]) -> MACType {
-        u8_2_mactype(data[3])
+        u8_2_mactype(data[3] & TYPE_MASK)
     }
 
     pub fn get_payload(data: &[Byte]) -> &[Byte] {
-        &data[4..data.len()]
+        &data[2..data.len()]
     }
 }
