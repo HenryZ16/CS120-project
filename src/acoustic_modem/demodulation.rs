@@ -553,7 +553,7 @@ impl Demodulation2 {
                             + phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
                             + phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING
                     };
-                    // println!("payload_len: {}", payload_len);
+                    println!("payload_len: {}", payload_len);
                 }
 
                 if tmp_bits_data.len() >= payload_len {
@@ -564,20 +564,20 @@ impl Demodulation2 {
                     if length == 0 {
                         break;
                     }
-                    let compressed_data = read_data_2_compressed_u8(tmp_bits_data);
+                    let compressed_data =
+                        read_data_2_compressed_u8(tmp_bits_data[0..payload_len].to_vec());
                     tmp_bits_data = Vec::with_capacity(demodulate_config.payload_bits_length);
 
                     if !PHYFrame::check_crc(&compressed_data) {
                         println!("[Demodulation]: !!! CRC wrong at frame");
-                        // println!("data: {:?}", compressed_data);
+                        println!("data: {:?}", compressed_data);
                         to_send.clear();
                         // break;
                     } else {
                         let _ = output_tx.send(
                             compressed_data[(phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
                                 + phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING)
-                                / 8
-                                ..compressed_data.len()]
+                                / 8..]
                                 .to_vec(),
                         );
                     }
