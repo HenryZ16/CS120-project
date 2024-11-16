@@ -517,7 +517,7 @@ impl Demodulation2 {
                 while tmp_buffer.len() - start_index >= ref_signal_len
                     && tmp_bits_data.len() < payload_len
                 {
-                    tmp_bits_data.push(if tmp_buffer[start_index] < tmp_buffer[start_index + 1] {
+                    tmp_bits_data.push(if tmp_buffer[start_index + 1] > 0.0 {
                         0
                     } else {
                         1
@@ -529,7 +529,7 @@ impl Demodulation2 {
                         > phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
                             + phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING
                 {
-                    println!("tmp bits: {:?}", tmp_bits_data);
+                    // println!("tmp bits: {:?}", tmp_bits_data);
                     length = 0;
                     for &bit in &tmp_bits_data[phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
                         ..phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
@@ -544,7 +544,7 @@ impl Demodulation2 {
                         is_reboot = true;
                         // break;
                     }
-                    println!("length: {:?}", length);
+                    // println!("length: {:?}", length);
                     // println!("max length: {}", max_length);
                     payload_len = if length == usize::MAX {
                         usize::MAX
@@ -559,8 +559,8 @@ impl Demodulation2 {
                 if tmp_bits_data.len() >= payload_len {
                     is_reboot = true;
                     let mut to_send: Vec<Byte> = vec![];
-                    println!("decoding payload len: {}", payload_len);
-                    println!("decoded length: {:?}", length);
+                    // println!("decoding payload len: {}", payload_len);
+                    // println!("decoded length: {:?}", length);
                     if length == 0 {
                         break;
                     }
@@ -569,7 +569,7 @@ impl Demodulation2 {
 
                     if !PHYFrame::check_crc(&compressed_data) {
                         println!("[Demodulation]: !!! CRC wrong at frame");
-                        println!("data: {:?}", compressed_data);
+                        // println!("data: {:?}", compressed_data);
                         to_send.clear();
                         // break;
                     } else {

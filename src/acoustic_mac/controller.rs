@@ -183,23 +183,31 @@ impl MacController {
                                 timer.start(TimerType::BACKOFF, 0, continue_sends);
                             }
                         } else {
-                            MacController::send_frame(
-                                &demodulate_status_tx,
-                                &mut detector,
-                                &mut sender,
-                                &ack_frame,
-                                false,
-                            )
-                            .await;
+                            // MacController::send_frame(
+                            //     &demodulate_status_tx,
+                            //     &mut detector,
+                            //     &mut sender,
+                            //     &ack_frame,
+                            //     false,
+                            // )
+                            // .await;
                             if (cur_recv_frame & 0xFF) as u8 == MACFrame::get_frame_id(&data) {
                                 // for i in 0..5 {
                                 // }
-                                println!("[MacController]: received frame id: {}", cur_recv_frame);
-                                cur_recv_frame += 1;
-                                continue_sends = 0;
-                                received.extend_from_slice(MACFrame::get_payload(&data));
-                                if received.len() >= receive_byte_num {
-                                    recv_padding = false;
+                                if data.len() < 5 {
+                                    println!("[MacController]: received NONE frame");
+                                    continue;
+                                } else {
+                                    println!(
+                                        "[MacController]: received frame id: {}",
+                                        cur_recv_frame
+                                    );
+                                    cur_recv_frame += 1;
+                                    continue_sends = 0;
+                                    received.extend_from_slice(MACFrame::get_payload(&data));
+                                    if received.len() >= receive_byte_num {
+                                        recv_padding = false;
+                                    }
                                 }
                             } else {
                                 println!(
