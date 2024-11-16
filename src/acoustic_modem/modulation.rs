@@ -84,7 +84,7 @@ impl Modulator {
         data_bits_len: usize,
     ) -> Vec<f32> {
         const MASK_8BIT: u8 = 0xff;
-        let sign = vec![vec![-0.5, 0.5], vec![0.5, -0.5]];
+        let sign = vec![vec![0.0, 1.0], vec![0.0, -1.0]];
         assert!(data_bits_len <= phy_frame::MAX_DIGITAL_FRAME_DATA_LENGTH);
 
         // merge data and data_bits_len
@@ -92,20 +92,22 @@ impl Modulator {
             vec![(data_bits_len >> 8) as u8, data_bits_len as u8 & MASK_8BIT];
         digital_phy_frame.extend(data);
         let crc_digital_phy_frame = PHYFrame::add_crc(digital_phy_frame);
-        println!(
-            "[bits_2_wave_single_digital_frame_no_ecc] crc_digital_phy_frame.len(): {}",
-            crc_digital_phy_frame.len()
-        );
-        println!(
-            "[bits_2_wave_single_digital_frame_no_ecc] crc_digital_phy_frame: {:?}",
-            crc_digital_phy_frame
-        );
+        // println!(
+        //     "[bits_2_wave_single_digital_frame_no_ecc] crc_digital_phy_frame.len(): {}",
+        //     crc_digital_phy_frame.len()
+        // );
+        // println!(
+        //     "[bits_2_wave_single_digital_frame_no_ecc] crc_digital_phy_frame: {:?}",
+        //     crc_digital_phy_frame
+        // );
 
         // modulate the data
         let mut modulated_psk_signal = vec![];
         for i in crc_digital_phy_frame {
             for j in 0..8 {
-                modulated_psk_signal.extend(sign[(i >> (7 - j)) as usize & 1].clone());
+                let cur_bit = (i >> (7 - j)) & 1;
+                let cur_signal = sign[cur_bit as usize].clone();
+                modulated_psk_signal.extend(cur_signal);
             }
         }
 

@@ -39,6 +39,7 @@ pub async fn obj_1_mac_send() -> Result<u32> {
 
     // send
     let frames = sender.generate_digital_data_frames(data, dest);
+    println!("[pa2-obj1-send] frames: {:?}", frames.len());
     for frame in &frames {
         sender.send_frame(frame).await;
     }
