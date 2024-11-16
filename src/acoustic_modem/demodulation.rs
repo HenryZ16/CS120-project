@@ -2,7 +2,9 @@ use crate::acoustic_modem::modulation::{self, ENABLE_ECC};
 use crate::acoustic_modem::phy_frame::MAX_DIGITAL_FRAME_DATA_LENGTH;
 use crate::acoustic_modem::phy_frame::{self, PHYFrame};
 use crate::asio_stream::InputAudioStream;
-use crate::utils::{read_data_2_compressed_u8, u8_2_code_rs_hexbit, Bit, Byte};
+use crate::utils::{
+    read_data_2_compressed_u8, read_data_2_compressed_u8_ref, u8_2_code_rs_hexbit, Bit, Byte,
+};
 use anyhow::Error;
 use cpal::traits::{DeviceTrait, HostTrait};
 use cpal::{Device, SampleRate, SupportedStreamConfig};
@@ -565,7 +567,7 @@ impl Demodulation2 {
                         break;
                     }
                     let compressed_data =
-                        read_data_2_compressed_u8(tmp_bits_data[0..payload_len].to_vec());
+                        read_data_2_compressed_u8_ref(&tmp_bits_data[0..payload_len]);
                     tmp_bits_data = Vec::with_capacity(demodulate_config.payload_bits_length);
 
                     if !PHYFrame::check_crc(&compressed_data) {

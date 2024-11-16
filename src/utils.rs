@@ -29,6 +29,10 @@ pub fn gen_random_bin_file(len: usize) {
 }
 
 pub fn read_data_2_compressed_u8(data: Vec<Bit>) -> Vec<Byte> {
+    read_data_2_compressed_u8_ref(&data)
+}
+
+pub fn read_data_2_compressed_u8_ref(data: &[Bit]) -> Vec<Byte> {
     let mut compressed_data = vec![];
     let mut cnt = 0;
     let mut byte = 0;
