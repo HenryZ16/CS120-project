@@ -51,7 +51,7 @@ impl MACFrame {
         }
     }
 
-    // Frame:: [dest : 7-4][src : 3-0][id : 7-2][type : 1-0][payload]
+    // Frame:: [[dest : 7-4][src : 3-0]][[id : 7-2][type : 1-0]][payload]
     pub fn get_whole_frame_bits(&self) -> Vec<Byte> {
         let byte_0 = ((self.dest << 4) & DEST_MASK) | (self.src & SRC_MASK);
         let byte_1 = (self.frame_id << 2) & ID_MASK | (self.mac_type & TYPE_MASK);
@@ -73,15 +73,15 @@ impl MACFrame {
     }
 
     pub fn get_dst(data: &[Byte]) -> MacAddress {
-        (data[1] & DEST_MASK) >> 4
+        (data[0] & DEST_MASK) >> 4
     }
 
     pub fn get_src(data: &[Byte]) -> MacAddress {
-        data[2] & SRC_MASK
+        data[0] & SRC_MASK
     }
 
     pub fn get_type(data: &[Byte]) -> MACType {
-        u8_2_mactype(data[3] & TYPE_MASK)
+        u8_2_mactype(data[1] & TYPE_MASK)
     }
 
     pub fn get_payload(data: &[Byte]) -> &[Byte] {
