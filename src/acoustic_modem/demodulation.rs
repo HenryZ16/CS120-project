@@ -555,7 +555,7 @@ impl Demodulation2 {
                             + phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
                             + phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING
                     };
-                    println!("payload_len: {}", payload_len);
+                    // println!("payload_len: {}", payload_len);
                 }
 
                 if tmp_bits_data.len() >= payload_len {
@@ -572,7 +572,7 @@ impl Demodulation2 {
 
                     if !PHYFrame::check_crc(&compressed_data) {
                         println!("[Demodulation]: !!! CRC wrong at frame");
-                        println!("data: {:?}", compressed_data);
+                        // println!("data: {:?}", compressed_data);
                         to_send.clear();
                         // break;
                     } else {

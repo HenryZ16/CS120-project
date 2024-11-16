@@ -74,9 +74,9 @@ impl RecordTimer {
                     1 << factor
                 };
                 let mut slot_times: u64 = self.rng.gen_range(0..=factor);
-                if continue_sends > 4 {
-                    slot_times *= 2;
-                }
+                // if continue_sends > 4 {
+                //     slot_times *= 2;
+                // }
                 Duration::from_millis(BACKOFF_SLOT_TIME * slot_times)
             }
             TimerType::ACK => Duration::from_millis(ACK_WAIT_TIME),
@@ -192,8 +192,6 @@ impl MacController {
                             )
                             .await;
                             if (cur_recv_frame & 0xFF) as u8 == MACFrame::get_frame_id(&data) {
-                                // for i in 0..5 {
-                                // }
                                 if data.len() < 5 {
                                     println!("[MacController]: received NONE frame");
                                     continue;
@@ -204,7 +202,7 @@ impl MacController {
                                     );
                                     cur_recv_frame += 1;
                                     continue_sends = 0;
-                                    received.extend_from_slice(MACFrame::get_payload(&data));
+                                    received.extend(MACFrame::get_payload(&data));
                                     if received.len() >= receive_byte_num {
                                         recv_padding = false;
                                     }
