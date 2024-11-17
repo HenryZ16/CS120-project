@@ -202,7 +202,7 @@ pub async fn obj_3(node_name: usize, to_send: usize) -> Result<u32> {
             &mut decoded_data,
             RECEIVE_BYTE_NUM,
             data,
-            match node_name {
+            match to_send {
                 0 => NODE_0_ADDRESS,
                 1 => NODE_1_ADDRESS,
                 2 => NODE_2_ADDRESS,
