@@ -439,178 +439,181 @@ impl Demodulation2 {
         let mut input_stream: InputAudioStream = self.input_config.create_input_stream();
 
         println!("listen daemon start");
-        while let Some(data) = input_stream.next().await {
-            // println!("demodulation running");
-            if let Ok(signal) = state_rx.try_recv() {
-                match signal {
-                    SwitchSignal::StopSignal => {
-                        // println!("Stop signal");
-                        tmp_buffer.clear();
-                        start_index = usize::MAX;
-                        local_max = 0.0;
-                        demodulate_state = demodulate_state.stop();
-                        tmp_bits_data.clear();
-                        is_reboot = false;
-                        input_stream.fresh();
+        loop {
+            while let Some(data) = input_stream.next().await {
+                // println!("demodulation running");
+                if let Ok(signal) = state_rx.try_recv() {
+                    match signal {
+                        SwitchSignal::StopSignal => {
+                            // println!("Stop signal");
+                            tmp_buffer.clear();
+                            start_index = usize::MAX;
+                            local_max = 0.0;
+                            demodulate_state = demodulate_state.stop();
+                            tmp_bits_data.clear();
+                            is_reboot = false;
+                            input_stream.fresh();
+                            continue;
+                        }
+                        SwitchSignal::ResumeSignal => {
+                            // println!("Resume signal");
+                            demodulate_state = demodulate_state.resume();
+                        }
+                        SwitchSignal::SwitchSignal => {
+                            demodulate_state.switch();
+                        }
+                    }
+                }
+                if demodulate_state == DemodulationState::Stop {
+                    input_stream.fresh();
+                    continue;
+                }
+
+                // println!("data len: {}", data.len());
+                // move_data_into_buffer(data, &mut tmp_buffer, alpha_check, channels, &mut prev);
+                for sample in data {
+                    tmp_buffer.push_back(sample);
+                }
+                if demodulate_state == DemodulationState::DetectPreamble {
+                    if tmp_buffer.len() <= demodulate_config.preamble_len {
                         continue;
                     }
-                    SwitchSignal::ResumeSignal => {
-                        // println!("Resume signal");
-                        demodulate_state = demodulate_state.resume();
+                    tmp_buffer.make_contiguous();
+                    for i in 0..tmp_buffer.len() - demodulate_config.preamble_len - 1 {
+                        let window =
+                            &tmp_buffer.as_slices().0[i..i + demodulate_config.preamble_len];
+                        let dot_product = dot_product(window, &demodulate_config.preamble);
+                        // if dot_product > 20.0 {
+                        //     println!("preamble dot product: {}", dot_product);
+                        // }
+                        if dot_product > local_max && dot_product > power_lim_preamble {
+                            local_max = dot_product;
+                            // println!("local max: {}", local_max);
+                            start_index = i + 1;
+                            // debug_vec.clear();
+                            // debug_vec.extend(window);
+                        } else if start_index != usize::MAX
+                            && i - start_index > demodulate_config.preamble_len
+                            && local_max > power_lim_preamble
+                        {
+                            start_index += demodulate_config.preamble_len - 1;
+                            demodulate_state = demodulate_state.next();
+                            // println!(
+                            //     "start index: {}, tmp buffer len: {}, max: {}",
+                            //     start_index, tmp_buffer_len, local_max
+                            // );
+                            local_max = 0.0;
+                            break;
+                        }
                     }
-                    SwitchSignal::SwitchSignal => {
-                        demodulate_state.switch();
-                    }
+                    // println!("start index: {}", start_index);
                 }
-            }
-            if demodulate_state == DemodulationState::Stop {
-                input_stream.fresh();
-                continue;
-            }
 
-            // println!("data len: {}", data.len());
-            // move_data_into_buffer(data, &mut tmp_buffer, alpha_check, channels, &mut prev);
-            for sample in data {
-                tmp_buffer.push_back(sample);
-            }
-            if demodulate_state == DemodulationState::DetectPreamble {
-                if tmp_buffer.len() <= demodulate_config.preamble_len {
-                    continue;
-                }
-                tmp_buffer.make_contiguous();
-                for i in 0..tmp_buffer.len() - demodulate_config.preamble_len - 1 {
-                    let window = &tmp_buffer.as_slices().0[i..i + demodulate_config.preamble_len];
-                    let dot_product = dot_product(window, &demodulate_config.preamble);
-                    // if dot_product > 20.0 {
-                    //     println!("preamble dot product: {}", dot_product);
-                    // }
-                    if dot_product > local_max && dot_product > power_lim_preamble {
-                        local_max = dot_product;
-                        // println!("local max: {}", local_max);
-                        start_index = i + 1;
-                        // debug_vec.clear();
-                        // debug_vec.extend(window);
-                    } else if start_index != usize::MAX
-                        && i - start_index > demodulate_config.preamble_len
-                        && local_max > power_lim_preamble
+                if demodulate_state == DemodulationState::RecvFrame {
+                    if tmp_buffer.len() < start_index
+                        || tmp_buffer.len() - start_index <= ref_signal_len
                     {
-                        start_index += demodulate_config.preamble_len - 1;
-                        demodulate_state = demodulate_state.next();
-                        // println!(
-                        //     "start index: {}, tmp buffer len: {}, max: {}",
-                        //     start_index, tmp_buffer_len, local_max
-                        // );
-                        local_max = 0.0;
-                        break;
+                        // println!("tmp buffer is not long enough");
+                        continue;
                     }
-                }
-                // println!("start index: {}", start_index);
-            }
+                    // tmp_buffer.make_contiguous();
 
-            if demodulate_state == DemodulationState::RecvFrame {
-                if tmp_buffer.len() < start_index
-                    || tmp_buffer.len() - start_index <= ref_signal_len
-                {
-                    // println!("tmp buffer is not long enough");
-                    continue;
-                }
-                // tmp_buffer.make_contiguous();
-
-                while tmp_buffer.len() - start_index >= ref_signal_len
-                    && tmp_bits_data.len() < payload_len
-                {
-                    tmp_bits_data.push(if tmp_buffer[start_index + 1] > 0.0 {
-                        0
-                    } else {
-                        1
-                    });
-                    start_index += ref_signal_len;
-                }
-                if payload_len == usize::MAX
-                    && tmp_bits_data.len()
-                        > phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
-                            + phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING
-                {
-                    // println!("tmp bits: {:?}", tmp_bits_data);
-                    length = 0;
-                    for &bit in &tmp_bits_data[phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
-                        ..phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
-                            + phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING]
+                    while tmp_buffer.len() - start_index >= ref_signal_len
+                        && tmp_bits_data.len() < payload_len
                     {
-                        length <<= 1;
-                        length += bit as usize;
+                        tmp_bits_data.push(if tmp_buffer[start_index + 1] > 0.0 {
+                            0
+                        } else {
+                            1
+                        });
+                        start_index += ref_signal_len;
                     }
-                    if length > MAX_DIGITAL_FRAME_DATA_LENGTH {
-                        println!("[Demodulation]: !!! length wrong at frame");
-                        length = usize::MAX;
+                    if payload_len == usize::MAX
+                        && tmp_bits_data.len()
+                            > phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
+                                + phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING
+                    {
+                        // println!("tmp bits: {:?}", tmp_bits_data);
+                        length = 0;
+                        for &bit in &tmp_bits_data[phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
+                            ..phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
+                                + phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING]
+                        {
+                            length <<= 1;
+                            length += bit as usize;
+                        }
+                        if length > MAX_DIGITAL_FRAME_DATA_LENGTH {
+                            println!("[Demodulation]: !!! length wrong at frame");
+                            length = usize::MAX;
+                            is_reboot = true;
+                            // break;
+                        }
+                        // println!("length: {:?}", length);
+                        // println!("max length: {}", max_length);
+                        payload_len = if length == usize::MAX {
+                            usize::MAX
+                        } else {
+                            length
+                                + phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
+                                + phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING
+                        };
+                        // println!("payload_len: {}", payload_len);
+                    }
+
+                    if tmp_bits_data.len() >= payload_len {
                         is_reboot = true;
-                        // break;
+                        let mut to_send: Vec<Byte> = vec![];
+                        // println!("decoding payload len: {}", payload_len);
+                        // println!("decoded length: {:?}", length);
+                        if length == 0 {
+                            break;
+                        }
+                        let compressed_data =
+                            read_data_2_compressed_u8_ref(&tmp_bits_data[0..payload_len]);
+                        tmp_bits_data = Vec::with_capacity(demodulate_config.payload_bits_length);
+
+                        if !PHYFrame::check_crc(&compressed_data) {
+                            println!("[Demodulation]: !!! CRC wrong at frame");
+                            // println!("data: {:?}", compressed_data);
+                            to_send.clear();
+                            // break;
+                        } else {
+                            let _ = output_tx.send(
+                                compressed_data[(phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
+                                    + phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING)
+                                    / 8..]
+                                    .to_vec(),
+                            );
+                        }
+                        // println!("tmp bit len: {}", tmp_bits_data.len());
+                        // println!("reboot");
                     }
-                    // println!("length: {:?}", length);
-                    // println!("max length: {}", max_length);
-                    payload_len = if length == usize::MAX {
-                        usize::MAX
-                    } else {
-                        length
-                            + phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
-                            + phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING
-                    };
-                    // println!("payload_len: {}", payload_len);
                 }
 
-                if tmp_bits_data.len() >= payload_len {
-                    is_reboot = true;
-                    let mut to_send: Vec<Byte> = vec![];
-                    // println!("decoding payload len: {}", payload_len);
-                    // println!("decoded length: {:?}", length);
-                    if length == 0 {
-                        break;
-                    }
-                    let compressed_data =
-                        read_data_2_compressed_u8_ref(&tmp_bits_data[0..payload_len]);
-                    tmp_bits_data = Vec::with_capacity(demodulate_config.payload_bits_length);
-
-                    if !PHYFrame::check_crc(&compressed_data) {
-                        println!("[Demodulation]: !!! CRC wrong at frame");
-                        // println!("data: {:?}", compressed_data);
-                        to_send.clear();
-                        // break;
-                    } else {
-                        let _ = output_tx.send(
-                            compressed_data[(phy_frame::FRAME_CRC_LENGTH_NO_ENCODING
-                                + phy_frame::FRAME_LENGTH_LENGTH_NO_ENCODING)
-                                / 8..]
-                                .to_vec(),
-                        );
-                    }
-                    // println!("tmp bit len: {}", tmp_bits_data.len());
-                    // println!("reboot");
+                let pop_times = if start_index == usize::MAX {
+                    tmp_buffer.len() - demodulate_config.preamble_len + 1
+                } else {
+                    start_index
+                };
+                for _ in 0..pop_times {
+                    tmp_buffer.pop_front();
                 }
+
+                start_index = if start_index == usize::MAX || is_reboot {
+                    payload_len = usize::MAX;
+                    demodulate_state = demodulate_state.resume();
+                    tmp_bits_data.clear();
+                    is_reboot = false;
+                    length = usize::MAX;
+                    usize::MAX
+                } else {
+                    0
+                };
+
+                // println!("channel size: {}", output_tx.strong_count());
+                // println!("current state: {:?}", demodulate_state);
+                // println!("buffer len: {}", tmp_buffer_len);
             }
-
-            let pop_times = if start_index == usize::MAX {
-                tmp_buffer.len() - demodulate_config.preamble_len + 1
-            } else {
-                start_index
-            };
-            for _ in 0..pop_times {
-                tmp_buffer.pop_front();
-            }
-
-            start_index = if start_index == usize::MAX || is_reboot {
-                payload_len = usize::MAX;
-                demodulate_state = demodulate_state.resume();
-                tmp_bits_data.clear();
-                is_reboot = false;
-                length = usize::MAX;
-                usize::MAX
-            } else {
-                0
-            };
-
-            // println!("channel size: {}", output_tx.strong_count());
-            // println!("current state: {:?}", demodulate_state);
-            // println!("buffer len: {}", tmp_buffer_len);
         }
 
         // println!("listen stoped");
