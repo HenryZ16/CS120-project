@@ -29,8 +29,8 @@ use rand::{rngs::StdRng, Rng, SeedableRng};
 
 const MAX_SEND: u64 = 40;
 const ACK_WAIT_TIME: u64 = 30;
-const BACKOFF_SLOT_TIME: u64 = 70;
-const BACKOFF_MAX_FACTOR: u64 = 3;
+const BACKOFF_SLOT_TIME: u64 = 45;
+const BACKOFF_MAX_FACTOR: u64 = 6;
 const RECV_TIME: u64 = 27;
 
 const DETECT_SIGNAL: Byte = 1;

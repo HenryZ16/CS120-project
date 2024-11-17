@@ -614,6 +614,8 @@ impl Demodulation2 {
                 // println!("current state: {:?}", demodulate_state);
                 // println!("buffer len: {}", tmp_buffer_len);
             }
+            println!("unexpected stop of listening");
+            input_stream = self.input_config.create_input_stream();
         }
 
         // println!("listen stoped");
