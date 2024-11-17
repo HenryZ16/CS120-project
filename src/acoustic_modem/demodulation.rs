@@ -498,10 +498,7 @@ impl Demodulation2 {
                         {
                             start_index += demodulate_config.preamble_len - 1;
                             demodulate_state = demodulate_state.next();
-                            // println!(
-                            //     "start index: {}, tmp buffer len: {}, max: {}",
-                            //     start_index, tmp_buffer_len, local_max
-                            // );
+                            // println!("start index: {}, max: {}", start_index, local_max);
                             local_max = 0.0;
                             break;
                         }
