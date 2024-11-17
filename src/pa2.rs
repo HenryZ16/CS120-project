@@ -23,6 +23,9 @@ const RECEIVER_ADDRESS: MacAddress = 2;
 
 const NODE_0_ADDRESS: MacAddress = 1;
 const NODE_1_ADDRESS: MacAddress = 2;
+const NODE_2_ADDRESS: MacAddress = 3;
+const NODE_3_ADDRESS: MacAddress = 4;
+const NONE_NODE: MacAddress = 0xF;
 
 pub async fn obj_1_mac_send() -> Result<u32> {
     let address = SENDER_ADDRESS;
@@ -175,16 +178,18 @@ pub async fn obj_2_recv() -> Result<u32> {
     Ok(0)
 }
 
-pub async fn obj_3(node_name: bool) -> Result<u32> {
+pub async fn obj_3(node_name: usize, to_send: usize) -> Result<u32> {
     let t_start = Instant::now();
 
     let mut decoded_data = vec![];
     let mut mac_controller = MacController::new(
         CONFIG_FILE,
-        if node_name == false {
-            NODE_0_ADDRESS
-        } else {
-            NODE_1_ADDRESS
+        match node_name {
+            0 => NODE_0_ADDRESS,
+            1 => NODE_1_ADDRESS,
+            2 => NODE_2_ADDRESS,
+            3 => NODE_3_ADDRESS,
+            _ => NONE_NODE,
         },
     );
     // read data from testset/data.bin
@@ -197,10 +202,12 @@ pub async fn obj_3(node_name: bool) -> Result<u32> {
             &mut decoded_data,
             RECEIVE_BYTE_NUM,
             data,
-            if node_name == true {
-                NODE_0_ADDRESS
-            } else {
-                NODE_1_ADDRESS
+            match node_name {
+                0 => NODE_0_ADDRESS,
+                1 => NODE_1_ADDRESS,
+                2 => NODE_2_ADDRESS,
+                3 => NODE_3_ADDRESS,
+                _ => NONE_NODE,
             },
         )
         .await;
@@ -295,13 +302,25 @@ pub async fn pa2(sel: i32, additional_type: &str) -> Result<u32> {
     if sel == 0 || sel == 3 {
         println!("Objective 3 start");
         match additional_type {
-            "node0" => match obj_3(false).await {
+            "node0" => match obj_3(0, 1).await {
                 Ok(_) => {}
                 Err(e) => {
                     println!("Error: {}", e);
                 }
             },
-            "node1" => match obj_3(true).await {
+            "node1" => match obj_3(1, 0).await {
+                Ok(_) => {}
+                Err(e) => {
+                    println!("Error: {}", e);
+                }
+            },
+            "node2" => match obj_3(2, 3).await {
+                Ok(_) => {}
+                Err(e) => {
+                    println!("Error: {}", e);
+                }
+            },
+            "node3" => match obj_3(3, 2).await {
                 Ok(_) => {}
                 Err(e) => {
                     println!("Error: {}", e);
