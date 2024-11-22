@@ -1,6 +1,7 @@
 target*
 testset*
 configuration*
+external*
 output.txt
 .vscode
 *.svg

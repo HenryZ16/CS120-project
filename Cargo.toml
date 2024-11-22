@@ -4,19 +4,20 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-plotters = "0.3.6"
-code-rs = "*"   
-num-integer = "*"
-num-traits = "*"
 anyhow = "*"
+code-rs = "*"   
+cpal = { version = "*", features = ["asio"] }
 futures = "*"
 hound = "*"
-tokio = { version = "1.41.0", features = ["full"] }
-tokio-util = { version = "0.7.12", features = ["full"] }
-tokio-stream = "*"
-rodio = "0.19"
-cpal = { version = "*", features = ["asio"] }
+num-integer = "*"
+num-traits = "*"
+plotters = "0.3.6"
 rand = "0.8"
 rand_distr = "0.4"
+rodio = "0.19"
 serde = { version = "1.0.214", features = ["derive"] }
 serde_yaml = "0.9.34+deprecated"
+tokio = { version = "1.41.0", features = ["full"] }
+tokio-stream = "*"
+tokio-util = { version = "0.7.12", features = ["full"] }
+wintun = "0.5.0"

@@ -30,6 +30,11 @@ The length of our PHY Frame is 1064, where each part is:
 
 - `Payload`: as mentioned in `Length`, we use Reed-Solomon to encode the data, to ensure the accuracy. In each payload, we use 64 bits to correct 32 symbolic errors. So the maximum length of the data in payload is 960 bits.
 
+## External
+
+Due to the license, you must download the external packets and extract them to the `external` dir:
+- [Wintun](https://www.wintun.net/)
+
 ## Thanks
 
 We appreciate the guides and public repositories below:
