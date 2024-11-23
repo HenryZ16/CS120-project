@@ -1,5 +1,6 @@
 pub mod controller;
 pub mod ip_packet;
+pub mod protocols;
 pub mod receive;
 pub mod send;
 
@@ -33,17 +34,6 @@ async fn test_grab_packet() {
             && packet_bytes[19] == 250
         {
             continue;
-        } else if packet_bytes[16] == 1
-            && packet_bytes[17] == 1
-            && packet_bytes[18] == 1
-            && packet_bytes[19] == 1
-        {
-            let mut return_packet = wlan_session
-                .allocate_send_packet(packet_bytes.len() as u16)
-                .unwrap();
-            let return_bytes = return_packet.bytes_mut();
-            return_bytes.copy_from_slice(&packet_bytes);
-            wlan_session.send_packet(return_packet);
         }
         println!(
             "Length: {:?},Received packet: {:?}",
