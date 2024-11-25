@@ -2,7 +2,10 @@ use plotters::data;
 use tokio::sync::mpsc::unbounded_channel;
 use tokio::sync::oneshot;
 
-use crate::acoustic_mac::controller::{MacController, MacSendTask};
+use crate::acoustic_mac::{
+    controller::{MacController, MacSendTask},
+    net_card::NetCard,
+};
 
 pub mod controller;
 pub mod ip_packet;
@@ -99,41 +102,27 @@ const CONFIG_FILE: &str = "configuration/pa2.yml";
 
 #[tokio::test]
 async fn test_send() {
-    let mac_controller = MacController::new(CONFIG_FILE, 0);
-    let (send_task_tx, send_task_rx) = unbounded_channel();
-    let (recv_task_tx, mut recv_task_rx) = unbounded_channel();
+    let net_card = NetCard::new(CONFIG_FILE, 0);
 
-    tokio::spawn(mac_controller.mac_daemon(send_task_rx, recv_task_tx));
+    let to_sends = vec![193; 10];
 
-    let send_data: Vec<u8> = vec![123; 10];
-    let (signal_tx, mut signal_rx) = oneshot::channel();
-    let send_task = MacSendTask::new(1, send_data, signal_tx);
-    // let mut signal_stream = UnboundedReceiverStream::new(signal_rx);
-
-    if let Ok(_) = send_task_tx.send(send_task) {
-        // loop {
-        if let Ok(result) = signal_rx.await {
-            if result == false {
-                println!("send failed");
-            } else {
-                println!("send successfully");
-            }
-        }
-        // }
+    let send_result = net_card.send_async(1, to_sends).await;
+    if send_result.is_err() {
+        println!("send failed");
     } else {
-        println!("Send task pass to Mac failed");
+        if send_result.unwrap() == false {
+            println!("send failed");
+        } else {
+            println!("send successfully");
+        }
     }
 }
 
 #[tokio::test]
 async fn test_recv() {
-    let mac_controller = MacController::new(CONFIG_FILE, 1);
-    let (send_task_tx, send_task_rx) = unbounded_channel();
-    let (recv_task_tx, mut recv_task_rx) = unbounded_channel();
+    let mut net_card = NetCard::new(CONFIG_FILE, 0);
 
-    tokio::spawn(mac_controller.mac_daemon(send_task_rx, recv_task_tx));
-
-    while let Some(data) = recv_task_rx.recv().await {
+    while let Ok(data) = net_card.recv_next().await {
         println!("received data: {:?}", data);
     }
 }
