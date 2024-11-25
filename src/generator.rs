@@ -1,5 +1,6 @@
 use cpal::{Device, SupportedStreamConfig};
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::fs;
 use std::net::Ipv4Addr;
 
@@ -18,6 +19,10 @@ pub struct ConfigGenerator {
     ip_addr: Ipv4Addr,
     ip_mask: Ipv4Addr,
     ip_gateway: Ipv4Addr,
+    if_router: bool,
+    // static ARP
+    if_static_arp: bool,
+    arp_table: HashMap<Ipv4Addr, u8>,
 }
 
 impl ConfigGenerator {
@@ -41,6 +46,15 @@ impl ConfigGenerator {
     }
     pub fn get_ip_gateway(&self) -> Ipv4Addr {
         self.ip_gateway
+    }
+    pub fn get_if_router(&self) -> bool {
+        self.if_router
+    }
+    pub fn get_if_static_arp(&self) -> bool {
+        self.if_static_arp
+    }
+    pub fn get_arp_table(&self) -> HashMap<Ipv4Addr, u8> {
+        self.arp_table.clone()
     }
     pub fn get_sample_rate(&self) -> u32 {
         self.sample_rate
