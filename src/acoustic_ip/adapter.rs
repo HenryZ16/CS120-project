@@ -115,7 +115,7 @@ impl Adapter {
     }
 
     async fn up_daemon(&mut self) {
-        match self.net_card.recv_next().await {
+        match self.net_card.try_recv() {
             Ok(data) => {
                 let packet = IpPacket::new_from_bytes(&data);
                 // u32::MAX: broadcast addr

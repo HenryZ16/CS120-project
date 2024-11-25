@@ -1,9 +1,8 @@
 use anyhow::{Error, Ok, Result};
 use tokio::sync::{
-    mpsc::{unbounded_channel, UnboundedSender},
+    mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
     oneshot::{self, Receiver},
 };
-use tokio_stream::{wrappers::UnboundedReceiverStream, StreamExt};
 
 use crate::{acoustic_mac::controller, generator::ConfigGenerator, utils::Byte};
 
@@ -13,7 +12,7 @@ use super::{
 };
 pub struct NetCard {
     send_task_tx: UnboundedSender<MacSendTask>,
-    recv_data_stream: UnboundedReceiverStream<Vec<Byte>>,
+    recv_data: UnboundedReceiver<Vec<Byte>>,
 }
 
 impl NetCard {
@@ -25,7 +24,7 @@ impl NetCard {
 
         Self {
             send_task_tx,
-            recv_data_stream: UnboundedReceiverStream::new(recv_task_rx),
+            recv_data: recv_task_rx,
         }
     }
 
@@ -37,7 +36,7 @@ impl NetCard {
 
         Self {
             send_task_tx,
-            recv_data_stream: UnboundedReceiverStream::new(recv_task_rx),
+            recv_data: recv_task_rx,
         }
     }
 
@@ -64,11 +63,15 @@ impl NetCard {
     }
 
     pub async fn recv_next(&mut self) -> Result<Vec<Byte>> {
-        if let Some(data) = self.recv_data_stream.next().await {
+        if let Some(data) = self.recv_data.recv().await {
             Ok(data)
         } else {
             println!("[NetCard]: Receive error");
             Err(Error::msg("[NetCard]: Receive error"))
         }
+    }
+
+    pub fn try_recv(&mut self) -> Result<Vec<Byte>, tokio::sync::mpsc::error::TryRecvError> {
+        self.recv_data.try_recv()
     }
 }
