@@ -138,7 +138,7 @@ impl Adapter {
                             return;
                         }
                         println!(
-                            "Received ICMP Echo Request from {:x?}",
+                            "Received ICMP Echo Request from {:?}",
                             Ipv4Addr::from_bits(packet.get_source_address())
                         );
 
