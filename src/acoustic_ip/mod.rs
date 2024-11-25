@@ -110,10 +110,10 @@ async fn test_send() {
 
     let send_result = net_card.send_async(1, to_sends).await;
     if send_result.is_err() {
-        println!("send failed");
+        println!("send failed because async error");
     } else {
         if send_result.unwrap() == false {
-            println!("send failed");
+            println!("send failed because receive false signal");
         } else {
             println!("send successfully");
         }

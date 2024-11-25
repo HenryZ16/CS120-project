@@ -59,7 +59,7 @@ impl NetCard {
         if result.is_ok() {
             Ok(result.unwrap())
         } else {
-            // println!("[NetCard]: Send error");
+            println!("[NetCard]: Send error");
             Err(Error::msg("[NetCard]: Send error"))
         }
     }
@@ -68,7 +68,7 @@ impl NetCard {
         if let Some(data) = self.recv_data_stream.next().await {
             Ok(data)
         } else {
-            // println!("[NetCard]: Receive error");
+            println!("[NetCard]: Receive error");
             Err(Error::msg("[NetCard]: Receive error"))
         }
     }

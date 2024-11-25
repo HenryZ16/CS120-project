@@ -399,14 +399,13 @@ impl MacController {
                 if let Ok(Some(data)) =
                     timeout(Duration::from_millis(RECV_TIME), decoded_data_rx.recv()).await
                 {
-                    println!("received data from demodulation");
                     // check data type
                     if mac_frame::MACFrame::get_dst(&data) == mac_address {
                         // println!("[Controller]: received data: {:?}", data);
                         if mac_frame::MACFrame::get_type(&data) == MACType::Ack {
                             if let Some(mut task) = cur_send_task.take() {
                                 task.cur_frame += 1;
-                                if task.cur_frame == task.to_sends.len() {
+                                if task.cur_frame == task.to_send_macframe.len() {
                                     println!("[MacDaemon]: complete 1 send task to {}", task.dst);
                                     let _ = task.endsignal_tx.send(true);
                                 } else if task.to_send_macframe.len() > task.cur_frame {
@@ -478,7 +477,6 @@ impl MacController {
                                 .await
                                 {
                                     task.timer.start(TimerType::ACK, 0, 0);
-                                    println!("[MacDaemon]: send one frame");
                                 } else {
                                     println!("[MacDaemon]: Busy channel, set backoff");
                                     task.resend_times += 1;
