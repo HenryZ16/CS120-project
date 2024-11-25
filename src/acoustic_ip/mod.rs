@@ -1,3 +1,9 @@
+use plotters::data;
+use tokio::sync::mpsc::unbounded_channel;
+use tokio::sync::oneshot;
+
+use crate::acoustic_mac::controller::{MacController, MacSendTask};
+
 pub mod controller;
 pub mod ip_packet;
 pub mod protocols;
@@ -87,4 +93,45 @@ async fn test_ping() {
     });
     let timer_handle = tokio::time::timeout(tokio::time::Duration::from_secs(25), listen_handle);
     let _ = timer_handle.await.unwrap();
+}
+
+const CONFIG_FILE: &str = "configuration/pa2.yml";
+
+#[tokio::test]
+async fn test_send() {
+    let mac_controller = MacController::new(CONFIG_FILE, 0);
+    let (send_task_tx, send_task_rx) = unbounded_channel();
+    let (recv_task_tx, mut recv_task_rx) = unbounded_channel();
+
+    tokio::spawn(mac_controller.mac_daemon(send_task_rx, recv_task_tx));
+
+    let send_data: Vec<u8> = vec![123; 10];
+    let (signal_tx, mut signal_rx) = oneshot::channel();
+    let send_task = MacSendTask::new(1, send_data, signal_tx);
+    // let mut signal_stream = UnboundedReceiverStream::new(signal_rx);
+
+    if let Ok(_) = send_task_tx.send(send_task) {
+        // loop {
+        if let Ok(result) = signal_rx.await {
+            println!("receive signal: {}", result);
+            // break;
+        }
+        // }
+        println!("send successfully");
+    } else {
+        println!("Send task pass to Mac failed");
+    }
+}
+
+#[tokio::test]
+async fn test_recv() {
+    let mac_controller = MacController::new(CONFIG_FILE, 1);
+    let (send_task_tx, send_task_rx) = unbounded_channel();
+    let (recv_task_tx, mut recv_task_rx) = unbounded_channel();
+
+    tokio::spawn(mac_controller.mac_daemon(send_task_rx, recv_task_tx));
+
+    while let Some(data) = recv_task_rx.recv().await {
+        println!("received data: {:?}", data);
+    }
 }

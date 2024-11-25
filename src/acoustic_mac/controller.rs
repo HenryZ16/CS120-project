@@ -21,7 +21,7 @@ use tokio::{sync::watch, time::error::Elapsed};
 use tokio::{
     sync::{
         mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
-        oneshot::{self, channel, Receiver, Sender},
+        oneshot::Sender,
     },
     time::timeout,
 };
@@ -371,16 +371,24 @@ impl MacController {
             let mut cur_send_task = None;
             // let mut t_rtt_start = Instant::now();
             loop {
+                // println!("running");
                 while let Ok(mut send_task) = send_task_rx.try_recv() {
                     send_task.fresh_send_frame(&mut sender);
                     send_tasks.push_back(send_task);
+                    println!("get one send task");
                 }
                 if cur_send_task.is_none() {
                     cur_send_task = send_tasks.pop_front();
+                    if let Some(mut task) = cur_send_task.take() {
+                        task.timer.start(TimerType::BACKOFF, 0, 0);
+                        cur_send_task = Some(task);
+                        println!("set timer for new send task");
+                    }
                 }
                 if let Ok(Some(data)) =
                     timeout(Duration::from_millis(RECV_TIME), decoded_data_rx.recv()).await
                 {
+                    println!("received data from demodulation");
                     // check data type
                     if mac_frame::MACFrame::get_dst(&data) == mac_address {
                         // println!("[Controller]: received data: {:?}", data);
@@ -412,7 +420,7 @@ impl MacController {
 
                             // if (cur_recv_frame & 0x3F) as u8 == MACFrame::get_frame_id(&data) {
                             if data.len() < 5 {
-                                println!("[MacController]: received NONE frame");
+                                println!("[MacDaemon]: received NONE frame");
                                 continue;
                             } else {
                                 let _ = recv_task_tx.send(MACFrame::get_payload(&data).to_vec());
@@ -420,7 +428,7 @@ impl MacController {
                         }
                     } else {
                         println!(
-                            "[MacController]: received other macaddress: {}",
+                            "[MacDaemon]: received other macaddress: {}",
                             mac_frame::MACFrame::get_dst(&data)
                         );
                     }
@@ -431,7 +439,7 @@ impl MacController {
                         match task.timer.timer_type {
                             TimerType::ACK => {
                                 println!(
-                                    "[MacController]: ACK timeout times: {} on frame {}",
+                                    "[MacDaemon]: ACK timeout times: {} on frame {}",
                                     task.retry_times, task.cur_frame
                                 );
                                 task.retry_times += 1;
@@ -440,6 +448,7 @@ impl MacController {
                                         "[MacDaemon]: Link error towards MacAddress {}",
                                         task.dst
                                     );
+                                    let _ = task.endsignal_tx.send(false);
                                 } else {
                                     task.timer.start(TimerType::BACKOFF, 0, 0);
                                     cur_send_task = Some(task);
@@ -457,6 +466,7 @@ impl MacController {
                                 .await
                                 {
                                     task.timer.start(TimerType::ACK, 0, 0);
+                                    println!("[MacDaemon]: send one frame");
                                 } else {
                                     println!("[MacDaemon]: Busy channel, set backoff");
                                     task.resend_times += 1;
@@ -469,7 +479,12 @@ impl MacController {
                                 cur_send_task = Some(task);
                             }
                         }
+                    } else {
+                        cur_send_task = Some(task);
                     }
+                    // if cur_send_task.is_none() {
+                    //     println!("didn't put back task");
+                    // }
                 }
             }
         });
