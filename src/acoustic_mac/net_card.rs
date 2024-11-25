@@ -5,7 +5,7 @@ use tokio::sync::{
 };
 use tokio_stream::{wrappers::UnboundedReceiverStream, StreamExt};
 
-use crate::{acoustic_mac::controller, utils::Byte};
+use crate::{acoustic_mac::controller, generator::ConfigGenerator, utils::Byte};
 
 use super::{
     controller::{MacController, MacSendTask},
@@ -18,10 +18,22 @@ pub struct NetCard {
 }
 
 impl NetCard {
-    pub fn new(config_file: &str, mac_address: MacAddress) -> Self {
+    pub fn new_from_config_file(config_file: &str, mac_address: MacAddress) -> Self {
         let mac_controller = MacController::new(config_file, mac_address);
         let (send_task_tx, send_task_rx) = unbounded_channel();
-        let (recv_task_tx, mut recv_task_rx) = unbounded_channel();
+        let (recv_task_tx, recv_task_rx) = unbounded_channel();
+        tokio::spawn(mac_controller.mac_daemon(send_task_rx, recv_task_tx));
+
+        Self {
+            send_task_tx,
+            recv_data_stream: UnboundedReceiverStream::new(recv_task_rx),
+        }
+    }
+
+    pub fn new_from_config(config: &ConfigGenerator) -> Self {
+        let mac_controller = MacController::new_from_config(config);
+        let (send_task_tx, send_task_rx) = unbounded_channel();
+        let (recv_task_tx, recv_task_rx) = unbounded_channel();
         tokio::spawn(mac_controller.mac_daemon(send_task_rx, recv_task_tx));
 
         Self {

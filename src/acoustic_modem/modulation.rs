@@ -47,6 +47,20 @@ impl Modulator {
         }
     }
 
+    pub fn new_from_config(device: cpal::Device, config: SupportedStreamConfig) -> Self {
+        let output_stream = OutputAudioStream::new(&device, config.clone());
+        let sample_rate = config.sample_rate().0;
+
+        Modulator {
+            carrier_freq: vec![0],
+            sample_rate,
+            redundant_periods: REDUNDANT_PERIODS,
+            enable_ofdm: false,
+            output_stream,
+            config,
+        }
+    }
+
     pub fn get_carrier_cnt(&self) -> usize {
         self.carrier_freq.len()
     }
