@@ -93,7 +93,14 @@ impl Adapter {
     }
 
     async fn up_daemon(&self) {}
-    async fn down_daemon(&self) {}
+    async fn down_daemon(&self) {
+        if let Ok(packet) = self.receive_from_ip_async() {
+            if packet.dst_is_subnet(&self.ip_gateway.unwrap(), &self.ip_mask) {
+                self.net_card
+                    .send_unblocked(0, packet.get_ip_packet_bytes());
+            }
+        }
+    }
 
     pub async fn adapter_daemon(&self) {
         // 1. Listen from the mac layer (up)

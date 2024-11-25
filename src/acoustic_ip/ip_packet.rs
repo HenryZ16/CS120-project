@@ -233,6 +233,10 @@ impl IpPacket {
     pub fn set_data(&mut self, data: Vec<Byte>) {
         self.data = data;
     }
+
+    pub fn dst_is_subnet(&self, domain: &Ipv4Addr, mask: &Ipv4Addr) -> bool {
+        (domain & mask) == (Ipv4Addr::from(self.get_destination_address()) & mask)
+    }
 }
 
 pub struct TestAdapter {
