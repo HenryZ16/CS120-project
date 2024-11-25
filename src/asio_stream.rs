@@ -135,7 +135,7 @@ pub struct InputAudioStream {
     stream: cpal::Stream,
     receiver: UnboundedReceiver<Vec<f32>>,
 }
-
+unsafe impl Send for InputAudioStream {}
 fn build_input_stream<T>(
     device: &Device,
     config: SupportedStreamConfig,

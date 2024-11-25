@@ -1,10 +1,16 @@
 use crate::{
-    acoustic_mac::{controller::MacDetector, receive},
+    acoustic_mac::{
+        controller::{self, MacController, MacDetector},
+        receive,
+    },
     utils::get_audio_device_and_config,
 };
 use std::fs::File;
 use std::io::Write;
-use tokio::time::{sleep, timeout, Duration, Instant};
+use tokio::{
+    sync::mpsc::unbounded_channel,
+    time::{sleep, timeout, Duration, Instant},
+};
 
 #[tokio::test]
 async fn test_receiver() {
@@ -49,4 +55,15 @@ async fn test_detector() {
         _ = detector_daemon => {Err(())}
         _ = detect_task => {Ok(())}
     };
+}
+
+#[tokio::test]
+async fn test_mac_daemon() {
+    let mac_controller = MacController::new("configuration/pa2.yml", 1);
+    let (send_task_tx, send_task_rx) = unbounded_channel();
+    let (recv_task_tx, mut recv_task_rx) = unbounded_channel();
+
+    tokio::spawn(mac_controller.mac_daemon(send_task_rx, recv_task_tx));
+
+    recv_task_rx.recv().await;
 }
