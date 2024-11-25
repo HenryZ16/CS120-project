@@ -113,11 +113,13 @@ async fn test_send() {
     if let Ok(_) = send_task_tx.send(send_task) {
         // loop {
         if let Ok(result) = signal_rx.await {
-            println!("receive signal: {}", result);
-            // break;
+            if result == false {
+                println!("send failed");
+            } else {
+                println!("send successfully");
+            }
         }
         // }
-        println!("send successfully");
     } else {
         println!("Send task pass to Mac failed");
     }
