@@ -2,6 +2,7 @@ mod acoustic_ip;
 mod acoustic_mac;
 mod acoustic_modem;
 mod asio_stream;
+mod generator;
 mod pa0;
 mod pa1;
 mod pa2;

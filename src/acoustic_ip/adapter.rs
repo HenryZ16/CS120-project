@@ -45,5 +45,14 @@ impl Adapter {
         }
     }
 
-    pub fn new_from_config(config_file: &str) -> Self {}
+    pub fn new_from_config(config_file: &str) -> Self {
+        let config = crate::generator::ConfigGenerator::new_from_yaml(config_file);
+        Self::new(
+            config.get_ip_addr(),
+            config.get_ip_mask(),
+            Some(config.get_ip_gateway()),
+            config.get_mac_addr(),
+            NetCard::new(config.get_lowest_power_limit()),
+        )
+    }
 }

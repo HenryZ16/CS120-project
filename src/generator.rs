@@ -3,7 +3,7 @@ use std::fs;
 use std::net::Ipv4Addr;
 
 #[derive(Deserialize, Debug, Clone)]
-struct IPGenerator {
+pub struct ConfigGenerator {
     // Phy layer
     lowest_power_limit: f32,
     // Mac layer
@@ -14,7 +14,7 @@ struct IPGenerator {
     ip_gateway: Ipv4Addr,
 }
 
-impl IPGenerator {
+impl ConfigGenerator {
     pub fn new_from_yaml(filename: &str) -> Self {
         let contents = fs::read_to_string(filename).expect("Failed to read file");
         let config: Self = serde_yaml::from_str(&contents).expect("Failed to parse YAML");

@@ -8,7 +8,6 @@ use crate::acoustic_mac::{
 };
 
 pub mod adapter;
-mod generator;
 pub mod ip_packet;
 pub mod protocols;
 
