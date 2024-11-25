@@ -208,6 +208,7 @@ impl Adapter {
         //    we may need to send the packet to the gateway
         //    then send the packet to the mac layer
         //  - both up and down should work concurrently
+        println!("adapter_daemon started.");
         loop {
             self.up_daemon().await;
             self.down_daemon().await;
