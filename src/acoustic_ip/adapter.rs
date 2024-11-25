@@ -55,4 +55,17 @@ impl Adapter {
             NetCard::new(config.get_lowest_power_limit()),
         )
     }
+
+    pub async fn adapter_daemon(&self) {
+        // 1. Listen from the mac layer
+        //    if `ping` echoRequest, send `ping` echoReply
+        //    else, send the packet to the ip layer
+        // 2. Listen from the ip layer
+        //    if is router, and the subnet of the packet is for the acoustic network,
+        //    send the packet to the mac layer
+        //    else, do nothing
+    }
+
+    pub async fn start_daemon(&self) {}
+    pub async fn stop_daemon(&self) {}
 }
