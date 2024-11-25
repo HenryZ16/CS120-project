@@ -13,13 +13,17 @@ use anyhow::Error;
 use cpal::Device;
 use cpal::SupportedStreamConfig;
 use futures::StreamExt;
+use std::collections::VecDeque;
 use std::result::Result::Ok;
 use std::time::{Duration, Instant};
+use tokio::{sync::watch, time::error::Elapsed};
 use tokio::{
-    sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
+    sync::{
+        mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
+        oneshot::{self, channel, Receiver, Sender},
+    },
     time::timeout,
 };
-use tokio::{sync::watch, time::error::Elapsed};
 
 use super::{
     mac_frame::{MACType, MacAddress},
@@ -63,7 +67,7 @@ impl RecordTimer {
     }
 
     // arg: duration in ms
-    fn start(&mut self, timer_type: TimerType, factor: u64, continue_sends: u64) {
+    fn start(&mut self, timer_type: TimerType, factor: u64, _continue_sends: u64) {
         self.start_instant = Instant::now();
 
         self.duration = match timer_type {
@@ -73,7 +77,7 @@ impl RecordTimer {
                 } else {
                     1 << factor
                 };
-                let mut slot_times: u64 = self.rng.gen_range(0..=factor);
+                let slot_times: u64 = self.rng.gen_range(0..=factor);
                 // if continue_sends > 4 {
                 //     slot_times *= 2;
                 // }
@@ -301,6 +305,128 @@ impl MacController {
         Ok(())
     }
 
+    pub async fn mac_daemon(
+        &mut self,
+        mut send_task_rx: UnboundedReceiver<MacSendTask>,
+        mut recv_task_tx: UnboundedSender<Vec<Byte>>,
+    ) {
+        let (decoded_data_tx, mut decoded_data_rx) = unbounded_channel();
+        let (demodulate_status_tx, demodulate_status_rx) = unbounded_channel();
+
+        let init_state = DemodulationState::DetectPreamble;
+        let (mut detector, request_rx, result_tx) = MacDetector::new().await;
+        let (device, config) = get_audio_device_and_config(self.phy_config.get_sample_rate());
+        let mut demodulator = self
+            .phy_config
+            .gen_demodulation(device.clone(), config.clone());
+        // start decode listening
+        let _listen_task =
+            demodulator.listening_daemon(decoded_data_tx, demodulate_status_rx, init_state);
+        let _detector_daemon =
+            MacDetector::daemon(request_rx, result_tx, device.clone(), config.clone());
+        let mut sender =
+            MacSender::new_from_genrator(&self.phy_config, self.mac_address, device, config);
+        let mac_address = self.mac_address;
+        let main_task = tokio::spawn(async move {
+            let mut receive_tasks: VecDeque<MacReceiveTask> = VecDeque::with_capacity(10);
+            let mut send_tasks: VecDeque<MacSendTask> = VecDeque::with_capacity(10);
+            let tmp = sender.generate_ack_frame(u8::MAX);
+            sender.send_frame(&tmp).await;
+            let mut cur_send_task = None;
+            let mut t_rtt_start = Instant::now();
+            loop {
+                while let Ok(mut recv_task) = recv_task_tx.try_recv() {
+                    receive_tasks.push_back(recv_task);
+                }
+                while let Ok(mut send_task) = send_task_rx.try_recv() {
+                    let ack_frame = sender.generate_ack_frame(send_task.dst);
+                    send_task.fresh_send_frame(
+                        sender.generate_digital_data_frames(send_task.to_sends[0], send_task.dst),
+                    );
+                    send_tasks.push_back(send_task);
+                }
+                if cur_send_task.is_none() {
+                    cur_send_task = send_tasks.pop_front();
+                }
+
+                if let Ok(Some(data)) =
+                    timeout(Duration::from_millis(RECV_TIME), decoded_data_rx.recv()).await
+                {
+                    // check data type
+                    if mac_frame::MACFrame::get_dst(&data) == mac_address {
+                        // println!("[Controller]: received data: {:?}", data);
+                        if mac_frame::MACFrame::get_type(&data) == MACType::Ack {
+                            if let Some(mut task) = cur_send_task {
+                                task.cur_frame += 1;
+                                if task.cur_frame == task.to_sends.len() {
+                                    println!("[MacDaemon]: complete 1 send task to {}", task.dst);
+                                    task.endsignal_tx.send(true);
+                                } else if task.to_send_macframe.len() > task.cur_frame {
+                                    task.retry_times = 0;
+                                    task.resend_times = 0;
+                                    println!(
+                                        "send frame {} success, RTT: {:?}",
+                                        task.cur_frame - 1,
+                                        t_rtt_start.elapsed()
+                                    );
+                                    task.timer.start(TimerType::BACKOFF, 0, 0);
+                                }
+                            } else {
+                                println!("[MacDaemon]: !!! No send task handle ACK");
+                            }
+                        } else {
+                            let ack_frame = sender.generate_ack_frame(MACFrame::get_src(&data));
+                            for task in receive_tasks {}
+
+                            MacController::send_frame(
+                                &demodulate_status_tx,
+                                &mut detector,
+                                &mut sender,
+                                &ack_frame,
+                                false,
+                            )
+                            .await;
+
+                            if (cur_recv_frame & 0x3F) as u8 == MACFrame::get_frame_id(&data) {
+                                if data.len() < 5 {
+                                    println!("[MacController]: received NONE frame");
+                                    continue;
+                                } else {
+                                    println!(
+                                        "[MacController]: received frame id: {}",
+                                        cur_recv_frame
+                                    );
+                                    cur_recv_frame += 1;
+                                    continue_sends = 0;
+                                    received.extend(MACFrame::get_payload(&data));
+                                    if received.len() >= receive_byte_num {
+                                        println!("received length: {} and stopped", received.len());
+                                        recv_padding = false;
+                                    }
+                                }
+                            } else {
+                                println!(
+                                    "[MacController]: expected frame id: {}, received id: {}",
+                                    if cur_recv_frame == 0 {
+                                        u8::MAX as usize
+                                    } else {
+                                        cur_recv_frame
+                                    },
+                                    MACFrame::get_frame_id(&data)
+                                );
+                            }
+                        }
+                    } else {
+                        println!(
+                            "[MacController]: received other macaddress: {}",
+                            mac_frame::MACFrame::get_dst(&data)
+                        );
+                    }
+                }
+            }
+        });
+    }
+
     // async fn task_daemon(
     //     decoded_data_rx: &mut UnboundedReceiver<Vec<Byte>>,
     //     demodulate_status_tx: &UnboundedSender<SwitchSignal>,
@@ -335,6 +461,60 @@ impl MacController {
         let _ = demodulate_status_tx.send(SwitchSignal::ResumeSignal);
 
         is_empty
+    }
+}
+
+pub type EndSignal = bool;
+
+pub struct MacSendTask {
+    dst: MacAddress,
+    to_sends: Vec<Vec<Byte>>,
+    to_send_macframe: Vec<MACFrame>,
+    endsignal_tx: Sender<EndSignal>,
+    timer: RecordTimer,
+    cur_frame: usize,
+    retry_times: u64,
+    resend_times: u64,
+}
+
+impl MacSendTask {
+    pub fn new(dst: MacAddress, to_sends: Vec<Vec<Byte>>, signal_tx: Sender<EndSignal>) -> Self {
+        Self {
+            dst,
+            to_sends,
+            to_send_macframe: vec![],
+            endsignal_tx: signal_tx,
+            timer: RecordTimer::new(),
+            cur_frame: 0,
+            retry_times: 0,
+            resend_times: 0,
+        }
+    }
+
+    pub fn fresh_send_frame(&mut self, to_send_macframe: Vec<MACFrame>) {
+        self.to_send_macframe = to_send_macframe;
+    }
+}
+
+pub struct MacReceiveTask {
+    src: MacAddress,
+    decoded_tx: UnboundedSender<Vec<Byte>>,
+    endsignal_rx: Receiver<EndSignal>,
+    cur_frame: usize,
+}
+
+impl MacReceiveTask {
+    pub fn new(
+        src: MacAddress,
+        decoded_tx: UnboundedSender<Vec<Byte>>,
+        signal_rx: Receiver<EndSignal>,
+    ) -> Self {
+        Self {
+            src,
+            decoded_tx,
+            endsignal_rx: signal_rx,
+            cur_frame: 0,
+        }
     }
 }
 
