@@ -153,7 +153,7 @@ impl Adapter {
                                     .send_async(dst_mac, reply_packet.get_ip_packet_bytes())
                                     .await;
                             } else {
-                                return;
+                                self.send_to_ip(packet);
                             }
                         }
                         _ => {
