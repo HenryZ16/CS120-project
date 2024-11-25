@@ -29,6 +29,7 @@ impl ConfigGenerator {
     pub fn new_from_yaml(filename: &str) -> Self {
         let contents = fs::read_to_string(filename).expect("Failed to read file");
         let config: Self = serde_yaml::from_str(&contents).expect("Failed to parse YAML");
+        println!("config: {:?}", config);
         config
     }
 

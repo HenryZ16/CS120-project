@@ -219,6 +219,9 @@ impl IpPacket {
     pub fn get_destination_address(&self) -> u32 {
         self.destination_address
     }
+    pub fn get_destination_ipv4_addr(&self) -> Ipv4Addr {
+        Ipv4Addr::from(self.get_destination_address())
+    }
     pub fn set_destination_address(&mut self, destination_address: u32) {
         self.destination_address = destination_address;
     }

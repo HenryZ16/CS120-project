@@ -167,11 +167,29 @@ impl Adapter {
             Err(_) => {}
         }
     }
+
     async fn down_daemon(&self) {
         if let Ok(packet) = self.receive_from_ip_async() {
-            if packet.dst_is_subnet(&self.ip_gateway.unwrap(), &self.ip_mask) {
-                self.net_card
-                    .send_unblocked(0, packet.get_ip_packet_bytes());
+            if packet.dst_is_subnet(&self.ip_gateway.unwrap(), &self.ip_mask)
+                || packet.get_destination_address() == u32::MAX
+            {
+                if let Some(&dst_mac) = self.arp_table.get(&packet.get_destination_ipv4_addr()) {
+                    let _ = self
+                        .net_card
+                        .send_async(dst_mac, packet.get_ip_packet_bytes())
+                        .await;
+                }
+            } else {
+                let _ = self
+                    .net_card
+                    .send_async(
+                        *self
+                            .arp_table
+                            .get(&self.ip_gateway.unwrap())
+                            .expect("No gateway"),
+                        packet.get_ip_packet_bytes(),
+                    )
+                    .await;
             }
         }
     }
