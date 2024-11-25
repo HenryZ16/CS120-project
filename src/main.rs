@@ -1,6 +1,7 @@
 mod acoustic_ip;
 mod acoustic_mac;
 mod acoustic_modem;
+mod adapter;
 mod asio_stream;
 mod generator;
 mod pa0;
@@ -16,7 +17,7 @@ fn help() {
     println!("  -p=N, --pa=N: Select PA N to demonstrate");
     println!("  -o, --objective=N: Select an objective N in a specified PA to demonstrate. If no PA specified, this will be ignored.");
     println!(
-        "  -t=<str>, --type=<str>: Additional type for the selected PA: send, send_file, mac_send"
+        "  -t=<str>, --type=<str>: Additional type for the selected PA: send, send_file, mac_send, start"
     );
     println!("  -d, -device: Show available ASIO devices");
     println!("  -g[=N], --generate[=N]: Generate a random data file with N (default 10000) bits");
@@ -127,6 +128,10 @@ async fn main() {
                     println!("Error: {}", e);
                 }
             }
+        }
+        Some((3, 0, _)) => {
+            println!("PA 3 selected.");
+            adapter::adapter_task().await;
         }
         Some((_, _, _)) => {
             println!("Invalid PA number");
