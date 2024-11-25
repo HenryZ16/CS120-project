@@ -348,7 +348,7 @@ impl MacController {
             sender.send_frame(to_send_frame).await;
         }
 
-        let _ = sleep(Duration::from_millis(25)).await;
+        // let _ = sleep(Duration::from_millis(25)).await;
         // demodulator open
         let _ = demodulate_status_tx.send(SwitchSignal::ResumeSignal);
 
