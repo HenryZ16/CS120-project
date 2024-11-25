@@ -139,7 +139,7 @@ impl Adapter {
                         }
                         println!(
                             "Received ICMP Echo Request from {:x?}",
-                            packet.get_source_address()
+                            Ipv4Addr::from_bits(packet.get_source_address())
                         );
 
                         let reply = icmp.reply_echo();
