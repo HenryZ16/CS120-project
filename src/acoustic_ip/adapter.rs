@@ -162,8 +162,7 @@ impl Adapter {
 
                         let _ = self
                             .net_card
-                            .send_async(dst_mac, reply_packet.get_ip_packet_bytes())
-                            .await;
+                            .send_unblocked(dst_mac, reply_packet.get_ip_packet_bytes());
                     }
                     _ => {
                         self.send_to_ip(packet);
@@ -186,8 +185,7 @@ impl Adapter {
                 if let Some(&dst_mac) = self.arp_table.get(&packet.get_destination_ipv4_addr()) {
                     let _ = self
                         .net_card
-                        .send_async(dst_mac, packet.get_ip_packet_bytes())
-                        .await;
+                        .send_unblocked(dst_mac, packet.get_ip_packet_bytes());
                 }
             } // else {
               //     let _ = self
