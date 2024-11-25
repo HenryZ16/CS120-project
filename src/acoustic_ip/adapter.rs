@@ -136,7 +136,7 @@ impl Adapter {
                         if !icmp.check_checksum() {
                             return;
                         }
-                        if icmp.get_type() == ICMPType::EchoReply {
+                        if icmp.get_type() != ICMPType::EchoRequest {
                             self.send_to_ip(packet);
                             return;
                         }
