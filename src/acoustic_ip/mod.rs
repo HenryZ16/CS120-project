@@ -2,9 +2,12 @@ use plotters::data;
 use tokio::sync::mpsc::unbounded_channel;
 use tokio::sync::oneshot;
 
-use crate::acoustic_mac::{
-    controller::{MacController, MacSendTask},
-    net_card::NetCard,
+use crate::{
+    acoustic_mac::{
+        controller::{MacController, MacSendTask},
+        net_card::NetCard,
+    },
+    generator::ConfigGenerator,
 };
 
 pub mod adapter;
@@ -96,11 +99,12 @@ async fn test_ping() {
     let _ = timer_handle.await.unwrap();
 }
 
-const CONFIG_FILE: &str = "configuration/pa2.yml";
+const CONFIG_FILE: &str = "configuration/pa3.yml";
 
 #[tokio::test]
 async fn test_send() {
-    let net_card = NetCard::new(CONFIG_FILE, 0);
+    let config = ConfigGenerator::new_from_yaml(CONFIG_FILE);
+    let net_card = config.get_net_card();
 
     let to_sends = vec![193; 10];
 
@@ -118,7 +122,8 @@ async fn test_send() {
 
 #[tokio::test]
 async fn test_recv() {
-    let mut net_card = NetCard::new(CONFIG_FILE, 1);
+    let config = ConfigGenerator::new_from_yaml(CONFIG_FILE);
+    let mut net_card = config.get_net_card();
 
     while let Ok(data) = net_card.recv_next().await {
         println!("received data: {:?}", data);

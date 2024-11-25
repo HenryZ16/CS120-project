@@ -1,6 +1,8 @@
 use crate::acoustic_modem::modulation::{self, ENABLE_ECC};
-use crate::acoustic_modem::phy_frame::MAX_DIGITAL_FRAME_DATA_LENGTH;
 use crate::acoustic_modem::phy_frame::{self, PHYFrame};
+use crate::acoustic_modem::phy_frame::{
+    FRAME_PAYLOAD_LENGTH, MAX_DIGITAL_FRAME_DATA_LENGTH, MAX_FRAME_DATA_LENGTH_NO_ENCODING,
+};
 use crate::asio_stream::InputAudioStream;
 use crate::utils::{
     read_data_2_compressed_u8, read_data_2_compressed_u8_ref, u8_2_code_rs_hexbit, Bit, Byte,
@@ -238,6 +240,30 @@ impl Demodulation2 {
         }
     }
 
+    pub fn new_from_config(
+        sample_rate: u32,
+        lowest_power_limit: f32,
+        device: Device,
+        config: SupportedStreamConfig,
+    ) -> Self {
+        let input_stream_config = InputStreamConfig::new(config, device);
+
+        let demodulation_config = DemodulationConfig::new(
+            sample_rate,
+            vec![],
+            vec![],
+            FRAME_PAYLOAD_LENGTH,
+            MAX_FRAME_DATA_LENGTH_NO_ENCODING,
+            lowest_power_limit,
+        );
+
+        Demodulation2 {
+            input_config: input_stream_config,
+            // buffer: VecDeque::new(),
+            demodulate_config: demodulation_config,
+        }
+    }
+
     pub async fn listening(&mut self, decoded_data: &mut Vec<u8>) {
         let demodulate_config = &self.demodulate_config;
         let payload_len = demodulate_config.payload_bits_length;
@@ -421,11 +447,8 @@ impl Demodulation2 {
 
         let power_lim_preamble = demodulate_config.lowest_power_limit;
 
-        let mut tmp_buffer: VecDeque<f32> = VecDeque::with_capacity(
-            5 * demodulate_config
-                .preamble_len
-                .max(demodulate_config.ref_signal_len[0]),
-        );
+        let mut tmp_buffer: VecDeque<f32> =
+            VecDeque::with_capacity(5 * demodulate_config.preamble_len);
 
         let mut local_max = 0.0;
         let mut start_index = usize::MAX;
@@ -438,7 +461,7 @@ impl Demodulation2 {
         let mut is_reboot = false;
         let mut input_stream: InputAudioStream = self.input_config.create_input_stream();
 
-        println!("listen daemon start");
+        // println!("listen daemon start");
         loop {
             while let Some(data) = input_stream.next().await {
                 // println!("demodulation running");
@@ -567,7 +590,7 @@ impl Demodulation2 {
                         }
                         let compressed_data =
                             read_data_2_compressed_u8_ref(&tmp_bits_data[0..payload_len]);
-                        tmp_bits_data = Vec::with_capacity(demodulate_config.payload_bits_length);
+                        tmp_bits_data.clear();
 
                         if !PHYFrame::check_crc(&compressed_data) {
                             println!("[Demodulation]: !!! CRC wrong at frame");

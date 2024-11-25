@@ -7,6 +7,7 @@ use crate::{
         generator::PhyLayerGenerator,
     },
     asio_stream::InputAudioStream,
+    generator::ConfigGenerator,
     utils::{get_audio_device_and_config, Byte},
 };
 use anyhow::Error;
@@ -100,17 +101,24 @@ impl RecordTimer {
 
 #[derive(Clone)]
 pub struct MacController {
-    phy_config: PhyLayerGenerator,
+    phy_config: ConfigGenerator,
     mac_address: MacAddress,
 }
 
 impl MacController {
     pub fn new(config_file: &str, mac_address: MacAddress) -> Self {
-        let phy_config = PhyLayerGenerator::new_from_yaml(config_file);
+        let phy_config = ConfigGenerator::new_from_yaml(config_file);
 
         Self {
             phy_config,
             mac_address,
+        }
+    }
+
+    pub fn new_from_config(config: &ConfigGenerator) -> Self {
+        Self {
+            phy_config: config.clone(),
+            mac_address: config.get_mac_addr(),
         }
     }
 
@@ -130,7 +138,7 @@ impl MacController {
         let (device, config) = get_audio_device_and_config(self.phy_config.get_sample_rate());
         let mut demodulator = self
             .phy_config
-            .gen_demodulation(device.clone(), config.clone());
+            .get_demodulator(device.clone(), config.clone());
         // start decode listening
         let _listen_task =
             demodulator.listening_daemon(decoded_data_tx, demodulate_status_rx, init_state);
@@ -359,7 +367,7 @@ impl MacController {
         let (device, config) = get_audio_device_and_config(self.phy_config.get_sample_rate());
         let mut demodulator = self
             .phy_config
-            .gen_demodulation(device.clone(), config.clone());
+            .get_demodulator(device.clone(), config.clone());
         // start decode listening
         let _listen_task =
             demodulator.listening_daemon(decoded_data_tx, demodulate_status_rx, init_state);
@@ -374,6 +382,7 @@ impl MacController {
             sender.send_frame(&tmp).await;
             let mut cur_send_task = None;
             // let mut t_rtt_start = Instant::now();
+            println!("Mac Daemon start");
             loop {
                 // println!("running");
                 while let Ok(mut send_task) = send_task_rx.try_recv() {
@@ -601,7 +610,7 @@ impl MacDetector {
         // println!("run daemon setup");
         let mut sample_stream = InputAudioStream::new(&device, config);
         // let mut sample = vec![];
-        println!("detector daemon start");
+        // println!("detector daemon start");
         loop {
             tokio::select! {
                 _ = request_rx.recv() => {

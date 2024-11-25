@@ -52,7 +52,7 @@ impl Adapter {
             config.get_ip_mask(),
             Some(config.get_ip_gateway()),
             config.get_mac_addr(),
-            NetCard::new(config.get_lowest_power_limit()),
+            config.get_net_card(),
         )
     }
 }

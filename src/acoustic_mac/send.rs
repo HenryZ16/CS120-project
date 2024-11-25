@@ -8,6 +8,7 @@ use crate::{
         modulation::Modulator,
         phy_frame,
     },
+    generator::ConfigGenerator,
     utils::Byte,
 };
 use std::vec;
@@ -20,10 +21,9 @@ pub struct MacSender {
 
 impl MacSender {
     pub fn new(config_file: &str, address: u8) -> Self {
-        let config = PhyLayerGenerator::new_from_yaml(config_file);
-        let (cpal_device, cpal_config) =
-            crate::utils::get_audio_device_and_config(config.get_sample_rate());
-        let mut modulator = config.gen_modulator(cpal_device, cpal_config);
+        let config = ConfigGenerator::new_from_yaml(config_file);
+        let (cpal_device, cpal_config) = config.get_audio_device_and_config();
+        let mut modulator = config.get_modulator(cpal_device, cpal_config);
 
         // warm up: reduce the first send time of frame
         futures::executor::block_on(modulator.send_modulated_signal(vec![0.0; 10]));
@@ -36,12 +36,12 @@ impl MacSender {
     }
 
     pub fn new_from_genrator(
-        generator: &PhyLayerGenerator,
+        generator: &ConfigGenerator,
         address: u8,
         device: Device,
         config: SupportedStreamConfig,
     ) -> Self {
-        let mut modulator = generator.gen_modulator(device, config);
+        let modulator = generator.get_modulator(device, config);
 
         // warm up: reduce the first send time of frame
         // futures::executor::block_on(modulator.send_modulated_signal(vec![0.0; 10]));
