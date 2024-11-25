@@ -117,6 +117,8 @@ impl Adapter {
     async fn up_daemon(&mut self) {
         match self.net_card.recv_next().await {
             Ok(data) => {
+                println!("[up_daemon]: received from mac layer");
+
                 let packet = IpPacket::new_from_bytes(&data);
                 // u32::MAX: broadcast addr
                 if !(packet.get_destination_address() == self.ip_addr.to_bits()
@@ -170,6 +172,7 @@ impl Adapter {
 
     async fn down_daemon(&mut self) {
         if let Ok(packet) = self.receive_from_ip_async() {
+            println!("[down_daemon]: received from ip layer");
             if packet.dst_is_subnet(&self.ip_gateway.unwrap(), &self.ip_mask)
                 || packet.get_destination_address() == u32::MAX
             {
