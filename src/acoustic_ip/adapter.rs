@@ -5,6 +5,7 @@ use crate::utils::Byte;
 use std::collections::HashMap;
 use std::net::Ipv4Addr;
 use std::sync::Arc;
+use std::thread::JoinHandle;
 use wintun::{Packet, Session};
 
 use super::ip_packet::IpPacket;
@@ -167,7 +168,7 @@ impl Adapter {
         }
     }
 
-    async fn down_daemon(&self) {
+    async fn down_daemon(&mut self) {
         if let Ok(packet) = self.receive_from_ip_async() {
             if packet.dst_is_subnet(&self.ip_gateway.unwrap(), &self.ip_mask)
                 || packet.get_destination_address() == u32::MAX
@@ -193,7 +194,7 @@ impl Adapter {
         }
     }
 
-    pub async fn adapter_daemon(&self) {
+    pub async fn adapter_daemon(&mut self) {
         // 1. Listen from the mac layer (up)
         //    if `ping` echoRequest, send `ping` echoReply
         //    else, send the packet to the ip layer
@@ -202,8 +203,21 @@ impl Adapter {
         //    then send the packet to the mac layer
         //    else if the dest is not directly connected
         //    we may need to send the packet to the gateway
+        //    then send the packet to the mac layer
+        //  - both up and down should work concurrently
+        loop {
+            self.up_daemon().await;
+            self.down_daemon().await;
+        }
     }
 
-    pub async fn start_daemon(&self) {}
-    pub async fn stop_daemon(&self) {}
+    pub async fn start_daemon(mut adapter: Adapter) -> tokio::task::JoinHandle<()> {
+        let main_task = tokio::spawn(async move {
+            adapter.adapter_daemon().await;
+        });
+        main_task
+    }
+    pub async fn stop_daemon(adapter_task: tokio::task::JoinHandle<()>) {
+        adapter_task.abort();
+    }
 }

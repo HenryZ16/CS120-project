@@ -11,7 +11,6 @@ use super::{
     controller::{MacController, MacSendTask},
     mac_frame::{MACFrame, MacAddress},
 };
-
 pub struct NetCard {
     send_task_tx: UnboundedSender<MacSendTask>,
     recv_data_stream: UnboundedReceiverStream<Vec<Byte>>,
