@@ -17,7 +17,10 @@ use futures::StreamExt;
 use std::collections::VecDeque;
 use std::result::Result::Ok;
 use std::time::{Duration, Instant};
-use tokio::{sync::watch, time::error::Elapsed};
+use tokio::{
+    sync::watch,
+    time::{error::Elapsed, sleep},
+};
 use tokio::{
     sync::{
         mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
@@ -337,6 +340,7 @@ impl MacController {
             sender.send_frame(to_send_frame).await;
         }
 
+        let _ = sleep(Duration::from_millis(25)).await;
         // demodulator open
         let _ = demodulate_status_tx.send(SwitchSignal::ResumeSignal);
 
@@ -375,14 +379,12 @@ impl MacController {
                 while let Ok(mut send_task) = send_task_rx.try_recv() {
                     send_task.fresh_send_frame(&mut sender);
                     send_tasks.push_back(send_task);
-                    println!("get one send task");
                 }
                 if cur_send_task.is_none() {
                     cur_send_task = send_tasks.pop_front();
                     if let Some(mut task) = cur_send_task.take() {
                         task.timer.start(TimerType::BACKOFF, 0, 0);
                         cur_send_task = Some(task);
-                        println!("set timer for new send task");
                     }
                 }
                 if let Ok(Some(data)) =
@@ -417,6 +419,7 @@ impl MacController {
                                 false,
                             )
                             .await;
+                            println!("send ack to MacAddress: {}", MACFrame::get_src(&data));
 
                             // if (cur_recv_frame & 0x3F) as u8 == MACFrame::get_frame_id(&data) {
                             if data.len() < 5 {
