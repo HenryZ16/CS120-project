@@ -118,50 +118,49 @@ impl Adapter {
             Ok(data) => {
                 let packet = IpPacket::new_from_bytes(&data);
                 // u32::MAX: broadcast addr
-                if packet.get_destination_address() == self.ip_addr.to_bits()
+                if !(packet.get_destination_address() == self.ip_addr.to_bits()
                     || self.if_router
-                    || packet.get_destination_address() == u32::MAX
+                    || packet.get_destination_address() == u32::MAX)
                 {
-                    match packet.get_protocol() {
-                        IpProtocol::ICMP => {
-                            if !packet.check_header_checksum() {
-                                return;
-                            }
-                            let icmp = ICMP::try_new_from_ip_packet(&packet).unwrap();
-                            if icmp.check_checksum() && icmp.get_type() == ICMPType::EchoRequest {
-                                println!(
-                                    "Received ICMP Echo Request from {:x?}",
-                                    packet.get_source_address()
-                                );
-
-                                let reply = icmp.reply_echo();
-                                let mut reply_packet = packet.clone();
-                                reply_packet.set_destination_address(packet.get_source_address());
-                                reply_packet.set_source_address(packet.get_destination_address());
-                                reply_packet.set_data(reply.get_icmp_bytes());
-
-                                let dst_mac = match self
-                                    .arp_table
-                                    .get(&Ipv4Addr::from_bits(packet.get_source_address()))
-                                {
-                                    Some(mac) => *mac,
-                                    None => u8::MAX,
-                                };
-
-                                let _ = self
-                                    .net_card
-                                    .send_async(dst_mac, reply_packet.get_ip_packet_bytes())
-                                    .await;
-                            } else {
-                                self.send_to_ip(packet);
-                            }
-                        }
-                        _ => {
-                            self.send_to_ip(packet);
-                        }
-                    }
-                } else {
                     return;
+                }
+                match packet.get_protocol() {
+                    IpProtocol::ICMP => {
+                        if !packet.check_header_checksum() {
+                            return;
+                        }
+                        let icmp = ICMP::try_new_from_ip_packet(&packet).unwrap();
+                        if !icmp.check_checksum() && icmp.get_type() == ICMPType::EchoRequest {
+                            self.send_to_ip(packet);
+                            return;
+                        }
+                        println!(
+                            "Received ICMP Echo Request from {:x?}",
+                            packet.get_source_address()
+                        );
+
+                        let reply = icmp.reply_echo();
+                        let mut reply_packet = packet.clone();
+                        reply_packet.set_destination_address(packet.get_source_address());
+                        reply_packet.set_source_address(packet.get_destination_address());
+                        reply_packet.set_data(reply.get_icmp_bytes());
+
+                        let dst_mac = match self
+                            .arp_table
+                            .get(&Ipv4Addr::from_bits(packet.get_source_address()))
+                        {
+                            Some(mac) => *mac,
+                            None => u8::MAX,
+                        };
+
+                        let _ = self
+                            .net_card
+                            .send_async(dst_mac, reply_packet.get_ip_packet_bytes())
+                            .await;
+                    }
+                    _ => {
+                        self.send_to_ip(packet);
+                    }
                 }
             }
             Err(_) => {}
@@ -174,9 +173,10 @@ impl Adapter {
         //    if `ping` echoRequest, send `ping` echoReply
         //    else, send the packet to the ip layer
         // 2. Listen from the ip layer (down)
-        //    if is router, and the subnet of the packet is for the acoustic network,
-        //    send the packet to the mac layer
-        //    else, do nothing
+        //    if the dest is directly connected or broadcast
+        //    then send the packet to the mac layer
+        //    else if the dest is not directly connected
+        //    we may need to send the packet to the gateway
     }
 
     pub async fn start_daemon(&self) {}
