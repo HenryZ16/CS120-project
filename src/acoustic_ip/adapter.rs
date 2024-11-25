@@ -133,10 +133,14 @@ impl Adapter {
                             return;
                         }
                         let icmp = ICMP::try_new_from_ip_packet(&packet).unwrap();
-                        if !icmp.check_checksum() && icmp.get_type() == ICMPType::EchoRequest {
+                        if !icmp.check_checksum() {
+                            return;
+                        }
+                        if icmp.get_type() == ICMPType::EchoReply {
                             self.send_to_ip(packet);
                             return;
                         }
+
                         println!(
                             "Received ICMP Echo Request from {:?}",
                             Ipv4Addr::from_bits(packet.get_source_address())
