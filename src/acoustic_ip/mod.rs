@@ -7,11 +7,10 @@ use crate::acoustic_mac::{
     net_card::NetCard,
 };
 
-pub mod controller;
+pub mod adapter;
+mod generator;
 pub mod ip_packet;
 pub mod protocols;
-pub mod receive;
-pub mod send;
 
 #[tokio::test]
 async fn test_grab_packet() {
@@ -120,7 +119,7 @@ async fn test_send() {
 
 #[tokio::test]
 async fn test_recv() {
-    let mut net_card = NetCard::new(CONFIG_FILE, 0);
+    let mut net_card = NetCard::new(CONFIG_FILE, 1);
 
     while let Ok(data) = net_card.recv_next().await {
         println!("received data: {:?}", data);
