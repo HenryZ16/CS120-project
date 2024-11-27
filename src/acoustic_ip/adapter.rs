@@ -124,13 +124,15 @@ impl Adapter {
         match self.net_card.try_recv() {
             Ok(data) => {
                 // println!("[up_daemon]: received from mac layer");
+                if data[0] >> 4 != 4 {
+                    return;
+                }
 
                 let packet = IpPacket::new_from_bytes(&data);
                 // u32::MAX: broadcast addr
-                if (!self.if_router
+                if !self.if_router
                     && (packet.get_destination_address() != self.ip_addr.to_bits()
-                        && packet.get_destination_address() != u32::MAX))
-                    || data[0] >> 4 != 4
+                        && packet.get_destination_address() != u32::MAX)
                 {
                     return;
                 }
