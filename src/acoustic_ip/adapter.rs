@@ -192,7 +192,7 @@ impl Adapter {
                         .net_card
                         .send_unblocked(dst_mac, packet.get_ip_packet_bytes());
                 }
-            } else {
+            } else if !self.if_router {
                 let _ = self
                     .net_card
                     .send_async(
