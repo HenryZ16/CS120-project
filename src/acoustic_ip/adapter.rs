@@ -127,9 +127,9 @@ impl Adapter {
 
                 let packet = IpPacket::new_from_bytes(&data);
                 // u32::MAX: broadcast addr
-                if !(packet.get_destination_address() == self.ip_addr.to_bits()
-                    || self.if_router
-                    || packet.get_destination_address() == u32::MAX)
+                if !self.if_router
+                    && (packet.get_destination_address() != self.ip_addr.to_bits()
+                        || packet.get_destination_address() != u32::MAX)
                 {
                     return;
                 }
@@ -142,9 +142,7 @@ impl Adapter {
                         if !icmp.check_checksum() {
                             return;
                         }
-                        if icmp.get_type() != ICMPType::EchoRequest
-                            || packet.get_destination_address() != self.ip_addr.to_bits()
-                        {
+                        if icmp.get_type() != ICMPType::EchoRequest {
                             self.send_to_ip(packet);
                             return;
                         }
