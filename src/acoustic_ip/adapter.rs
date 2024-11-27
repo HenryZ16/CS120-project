@@ -196,7 +196,7 @@ impl Adapter {
     async fn down_daemon(&mut self) {
         match self.receive_from_ip_async() {
             Ok(packet) => {
-                if packet.dst_is_subnet(&self.ip_gateway.unwrap(), &self.ip_mask)
+                if packet.dst_is_subnet(&self.ip_addr, &self.ip_mask)
                     || packet.get_destination_address() == u32::MAX
                 {
                     if let Some(&dst_mac) = self.arp_table.get(&packet.get_destination_ipv4_addr())
