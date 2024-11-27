@@ -35,6 +35,8 @@ impl Adapter {
         mac_address: u8,
         net_card: NetCard,
     ) -> Self {
+        let ip_gateway = if if_router { None } else { ip_gateway };
+
         let wintun = unsafe { wintun::load_from_path("external\\wintun\\bin\\amd64\\wintun.dll") }
             .expect("Failed to load wintun dll");
         let adapter = match wintun::Adapter::open(&wintun, "AcousticNet") {
