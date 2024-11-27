@@ -12,6 +12,7 @@ pub enum IpProtocol {
     ENCAP = 41,
     OSPF = 89,
     SCTP = 132,
+    OTHER = -1,
 }
 
 #[derive(Debug, Clone)]
@@ -183,7 +184,7 @@ impl IpPacket {
             41 => IpProtocol::ENCAP,
             89 => IpProtocol::OSPF,
             132 => IpProtocol::SCTP,
-            _ => panic!("Unsupported protocol"),
+            _ => IpProtocol::OTHER,
         }
     }
 
