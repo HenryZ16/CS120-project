@@ -206,6 +206,9 @@ impl Adapter {
                             .send_unblocked(dst_mac, packet.get_ip_packet_bytes());
                     }
                 } else if !self.if_router {
+                    if packet.get_protocol() == IpProtocol::OTHER {
+                        return;
+                    }
                     let _ = self
                         .net_card
                         .send_async(
