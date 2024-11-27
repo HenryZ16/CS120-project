@@ -392,7 +392,7 @@ impl MacController {
                 }
                 // if let Ok(Some(data)) =
                 // timeout(Duration::from_millis(RECV_TIME), decoded_data_rx.recv()).await
-                if let Some(data) = decoded_data_rx.recv().await {
+                if let Ok(data) = decoded_data_rx.try_recv() {
                     // check data type
                     if mac_frame::MACFrame::get_dst(&data) == mac_address {
                         // println!("[Controller]: received data: {:?}", data);
