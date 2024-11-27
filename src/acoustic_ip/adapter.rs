@@ -117,7 +117,7 @@ impl Adapter {
     async fn up_daemon(&mut self) {
         match self.net_card.try_recv() {
             Ok(data) => {
-                println!("[up_daemon]: received from mac layer");
+                // println!("[up_daemon]: received from mac layer");
 
                 let packet = IpPacket::new_from_bytes(&data);
                 // u32::MAX: broadcast addr
@@ -141,10 +141,10 @@ impl Adapter {
                             return;
                         }
 
-                        println!(
-                            "Received ICMP Echo Request from {:?}",
-                            Ipv4Addr::from_bits(packet.get_source_address())
-                        );
+                        // println!(
+                        //     "Received ICMP Echo Request from {:?}",
+                        //     Ipv4Addr::from_bits(packet.get_source_address())
+                        // );
 
                         let reply = icmp.reply_echo();
                         let mut reply_packet = packet.clone();
@@ -175,10 +175,10 @@ impl Adapter {
 
     async fn down_daemon(&mut self) {
         if let Ok(packet) = self.receive_from_ip_async() {
-            println!(
-                "[down_daemon]: received from ip layer, dst: {:?}",
-                Ipv4Addr::from_bits(packet.get_destination_address())
-            );
+            // println!(
+            //     "[down_daemon]: received from ip layer, dst: {:?}",
+            //     Ipv4Addr::from_bits(packet.get_destination_address())
+            // );
             if packet.dst_is_subnet(&self.ip_gateway.unwrap(), &self.ip_mask)
                 || packet.get_destination_address() == u32::MAX
             {

@@ -34,7 +34,7 @@ const MAX_SEND: u64 = 12;
 const ACK_WAIT_TIME: u64 = 30;
 const BACKOFF_SLOT_TIME: u64 = 70;
 const BACKOFF_MAX_FACTOR: u64 = 6;
-const RECV_TIME: u64 = 27;
+const RECV_TIME: u64 = 10;
 
 const DETECT_SIGNAL: Byte = 1;
 const ENERGE_LIMIT: f32 = 0.005;
@@ -390,9 +390,10 @@ impl MacController {
                         cur_send_task = Some(task);
                     }
                 }
-                // if let Ok(Some(data)) =
-                // timeout(Duration::from_millis(RECV_TIME), decoded_data_rx.recv()).await
-                if let Ok(data) = decoded_data_rx.try_recv() {
+                if let Ok(Some(data)) =
+                    timeout(Duration::from_millis(RECV_TIME), decoded_data_rx.recv()).await
+                {
+                    // if let Ok(data) = decoded_data_rx.try_recv() {
                     // check data type
                     if mac_frame::MACFrame::get_dst(&data) == mac_address {
                         // println!("[Controller]: received data: {:?}", data);
