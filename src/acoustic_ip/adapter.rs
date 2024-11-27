@@ -192,18 +192,18 @@ impl Adapter {
                         .net_card
                         .send_unblocked(dst_mac, packet.get_ip_packet_bytes());
                 }
-            } // else {
-              //     let _ = self
-              //         .net_card
-              //         .send_async(
-              //             *self
-              //                 .arp_table
-              //                 .get(&self.ip_gateway.unwrap())
-              //                 .expect("No gateway"),
-              //             packet.get_ip_packet_bytes(),
-              //         )
-              //         .await;
-              // }
+            } else {
+                let _ = self
+                    .net_card
+                    .send_async(
+                        *self
+                            .arp_table
+                            .get(&self.ip_gateway.unwrap())
+                            .expect("No gateway"),
+                        packet.get_ip_packet_bytes(),
+                    )
+                    .await;
+            }
         }
     }
 
