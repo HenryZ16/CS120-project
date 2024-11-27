@@ -142,10 +142,16 @@ impl Adapter {
                         if !icmp.check_checksum() {
                             return;
                         }
+                        println!(
+                            "Receive ICMP Echo packet from {:?} to {:?}",
+                            Ipv4Addr::from(packet.get_source_address()),
+                            Ipv4Addr::from(packet.get_destination_address())
+                        );
                         if icmp.get_type() != ICMPType::EchoRequest
                             || (packet.get_destination_address() != self.ip_addr.to_bits()
                                 && packet.get_destination_address() != u32::MAX)
                         {
+                            println!("Forwarding ICMP packet");
                             self.send_to_ip(packet);
                             return;
                         }
