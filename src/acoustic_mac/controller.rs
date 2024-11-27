@@ -1,11 +1,8 @@
-use std::{mem, u32, u64, vec};
+use std::{u32, u64, vec};
 
 use crate::{
     acoustic_mac::mac_frame::{self, MACFrame},
-    acoustic_modem::{
-        demodulation::{DemodulationState, SwitchSignal},
-        generator::PhyLayerGenerator,
-    },
+    acoustic_modem::demodulation::{DemodulationState, SwitchSignal},
     asio_stream::InputAudioStream,
     generator::ConfigGenerator,
     utils::{get_audio_device_and_config, Byte},
@@ -18,10 +15,7 @@ use futures::StreamExt;
 use std::collections::VecDeque;
 use std::result::Result::Ok;
 use std::time::{Duration, Instant};
-use tokio::{
-    sync::watch,
-    time::{error::Elapsed, sleep},
-};
+use tokio::sync::watch;
 use tokio::{
     sync::{
         mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
@@ -396,9 +390,9 @@ impl MacController {
                         cur_send_task = Some(task);
                     }
                 }
-                if let Ok(Some(data)) =
-                    timeout(Duration::from_millis(RECV_TIME), decoded_data_rx.recv()).await
-                {
+                // if let Ok(Some(data)) =
+                // timeout(Duration::from_millis(RECV_TIME), decoded_data_rx.recv()).await
+                if let Some(data) = decoded_data_rx.recv().await {
                     // check data type
                     if mac_frame::MACFrame::get_dst(&data) == mac_address {
                         // println!("[Controller]: received data: {:?}", data);
