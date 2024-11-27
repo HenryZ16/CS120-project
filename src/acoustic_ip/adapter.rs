@@ -129,7 +129,7 @@ impl Adapter {
                 // u32::MAX: broadcast addr
                 if !self.if_router
                     && (packet.get_destination_address() != self.ip_addr.to_bits()
-                        || packet.get_destination_address() != u32::MAX)
+                        && packet.get_destination_address() != u32::MAX)
                 {
                     return;
                 }
