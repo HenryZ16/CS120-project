@@ -142,7 +142,9 @@ impl Adapter {
                         if !icmp.check_checksum() {
                             return;
                         }
-                        if icmp.get_type() != ICMPType::EchoRequest {
+                        if icmp.get_type() != ICMPType::EchoRequest
+                            || packet.get_destination_address() != self.ip_addr.to_bits()
+                        {
                             self.send_to_ip(packet);
                             return;
                         }
