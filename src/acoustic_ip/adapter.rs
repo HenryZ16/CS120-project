@@ -142,7 +142,10 @@ impl Adapter {
                         if !icmp.check_checksum() {
                             return;
                         }
-                        if icmp.get_type() != ICMPType::EchoRequest {
+                        if icmp.get_type() != ICMPType::EchoRequest
+                            || (packet.get_destination_address() != self.ip_addr.to_bits()
+                                && packet.get_destination_address() != u32::MAX)
+                        {
                             self.send_to_ip(packet);
                             return;
                         }
