@@ -34,7 +34,7 @@ const MAX_SEND: u64 = 12;
 const ACK_WAIT_TIME: u64 = 30;
 const BACKOFF_SLOT_TIME: u64 = 70;
 const BACKOFF_MAX_FACTOR: u64 = 6;
-const RECV_TIME: u64 = 10;
+const RECV_TIME: u64 = 1;
 
 const DETECT_SIGNAL: Byte = 1;
 const ENERGE_LIMIT: f32 = 0.005;

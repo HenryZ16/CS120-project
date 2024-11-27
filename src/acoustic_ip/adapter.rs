@@ -39,9 +39,15 @@ impl Adapter {
             .expect("Failed to load wintun dll");
         let adapter = match wintun::Adapter::open(&wintun, "AcousticNet") {
             Ok(adapter) => adapter,
-            Err(_) => wintun::Adapter::create(&wintun, "AcousticNet", "Wintun", None)
-                .expect("Failed to create wintun adapter!"),
+            Err(_) => wintun::Adapter::create(
+                &wintun,
+                "AcousticNet",
+                "Wintun",
+                Some(0x12344321123443211234432112344321),
+            )
+            .expect("Failed to create wintun adapter!"),
         };
+        println!("Adapter name: {:?}", adapter.get_name());
         adapter.set_address(ip_addr).unwrap();
         adapter.set_netmask(ip_mask).unwrap();
         adapter.set_gateway(ip_gateway).unwrap();
