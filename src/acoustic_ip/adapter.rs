@@ -176,9 +176,9 @@ impl Adapter {
                             Ipv4Addr::from(packet.get_source_address()),
                             Ipv4Addr::from(packet.get_destination_address())
                         );
-                        if icmp.get_type() != ICMPType::EchoRequest
-                            || (packet.get_destination_address() != self.ip_addr.to_bits()
-                                && packet.get_destination_address() != u32::MAX)
+                        if packet.get_destination_address() != self.ip_addr.to_bits()
+                            && packet.get_destination_address() != u32::MAX
+                            && self.if_router
                         {
                             println!("Forwarding ICMP packet");
                             // self.send_to_ip(packet);
@@ -186,6 +186,13 @@ impl Adapter {
                             return;
                         }
 
+                        if icmp.get_type() == ICMPType::EchoReply
+                            && packet.get_destination_address() == self.ip_addr.to_bits()
+                        {
+                            println!("Receive reply");
+                            self.send_to_ip(packet);
+                            return;
+                        }
                         // println!(
                         //     "Received ICMP Echo Request from {:?}",
                         //     Ipv4Addr::from_bits(packet.get_source_address())
