@@ -1,6 +1,7 @@
 use pnet::datalink::Channel::Ethernet;
 use pnet::datalink::{self, NetworkInterface};
 use pnet::packet::ethernet::{EtherTypes, EthernetPacket, MutableEthernetPacket};
+use pnet::packet::icmp::echo_request::EchoRequestPacket;
 use pnet::packet::icmp::{IcmpPacket, IcmpType};
 use pnet::packet::ipv4::Ipv4Packet;
 use pnet::packet::{MutablePacket, Packet};
@@ -65,13 +66,17 @@ pub fn nat_forward_daemon(
             // println!("received packets");
             match packet.get_protocol() {
                 IpProtocol::ICMP => {
-                    let mut icmp_header = vec![0; packet.get_internet_header_length() as usize];
-                    let new_packet = ip_packet_to_icmp(&packet, &mut icmp_header);
+                    let local_icmp = ICMP::try_new_from_ip_packet(&packet).unwrap();
+                    // let mut header = local_icmp.get_icmp_header();
+                    // let mut payload = local_icmp.get_payload();
+                    let mut byte = local_icmp.get_icmp_bytes();
+                    let new_packet = EchoRequestPacket::new(&mut byte).unwrap();
+                    // new_packet.set_payload(local_icmp.get_payload());
                     // println!("icmp dst: {:?}", packet.get_destination_ipv4_addr());
                     let mut nat_table_handle = nat_table_clone.lock().unwrap();
                     nat_table_handle
                         .insert(new_packet.get_identifier(), packet.get_source_address());
-                    println!("new packet: {:?}", new_packet.payload());
+                    println!("new packet: {:?}{:?}", new_packet, new_packet.payload());
                     let _ = icmp_tx.send_to(new_packet, packet.get_destination_ipv4_addr().into());
                 }
                 _ => {}
@@ -151,25 +156,15 @@ pub fn nat_forward_daemon(
     println!("Nat Forward Daemon start");
 }
 
-fn ip_packet_to_icmp<'a>(
-    ip_packet: &IpPacket,
-    icmp_header: &'a mut [u8],
-) -> MutableEchoRequestPacket<'a> {
-    let mut icmp = MutableEchoRequestPacket::new(icmp_header).unwrap();
-    let local_icmp = ICMP::try_new_from_ip_packet(ip_packet).unwrap();
-    icmp.set_icmp_type(match local_icmp.get_type() {
-        ICMPType::EchoRequest => IcmpTypes::EchoRequest,
-        ICMPType::EchoReply => IcmpTypes::EchoReply,
-        ICMPType::Unsupported => IcmpTypes::DestinationUnreachable,
-    });
-    icmp.set_icmp_code(IcmpCodes::NoCode);
-    icmp.set_sequence_number(local_icmp.get_sequence_number().unwrap());
-    icmp.set_identifier(local_icmp.get_utils() as u16);
-    icmp.set_payload(&local_icmp.get_payload());
-    let checksum = checksum(icmp.packet(), 1);
-    icmp.set_checksum(checksum);
-    icmp
-}
+// fn ip_packet_to_icmp(ip_packet: &IpPacket) -> MutableEchoRequestPacket {
+//     let local_icmp = ICMP::try_new_from_ip_packet(ip_packet).unwrap();
+//     let mut header = local_icmp.get_icmp_header();
+//     let mut icmp = MutableEchoRequestPacket::new(&mut header).unwrap();
+//     icmp.set_payload(&local_icmp.get_payload());
+//     let checksum = checksum(icmp.packet(), 1);
+//     icmp.set_checksum(checksum);
+//     icmp
+// }
 
 #[test]
 fn test_pnet() {
