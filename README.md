@@ -34,6 +34,7 @@ The length of our PHY Frame is 1064, where each part is:
 
 Due to the license, you must download the external packets and extract them to the `external` dir:
 - [Wintun](https://www.wintun.net/)
+- [pnet](https://docs.rs/pnet/latest/pnet/)
 
 ## Thanks
 
