@@ -17,7 +17,7 @@ pub struct ICMP {
     icmp_type: u8,
     icmp_code: u8,
     checksum: u16,
-    identifier: u32,
+    utils: u32,
     payload: Vec<u8>,
 }
 
@@ -38,7 +38,7 @@ impl ICMP {
             icmp_type,
             icmp_code,
             checksum,
-            identifier: utils,
+            utils: utils,
             payload,
         })
     }
@@ -55,10 +55,10 @@ impl ICMP {
         bytes.push(self.icmp_code);
         bytes.push((self.checksum >> 8) as u8);
         bytes.push((self.checksum & 0xff) as u8);
-        bytes.push((self.identifier >> 24) as u8);
-        bytes.push((self.identifier >> 16) as u8);
-        bytes.push((self.identifier >> 8) as u8);
-        bytes.push((self.identifier & 0xff) as u8);
+        bytes.push((self.utils >> 24) as u8);
+        bytes.push((self.utils >> 16) as u8);
+        bytes.push((self.utils >> 8) as u8);
+        bytes.push((self.utils & 0xff) as u8);
         bytes.extend(self.payload.iter());
         bytes
     }
@@ -96,13 +96,13 @@ impl ICMP {
     }
     pub fn get_sequence_number(&self) -> Result<u16, &'static str> {
         match self.icmp_type {
-            0 => Ok((self.identifier & 0xFFFF) as u16),
-            8 => Ok((self.identifier & 0xFFFF) as u16),
+            0 => Ok((self.utils & 0xFFFF) as u16),
+            8 => Ok((self.utils & 0xFFFF) as u16),
             _ => Err("Unsupported ICMP type"),
         }
     }
-    pub fn get_identifier(&self) -> u32 {
-        self.identifier
+    pub fn get_utils(&self) -> u32 {
+        self.utils
     }
     pub fn get_payload(&self) -> &[u8] {
         &self.payload
