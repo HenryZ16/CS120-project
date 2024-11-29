@@ -35,7 +35,7 @@ use super::adapter::Adapter;
 use super::ip_packet::{IpPacket, IpProtocol};
 use super::protocols::icmp::{ICMPType, ICMP};
 
-const ICMP_HEADER_SIZE: usize = 64;
+// const ICMP_HEADER_SIZE: usize = 64;
 
 // pub fn nat_listen_daemon(if_index: ) {
 //     let protocol = Layer4(TransportProtocol::Ipv4(IpNextHeaderProtocols::Icmp));
@@ -65,12 +65,13 @@ pub fn nat_forward_daemon(
             // println!("received packets");
             match packet.get_protocol() {
                 IpProtocol::ICMP => {
-                    let mut icmp_header: [u8; ICMP_HEADER_SIZE] = [0; ICMP_HEADER_SIZE];
+                    let mut icmp_header = vec![0; packet.get_internet_header_length() as usize];
                     let new_packet = ip_packet_to_icmp(&packet, &mut icmp_header);
                     // println!("icmp dst: {:?}", packet.get_destination_ipv4_addr());
                     let mut nat_table_handle = nat_table_clone.lock().unwrap();
                     nat_table_handle
                         .insert(new_packet.get_identifier(), packet.get_source_address());
+                    println!("new packet: {:?}", new_packet.payload());
                     let _ = icmp_tx.send_to(new_packet, packet.get_destination_ipv4_addr().into());
                 }
                 _ => {}
@@ -108,10 +109,15 @@ pub fn nat_forward_daemon(
                         EtherTypes::Ipv4 => {
                             let header = Ipv4Packet::new(packet.payload()).unwrap();
                             let mut packet = IpPacket::new_from_bytes(packet.payload());
+
                             match header.get_next_level_protocol() {
                                 IpNextHeaderProtocols::Icmp => {
+                                    // println!(
+                                    //     "receive acoustic packet: {:?}, length: {}, head length: {}",
+                                    //     packet,
+                                    //     packet.get_total_length(), packet.get_internet_header_length()
+                                    // );
                                     if packet.dst_is_subnet(&acoustic_domain, &acoustic_mask) {
-                                        println!("receive acoustic packet");
                                         let _ = forward_acoustic_tx_copy.send(packet);
                                         continue;
                                     }
@@ -127,6 +133,8 @@ pub fn nat_forward_daemon(
                                                 .get(&(icmp_packet.get_identifier() as u16))
                                                 .unwrap(),
                                         );
+                                        packet.update_header_checksum();
+                                        // println!("icmp data: {:?}", icmp_packet.get_payload());
                                         let _ = forward_acoustic_tx_copy.send(packet);
                                     }
                                 }

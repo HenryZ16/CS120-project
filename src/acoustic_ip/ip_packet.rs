@@ -205,6 +205,9 @@ impl IpPacket {
         }
         !sum as u16
     }
+    pub fn update_header_checksum(&mut self) {
+        self.header_checksum = self.calc_header_checksum();
+    }
     pub fn check_header_checksum(&self) -> bool {
         let packet_bytes = self.get_ip_packet_bytes();
         self.calc_header_checksum() == (packet_bytes[10] as u16) << 8 | packet_bytes[11] as u16
