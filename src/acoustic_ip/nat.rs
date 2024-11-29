@@ -119,12 +119,12 @@ pub fn nat_forward_daemon(
                                         ICMP::try_new_from_ip_packet(&packet).unwrap();
                                     let nat_table_handle = nat_table_clone.lock().unwrap();
                                     if nat_table_handle
-                                        .contains_key(&(icmp_packet.get_identifier() as u16))
+                                        .contains_key(&(icmp_packet.get_utils() as u16))
                                     {
                                         println!("receive reply of acoustic packet");
                                         packet.set_destination_address(
                                             *nat_table_handle
-                                                .get(&(icmp_packet.get_identifier() as u16))
+                                                .get(&(icmp_packet.get_utils() as u16))
                                                 .unwrap(),
                                         );
                                         let _ = forward_acoustic_tx_copy.send(packet);
@@ -156,7 +156,7 @@ fn ip_packet_to_icmp<'a>(
     });
     icmp.set_icmp_code(IcmpCodes::NoCode);
     icmp.set_sequence_number(local_icmp.get_sequence_number().unwrap());
-    icmp.set_identifier(local_icmp.get_identifier() as u16);
+    icmp.set_identifier(local_icmp.get_utils() as u16);
     icmp.set_payload(&local_icmp.get_payload());
     let checksum = checksum(icmp.packet(), 1);
     icmp.set_checksum(checksum);
