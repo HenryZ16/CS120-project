@@ -151,6 +151,7 @@ impl Adapter {
             Ok(data) => {
                 // println!("[up_daemon]: received from mac layer");
                 if data[0] >> 4 != 4 {
+                    println!("Non Ipv4 packet");
                     return;
                 }
 
@@ -160,10 +161,15 @@ impl Adapter {
                     && (packet.get_destination_address() != self.ip_addr.to_bits()
                         && packet.get_destination_address() != u32::MAX)
                 {
+                    println!(
+                        "Drop packet. Its destination: {:?}",
+                        Ipv4Addr::from_bits(packet.get_destination_address())
+                    );
                     return;
                 }
                 match packet.get_protocol() {
                     IpProtocol::ICMP => {
+                        println!("ICMP packet");
                         if !packet.check_header_checksum() {
                             return;
                         }
@@ -189,7 +195,7 @@ impl Adapter {
                         if icmp.get_type() == ICMPType::EchoReply
                             && packet.get_destination_address() == self.ip_addr.to_bits()
                         {
-                            println!("Receive reply");
+                            println!("Receive reply: {:?}", packet.get_ip_packet_bytes());
                             self.send_to_ip(packet);
                             return;
                         }
@@ -217,6 +223,7 @@ impl Adapter {
                             .send_unblocked(dst_mac, reply_packet.get_ip_packet_bytes());
                     }
                     _ => {
+                        println!("Non ICMP packet, send to ip");
                         self.send_to_ip(packet);
                     }
                 }
@@ -243,6 +250,7 @@ impl Adapter {
                     if packet.get_protocol() != IpProtocol::ICMP {
                         return;
                     }
+                    println!("send: {:?}", packet.get_ip_packet_bytes());
                     let _ = self
                         .net_card
                         .send_async(
@@ -285,15 +293,15 @@ impl Adapter {
     pub async fn start_daemon(mut adapter: Adapter) -> tokio::task::JoinHandle<()> {
         let (to_out_tx, to_out_rx) = unbounded_channel();
         let (get_in_tx, get_in_rx) = unbounded_channel();
-        if adapter.if_router {
-            nat_forward_daemon(
-                to_out_rx,
-                get_in_tx,
-                adapter.additional_if_index.clone(),
-                adapter.ip_addr,
-                adapter.ip_mask,
-            );
-        }
+        // if adapter.if_router {
+        //     nat_forward_daemon(
+        //         to_out_rx,
+        //         get_in_tx,
+        //         adapter.additional_if_index.clone(),
+        //         adapter.ip_addr,
+        //         adapter.ip_mask,
+        //     );
+        // }
         let main_task = tokio::spawn(async move {
             adapter.adapter_daemon(to_out_tx, get_in_rx).await;
         });
