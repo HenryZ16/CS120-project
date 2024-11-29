@@ -38,7 +38,7 @@ impl ICMP {
             icmp_type,
             icmp_code,
             checksum,
-            utils: utils,
+            utils,
             payload,
         })
     }
@@ -49,7 +49,7 @@ impl ICMP {
         ICMP::try_new_from_bytes(&packet.get_data())
     }
 
-    pub fn get_icmp_bytes(&self) -> Vec<u8> {
+    pub fn get_icmp_header(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
         bytes.push(self.icmp_type);
         bytes.push(self.icmp_code);
@@ -59,7 +59,12 @@ impl ICMP {
         bytes.push((self.utils >> 16) as u8);
         bytes.push((self.utils >> 8) as u8);
         bytes.push((self.utils & 0xff) as u8);
-        bytes.extend(self.payload.iter());
+        bytes
+    }
+
+    pub fn get_icmp_bytes(&self) -> Vec<u8> {
+        let mut bytes = self.get_icmp_header();
+        bytes.extend(self.payload.clone());
         bytes
     }
 
