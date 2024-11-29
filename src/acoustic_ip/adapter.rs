@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
 use std::thread::JoinHandle;
-use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
+use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use wintun::{Packet, Session};
 
 use super::ip_packet::IpPacket;
@@ -19,6 +19,7 @@ pub struct Adapter {
     ip_mask: Ipv4Addr,
     ip_gateway: Option<Ipv4Addr>,
     if_router: bool,
+    additional_if_index: Vec<u32>,
     session: Arc<Session>,
     if_static_arp: bool,
     arp_table: HashMap<Ipv4Addr, u8>,
@@ -33,6 +34,7 @@ impl Adapter {
         ip_mask: Ipv4Addr,
         ip_gateway: Option<Ipv4Addr>,
         if_router: bool,
+        additional_if_index: Vec<u32>,
         if_static_arp: bool,
         arp_table: HashMap<Ipv4Addr, u8>,
         mac_address: u8,
@@ -69,6 +71,7 @@ impl Adapter {
             ip_mask,
             ip_gateway,
             if_router,
+            additional_if_index,
             session,
             if_static_arp,
             arp_table,
@@ -84,6 +87,7 @@ impl Adapter {
             config.get_ip_mask(),
             Some(config.get_ip_gateway()),
             config.get_if_router(),
+            config.get_additional_interfaces(),
             config.get_if_static_arp(),
             config.get_arp_table(),
             config.get_mac_addr(),
@@ -122,6 +126,23 @@ impl Adapter {
             }
             Ok(None) => Err("No packet received")?,
             Err(_) => Err("Failed to receive packet")?,
+        }
+    }
+
+    pub fn receive_packet(
+        &self,
+        forward_rx: &mut UnboundedReceiver<IpPacket>,
+    ) -> Result<IpPacket, &'static str> {
+        if let Ok(packet) = self.receive_from_ip_async() {
+            // println!("recv packet from sys");
+            Ok(packet)
+        } else {
+            if let Ok(packet) = forward_rx.try_recv() {
+                println!("recv packet from other adapter");
+                Ok(packet)
+            } else {
+                Err("Failed to receive packet")?
+            }
         }
     }
 
@@ -197,8 +218,8 @@ impl Adapter {
         }
     }
 
-    async fn down_daemon(&mut self) {
-        match self.receive_from_ip_async() {
+    async fn down_daemon(&mut self, forward_rx: &mut UnboundedReceiver<IpPacket>) {
+        match self.receive_packet(forward_rx) {
             Ok(packet) => {
                 if packet.dst_is_subnet(&self.ip_addr, &self.ip_mask)
                     || packet.get_destination_address() == u32::MAX
@@ -229,7 +250,11 @@ impl Adapter {
         }
     }
 
-    pub async fn adapter_daemon(&mut self, nat_tx: UnboundedSender<IpPacket>) {
+    pub async fn adapter_daemon(
+        &mut self,
+        nat_tx: UnboundedSender<IpPacket>,
+        mut nat_rx: UnboundedReceiver<IpPacket>,
+    ) {
         // 1. Listen from the mac layer (up)
         //    if `ping` echoRequest, send `ping` echoReply
         //    else, send the packet to the ip layer
@@ -243,18 +268,25 @@ impl Adapter {
         println!("Adapter Daemon started.");
         loop {
             self.up_daemon(&nat_tx).await;
-            self.down_daemon().await;
+            self.down_daemon(&mut nat_rx).await;
             let _ = tokio::time::sleep(tokio::time::Duration::from_millis(5)).await;
         }
     }
 
     pub async fn start_daemon(mut adapter: Adapter) -> tokio::task::JoinHandle<()> {
-        let (nat_tx, nat_rx) = unbounded_channel();
+        let (to_out_tx, to_out_rx) = unbounded_channel();
+        let (get_in_tx, get_in_rx) = unbounded_channel();
         if adapter.if_router == true {
-            nat_forward_daemon(nat_rx);
+            nat_forward_daemon(
+                to_out_rx,
+                get_in_tx,
+                adapter.additional_if_index.clone(),
+                adapter.ip_addr,
+                adapter.ip_mask,
+            );
         }
         let main_task = tokio::spawn(async move {
-            adapter.adapter_daemon(nat_tx).await;
+            adapter.adapter_daemon(to_out_tx, get_in_rx).await;
         });
         main_task
     }

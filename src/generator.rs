@@ -23,6 +23,8 @@ pub struct ConfigGenerator {
     // static ARP
     if_static_arp: bool,
     arp_table: HashMap<Ipv4Addr, u8>,
+    // Route IF
+    additional_if_index: Vec<u32>,
 }
 
 impl ConfigGenerator {
@@ -50,6 +52,9 @@ impl ConfigGenerator {
     }
     pub fn get_if_router(&self) -> bool {
         self.if_router
+    }
+    pub fn get_additional_interfaces(&self) -> Vec<u32> {
+        self.additional_if_index.clone()
     }
     pub fn get_if_static_arp(&self) -> bool {
         self.if_static_arp

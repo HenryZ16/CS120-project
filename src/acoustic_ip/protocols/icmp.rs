@@ -17,12 +17,12 @@ pub struct ICMP {
     icmp_type: u8,
     icmp_code: u8,
     checksum: u16,
-    utils: u32,
+    identifier: u32,
     payload: Vec<u8>,
 }
 
 impl ICMP {
-    pub fn try_new_from_bytes(bytes: &Vec<u8>) -> Result<ICMP, &'static str> {
+    pub fn try_new_from_bytes(bytes: &[u8]) -> Result<ICMP, &'static str> {
         if bytes.len() < 8 {
             Err("ICMP packet too short")?;
         }
@@ -38,7 +38,7 @@ impl ICMP {
             icmp_type,
             icmp_code,
             checksum,
-            utils,
+            identifier: utils,
             payload,
         })
     }
@@ -55,10 +55,10 @@ impl ICMP {
         bytes.push(self.icmp_code);
         bytes.push((self.checksum >> 8) as u8);
         bytes.push((self.checksum & 0xff) as u8);
-        bytes.push((self.utils >> 24) as u8);
-        bytes.push((self.utils >> 16) as u8);
-        bytes.push((self.utils >> 8) as u8);
-        bytes.push((self.utils & 0xff) as u8);
+        bytes.push((self.identifier >> 24) as u8);
+        bytes.push((self.identifier >> 16) as u8);
+        bytes.push((self.identifier >> 8) as u8);
+        bytes.push((self.identifier & 0xff) as u8);
         bytes.extend(self.payload.iter());
         bytes
     }
@@ -96,13 +96,13 @@ impl ICMP {
     }
     pub fn get_sequence_number(&self) -> Result<u16, &'static str> {
         match self.icmp_type {
-            0 => Ok((self.utils & 0xFFFF) as u16),
-            8 => Ok((self.utils & 0xFFFF) as u16),
+            0 => Ok((self.identifier & 0xFFFF) as u16),
+            8 => Ok((self.identifier & 0xFFFF) as u16),
             _ => Err("Unsupported ICMP type"),
         }
     }
     pub fn get_identifier(&self) -> u32 {
-        self.utils
+        self.identifier
     }
     pub fn get_payload(&self) -> &[u8] {
         &self.payload

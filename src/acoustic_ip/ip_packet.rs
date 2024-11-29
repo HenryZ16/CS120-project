@@ -35,7 +35,7 @@ pub struct IpPacket {
 }
 
 impl IpPacket {
-    pub fn new_from_bytes(bytes: &Vec<Byte>) -> IpPacket {
+    pub fn new_from_bytes(bytes: &[Byte]) -> IpPacket {
         if bytes.len() < 20 {
             panic!("Invalid IP packet length");
         }
