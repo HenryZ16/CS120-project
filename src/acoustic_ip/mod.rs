@@ -13,6 +13,7 @@ use crate::{
 pub mod adapter;
 pub mod ip_packet;
 pub mod protocols;
+pub mod nat;
 
 #[tokio::test]
 async fn test_grab_packet() {

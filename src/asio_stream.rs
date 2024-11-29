@@ -133,7 +133,7 @@ impl:
 */
 pub struct InputAudioStream {
     stream: cpal::Stream,
-    receiver: UnboundedReceiver<Vec<f32>>,
+    pub receiver: UnboundedReceiver<Vec<f32>>,
 }
 unsafe impl Send for InputAudioStream {}
 fn build_input_stream<T>(
@@ -153,6 +153,7 @@ where
                 .map(|&sample| f32::from_sample(sample))
                 .collect::<Vec<f32>>();
             sender.send(data).unwrap();
+            // println!("data sended in stream");
         },
         |err| eprintln!("an error occurred on stream: {}", err),
         None,
@@ -180,6 +181,7 @@ impl InputAudioStream {
     }
 
     pub fn fresh(&mut self) {
+        // println!("inputstream freshed");
         while let Ok(_) = self.receiver.try_recv() {}
     }
 }

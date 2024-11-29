@@ -14,10 +14,13 @@ num-traits = "*"
 plotters = "0.3.6"
 rand = "0.8"
 rand_distr = "0.4"
-rodio = "0.19"
-serde = { version = "1.0.214", features = ["derive"] }
+rodio = "0.20.1"
+serde = { version = "1.0.215", features = ["derive"] }
 serde_yaml = "0.9.34+deprecated"
-tokio = { version = "1.41.0", features = ["full"] }
+tokio = { version = "1.41.1", features = ["full"] }
 tokio-stream = "*"
 tokio-util = { version = "0.7.12", features = ["full"] }
 wintun = "0.5.0"
+pcap = {version = "*", features = ["capture-stream"] } 
+pnet = "0.35.0"
+pnet_transport = "0.35.0"

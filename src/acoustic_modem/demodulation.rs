@@ -14,8 +14,10 @@ use futures::StreamExt;
 use std::collections::VecDeque;
 use std::ops::{Add, Mul};
 use std::result::Result::Ok;
+use std::time::Duration;
 use std::{mem, vec};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+use tokio::time::sleep;
 
 pub enum SwitchSignal {
     StopSignal,
@@ -635,7 +637,9 @@ impl Demodulation2 {
                 // println!("buffer len: {}", tmp_buffer_len);
             }
             println!("unexpected stop of listening");
-            input_stream = self.input_config.create_input_stream();
+            sleep(Duration::from_millis(200)).await;
+            // println!("sender is closed: {:?}", input_stream.receiver.is_closed());
+            // input_stream = self.input_config.create_input_stream();
         }
 
         // println!("listen stoped");

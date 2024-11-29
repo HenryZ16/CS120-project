@@ -6,5 +6,5 @@ pub async fn adapter_task() {
 
     let adapter = Adapter::new_from_config(config_file);
     let _adapter_task = Adapter::start_daemon(adapter).await;
-    sleep(Duration::from_secs(600)).await;
+    sleep(Duration::from_secs(6000)).await;
 }

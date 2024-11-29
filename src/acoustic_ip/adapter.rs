@@ -2,13 +2,16 @@ use crate::acoustic_ip::ip_packet::IpProtocol;
 use crate::acoustic_ip::protocols::icmp::{ICMPType, ICMP};
 use crate::acoustic_mac::net_card::NetCard;
 use crate::utils::Byte;
+use pnet_transport::TransportSender;
 use std::collections::HashMap;
-use std::net::Ipv4Addr;
+use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
 use std::thread::JoinHandle;
+use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 use wintun::{Packet, Session};
 
 use super::ip_packet::IpPacket;
+use super::nat::nat_forward_daemon;
 
 pub struct Adapter {
     // to IP layer
@@ -122,7 +125,7 @@ impl Adapter {
         }
     }
 
-    async fn up_daemon(&mut self) {
+    async fn up_daemon(&mut self, forward_tx: &UnboundedSender<IpPacket>) {
         match self.net_card.try_recv() {
             Ok(data) => {
                 // println!("[up_daemon]: received from mac layer");
@@ -157,7 +160,8 @@ impl Adapter {
                                 && packet.get_destination_address() != u32::MAX)
                         {
                             println!("Forwarding ICMP packet");
-                            self.send_to_ip(packet);
+                            // self.send_to_ip(packet);
+                            let _ = forward_tx.send(packet);
                             return;
                         }
 
@@ -225,7 +229,7 @@ impl Adapter {
         }
     }
 
-    pub async fn adapter_daemon(&mut self) {
+    pub async fn adapter_daemon(&mut self, nat_tx: UnboundedSender<IpPacket>) {
         // 1. Listen from the mac layer (up)
         //    if `ping` echoRequest, send `ping` echoReply
         //    else, send the packet to the ip layer
@@ -238,15 +242,19 @@ impl Adapter {
         //  - both up and down should work concurrently
         println!("Adapter Daemon started.");
         loop {
-            self.up_daemon().await;
+            self.up_daemon(&nat_tx).await;
             self.down_daemon().await;
             let _ = tokio::time::sleep(tokio::time::Duration::from_millis(5)).await;
         }
     }
 
     pub async fn start_daemon(mut adapter: Adapter) -> tokio::task::JoinHandle<()> {
+        let (nat_tx, nat_rx) = unbounded_channel();
+        if adapter.if_router == true {
+            nat_forward_daemon(nat_rx);
+        }
         let main_task = tokio::spawn(async move {
-            adapter.adapter_daemon().await;
+            adapter.adapter_daemon(nat_tx).await;
         });
         main_task
     }

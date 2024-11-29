@@ -101,6 +101,12 @@ impl ICMP {
             _ => Err("Unsupported ICMP type"),
         }
     }
+    pub fn get_identifier(&self) -> u32 {
+        self.utils
+    }
+    pub fn get_payload(&self) -> &[u8] {
+        &self.payload
+    }
 
     pub fn reply_echo(&self) -> ICMP {
         let mut reply = self.clone();
