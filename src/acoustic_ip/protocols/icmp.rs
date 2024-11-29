@@ -94,6 +94,13 @@ impl ICMP {
             _ => ICMPType::Unsupported,
         }
     }
+    pub fn get_sequence_number(&self) -> Result<u16, &'static str> {
+        match self.icmp_type {
+            0 => Ok((self.utils & 0xFFFF) as u16),
+            8 => Ok((self.utils & 0xFFFF) as u16),
+            _ => Err("Unsupported ICMP type"),
+        }
+    }
 
     pub fn reply_echo(&self) -> ICMP {
         let mut reply = self.clone();
