@@ -63,21 +63,15 @@ pub fn nat_forward_daemon(
         let (mut icmp_tx, mut icmp_rx) = transport_channel(128, protocol).unwrap();
 
         while let Some(packet) = forward_acoustic_rx.blocking_recv() {
-            // println!("received packets");
+            println!("received acoustic packets");
             match packet.get_protocol() {
                 IpProtocol::ICMP => {
                     let local_icmp = ICMP::try_new_from_ip_packet(&packet).unwrap();
-                    // let mut header = local_icmp.get_icmp_header();
-                    // let mut payload = local_icmp.get_payload();
-                    let mut byte = local_icmp.get_icmp_bytes();
-                    let new_packet = EchoRequestPacket::new(&mut byte).unwrap();
-                    // new_packet.set_payload(local_icmp.get_payload());
-                    // println!("icmp dst: {:?}", packet.get_destination_ipv4_addr());
-                    let mut nat_table_handle = nat_table_clone.lock().unwrap();
-                    nat_table_handle
-                        .insert(new_packet.get_identifier(), packet.get_source_address());
-                    println!("new packet: {:?}{:?}", new_packet, new_packet.payload());
+                    let mut bytes = local_icmp.get_icmp_bytes();
+                    let new_packet = IcmpPacket::new(&mut bytes).unwrap();
                     let _ = icmp_tx.send_to(new_packet, packet.get_destination_ipv4_addr().into());
+                    let mut nat_table_handle = nat_table_clone.lock().unwrap();
+                    nat_table_handle.insert(local_icmp.get_utils(), packet.get_source_address());
                 }
                 _ => {}
             }
@@ -117,29 +111,27 @@ pub fn nat_forward_daemon(
 
                             match header.get_next_level_protocol() {
                                 IpNextHeaderProtocols::Icmp => {
-                                    // println!(
-                                    //     "receive acoustic packet: {:?}, length: {}, head length: {}",
-                                    //     packet,
-                                    //     packet.get_total_length(), packet.get_internet_header_length()
-                                    // );
+                                    println!("detected icmp packet in other iterface");
                                     if packet.dst_is_subnet(&acoustic_domain, &acoustic_mask) {
+                                        println!("forward to acoustic");
                                         let _ = forward_acoustic_tx_copy.send(packet);
                                         continue;
                                     }
                                     let icmp_packet =
                                         ICMP::try_new_from_ip_packet(&packet).unwrap();
                                     let nat_table_handle = nat_table_clone.lock().unwrap();
-                                    if nat_table_handle
-                                        .contains_key(&(icmp_packet.get_utils() as u16))
-                                    {
+                                    if nat_table_handle.contains_key(&icmp_packet.get_utils()) {
                                         println!("receive reply of acoustic packet");
                                         packet.set_destination_address(
                                             *nat_table_handle
-                                                .get(&(icmp_packet.get_utils() as u16))
+                                                .get(&icmp_packet.get_utils())
                                                 .unwrap(),
                                         );
                                         packet.update_header_checksum();
-                                        // println!("icmp data: {:?}", icmp_packet.get_payload());
+                                        println!(
+                                            "icmp reply data: {:?}",
+                                            icmp_packet.get_payload()
+                                        );
                                         let _ = forward_acoustic_tx_copy.send(packet);
                                     }
                                 }
@@ -155,16 +147,6 @@ pub fn nat_forward_daemon(
     }
     println!("Nat Forward Daemon start");
 }
-
-// fn ip_packet_to_icmp(ip_packet: &IpPacket) -> MutableEchoRequestPacket {
-//     let local_icmp = ICMP::try_new_from_ip_packet(ip_packet).unwrap();
-//     let mut header = local_icmp.get_icmp_header();
-//     let mut icmp = MutableEchoRequestPacket::new(&mut header).unwrap();
-//     icmp.set_payload(&local_icmp.get_payload());
-//     let checksum = checksum(icmp.packet(), 1);
-//     icmp.set_checksum(checksum);
-//     icmp
-// }
 
 #[test]
 fn test_pnet() {
@@ -192,4 +174,21 @@ fn test_pnet() {
             println!("{:?}", data);
         }
     }
+}
+
+#[test]
+fn test_ippacket_to_icmp() {
+    let icmp_data = [
+        8, 0, 77, 72, 0, 1, 0, 19, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109,
+        110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 97, 98, 99, 100, 101, 102, 103, 104, 105,
+    ];
+    let icmp = ICMP::try_new_from_bytes(&icmp_data).unwrap();
+
+    let mut header = icmp.get_icmp_header();
+    let mut payload = icmp.get_payload();
+    let mut data = icmp.get_icmp_bytes();
+
+    let mut_icmp = IcmpPacket::new(&mut data).unwrap();
+
+    println!("tranversed icmp: {:?}", mut_icmp.packet());
 }

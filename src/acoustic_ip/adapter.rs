@@ -293,15 +293,15 @@ impl Adapter {
     pub async fn start_daemon(mut adapter: Adapter) -> tokio::task::JoinHandle<()> {
         let (to_out_tx, to_out_rx) = unbounded_channel();
         let (get_in_tx, get_in_rx) = unbounded_channel();
-        // if adapter.if_router {
-        //     nat_forward_daemon(
-        //         to_out_rx,
-        //         get_in_tx,
-        //         adapter.additional_if_index.clone(),
-        //         adapter.ip_addr,
-        //         adapter.ip_mask,
-        //     );
-        // }
+        if adapter.if_router {
+            nat_forward_daemon(
+                to_out_rx,
+                get_in_tx,
+                adapter.additional_if_index.clone(),
+                adapter.ip_addr,
+                adapter.ip_mask,
+            );
+        }
         let main_task = tokio::spawn(async move {
             adapter.adapter_daemon(to_out_tx, get_in_rx).await;
         });

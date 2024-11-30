@@ -31,8 +31,8 @@ use super::{
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
 const MAX_SEND: u64 = 3;
-const ACK_WAIT_TIME: u64 = 30;
-const BACKOFF_SLOT_TIME: u64 = 70;
+const ACK_WAIT_TIME: u64 = 60;
+const BACKOFF_SLOT_TIME: u64 = 50;
 const BACKOFF_MAX_FACTOR: u64 = 6;
 const RECV_TIME: u64 = 1;
 
@@ -74,7 +74,7 @@ impl RecordTimer {
                 let factor = if (1 << factor) > BACKOFF_MAX_FACTOR {
                     BACKOFF_MAX_FACTOR
                 } else {
-                    1 << factor
+                    factor
                 };
                 let slot_times: u64 = self.rng.gen_range(0..=factor);
                 // if continue_sends > 4 {
@@ -261,7 +261,7 @@ impl MacController {
                                 // continue;
                             }
 
-                            timer.start(TimerType::BACKOFF, 0, continue_sends);
+                            timer.start(TimerType::BACKOFF, retry_times, continue_sends);
                         }
                         TimerType::BACKOFF => {
                             t_rtt_start = Instant::now();
@@ -275,7 +275,7 @@ impl MacController {
                             )
                             .await
                             {
-                                timer.start(TimerType::ACK, 0, continue_sends);
+                                timer.start(TimerType::ACK, retry_times, continue_sends);
                                 // println!("send a frame: {:?}", t_rtt_start.elapsed());
                             } else {
                                 println!(
@@ -401,7 +401,7 @@ impl MacController {
                             if let Some(mut task) = cur_send_task.take() {
                                 task.cur_frame += 1;
                                 if task.cur_frame == task.to_send_macframe.len() {
-                                    println!("[MacDaemon]: complete 1 send task to {}", task.dst);
+                                    // println!("[MacDaemon]: complete 1 send task to {}", task.dst);
                                     let _ = task.endsignal_tx.send(true);
                                 } else if task.to_send_macframe.len() > task.cur_frame {
                                     task.retry_times = 0;
@@ -422,21 +422,21 @@ impl MacController {
                                 false,
                             )
                             .await;
-                            println!("send ack to MacAddress: {}", MACFrame::get_src(&data));
+                            // println!("send ack to MacAddress: {}", MACFrame::get_src(&data));
 
                             // if (cur_recv_frame & 0x3F) as u8 == MACFrame::get_frame_id(&data) {
                             if data.len() < 5 {
-                                println!("[MacDaemon]: received NONE frame");
+                                // println!("[MacDaemon]: received NONE frame");
                                 continue;
                             } else {
                                 let _ = recv_task_tx.send(MACFrame::get_payload(&data).to_vec());
                             }
                         }
                     } else {
-                        println!(
-                            "[MacDaemon]: received other macaddress: {}",
-                            mac_frame::MACFrame::get_dst(&data)
-                        );
+                        // println!(
+                        //     "[MacDaemon]: received other macaddress: {}",
+                        //     mac_frame::MACFrame::get_dst(&data)
+                        // );
                     }
                 }
 
@@ -456,7 +456,7 @@ impl MacController {
                                     );
                                     let _ = task.endsignal_tx.send(false);
                                 } else {
-                                    task.timer.start(TimerType::BACKOFF, 0, 0);
+                                    task.timer.start(TimerType::BACKOFF, task.retry_times, 0);
                                     cur_send_task = Some(task);
                                 }
                             }
