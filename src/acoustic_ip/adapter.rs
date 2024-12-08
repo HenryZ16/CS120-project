@@ -1,17 +1,13 @@
 use crate::acoustic_ip::ip_packet::IpProtocol;
 use crate::acoustic_ip::protocols::icmp::{ICMPType, ICMP};
 use crate::acoustic_mac::net_card::NetCard;
-use crate::utils::Byte;
-use pnet_transport::TransportSender;
 use std::collections::HashMap;
-use std::net::{IpAddr, Ipv4Addr};
+use std::net::Ipv4Addr;
 use std::sync::Arc;
-use std::thread::JoinHandle;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
-use wintun::{Packet, Session};
+use wintun::Session;
 
 use super::ip_packet::IpPacket;
-use super::nat::nat_forward_daemon;
 
 pub struct Adapter {
     // to IP layer
@@ -293,15 +289,6 @@ impl Adapter {
     pub async fn start_daemon(mut adapter: Adapter) -> tokio::task::JoinHandle<()> {
         let (to_out_tx, to_out_rx) = unbounded_channel();
         let (get_in_tx, get_in_rx) = unbounded_channel();
-        if adapter.if_router {
-            nat_forward_daemon(
-                to_out_rx,
-                get_in_tx,
-                adapter.additional_if_index.clone(),
-                adapter.ip_addr,
-                adapter.ip_mask,
-            );
-        }
         let main_task = tokio::spawn(async move {
             adapter.adapter_daemon(to_out_tx, get_in_rx).await;
         });
