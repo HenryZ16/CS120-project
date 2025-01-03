@@ -2,10 +2,11 @@ use crate::acoustic_ip::ip_packet::IpProtocol;
 use crate::acoustic_ip::protocols::icmp::{ICMPType, ICMP};
 use crate::acoustic_mac::net_card::NetCard;
 use crate::acoustic_modem::phy_frame;
-use rand::Rng;
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use wintun::Session;
 
@@ -264,7 +265,12 @@ impl Adapter {
                         Ipv4Addr::from(packet.get_source_address())
                     );
 
-                    let mut rng = rand::thread_rng();
+                    let start = SystemTime::now();
+                    let since_the_epoch = start
+                        .duration_since(UNIX_EPOCH)
+                        .expect("Time went backwards");
+                    let seed = since_the_epoch.as_nanos() as u64;
+                    let mut rng = StdRng::seed_from_u64(seed);
                     if rng.gen_range(0..4) != 0 {
                         println!("Drop packet");
                         return;
