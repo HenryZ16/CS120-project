@@ -169,7 +169,7 @@ impl Adapter {
                         "Drop packet. Its destination: {:?}",
                         Ipv4Addr::from_bits(packet.get_destination_address())
                     );
-                    // self.send_to_ip(packet);
+                    self.send_to_ip(packet);
                     return;
                 }
                 match packet.get_protocol() {
@@ -279,6 +279,11 @@ impl Adapter {
                 } else if !self.if_router {
                     if packet.get_protocol() != IpProtocol::ICMP
                         && !self.ip_filter(&packet.get_destination_ipv4_addr())
+                    {
+                        return;
+                    }
+                    if !packet.dst_is_subnet(&self.ip_addr, &self.ip_mask)
+                        && !packet.src_is_subnet(&self.ip_addr, &self.ip_mask)
                     {
                         return;
                     }

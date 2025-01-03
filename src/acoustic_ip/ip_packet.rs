@@ -244,6 +244,10 @@ impl IpPacket {
     pub fn dst_is_subnet(&self, domain: &Ipv4Addr, mask: &Ipv4Addr) -> bool {
         (domain & mask) == (Ipv4Addr::from(self.get_destination_address()) & mask)
     }
+
+    pub fn src_is_subnet(&self, domain: &Ipv4Addr, mask: &Ipv4Addr) -> bool {
+        (domain & mask) == (Ipv4Addr::from(self.get_source_address()) & mask)
+    }
 }
 
 pub struct TestAdapter {
