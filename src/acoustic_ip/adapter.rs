@@ -237,6 +237,31 @@ impl Adapter {
         }
     }
 
+    fn ip_filter(&self, dst: &Ipv4Addr) -> bool {
+        let if_gateway = Some(self.ip_addr) == self.ip_gateway;
+
+        let mut white_list: Vec<Ipv4Addr> = vec![];
+        white_list.push(Ipv4Addr::new(10, 15, 44, 11));
+        white_list.push(Ipv4Addr::new(202, 89, 233, 100));
+        white_list.push(Ipv4Addr::new(202, 89, 233, 101));
+
+        let dst_int = u32::from(dst.clone());
+        let mask_int = u32::from(self.ip_mask);
+        let subnet_int = u32::from(self.ip_addr) & mask_int;
+        if if_gateway {
+            return (dst_int & mask_int) == subnet_int;
+        }
+
+        let mut res: bool = false;
+        for addr in white_list.into_iter() {
+            if &addr == dst {
+                res = true;
+            }
+        }
+
+        return res;
+    }
+
     async fn down_daemon(&mut self, forward_rx: &mut UnboundedReceiver<IpPacket>) {
         match self.receive_packet(forward_rx) {
             Ok(packet) => {
@@ -253,13 +278,7 @@ impl Adapter {
                     }
                 } else if !self.if_router {
                     if packet.get_protocol() != IpProtocol::ICMP
-                        && (packet.get_destination_ipv4_addr() != Ipv4Addr::new(10, 15, 44, 11)
-                            || (packet.get_destination_ipv4_addr()
-                                == Ipv4Addr::new(10, 15, 44, 11)
-                                && Some(self.ip_addr) == self.ip_gateway))
-                        && packet.get_destination_ipv4_addr() != Ipv4Addr::new(121, 194, 11, 72)
-                        && packet.get_destination_ipv4_addr() != Ipv4Addr::new(202, 89, 233, 100)
-                        && packet.get_destination_ipv4_addr() != Ipv4Addr::new(202, 89, 233, 101)
+                        && !self.ip_filter(&packet.get_destination_ipv4_addr())
                     {
                         return;
                     }
