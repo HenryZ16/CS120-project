@@ -253,7 +253,10 @@ impl Adapter {
                     }
                 } else if !self.if_router {
                     if packet.get_protocol() != IpProtocol::ICMP
-                        && packet.get_destination_ipv4_addr() != Ipv4Addr::new(10, 15, 44, 11)
+                        && (packet.get_destination_ipv4_addr() != Ipv4Addr::new(10, 15, 44, 11)
+                            || (packet.get_destination_ipv4_addr()
+                                == Ipv4Addr::new(10, 15, 44, 11)
+                                && Some(self.ip_addr) == self.ip_gateway))
                         && packet.get_destination_ipv4_addr() != Ipv4Addr::new(121, 194, 11, 72)
                         && packet.get_destination_ipv4_addr() != Ipv4Addr::new(202, 89, 233, 100)
                         && packet.get_destination_ipv4_addr() != Ipv4Addr::new(202, 89, 233, 101)
