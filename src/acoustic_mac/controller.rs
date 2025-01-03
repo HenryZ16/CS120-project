@@ -32,7 +32,7 @@ use rand::{rngs::StdRng, Rng, SeedableRng};
 
 const MAX_SEND: u64 = 3;
 const ACK_WAIT_TIME: u64 = 60;
-const BACKOFF_SLOT_TIME: u64 = 50;
+const BACKOFF_SLOT_TIME: u64 = 350;
 const BACKOFF_MAX_FACTOR: u64 = 6;
 const RECV_TIME: u64 = 1;
 
@@ -382,6 +382,10 @@ impl MacController {
                 while let Ok(mut send_task) = send_task_rx.try_recv() {
                     send_task.fresh_send_frame(&mut sender);
                     send_tasks.push_back(send_task);
+                    // if send_tasks.len() > 4 {
+                    //     println!("send_tasks max length exceeded");
+                    //     while let Ok(mut send_task) = send_task_rx.try_recv() {}
+                    // }
                 }
                 if cur_send_task.is_none() {
                     cur_send_task = send_tasks.pop_front();
@@ -444,10 +448,10 @@ impl MacController {
                     if task.timer.is_timeout() {
                         match task.timer.timer_type {
                             TimerType::ACK => {
-                                println!(
-                                    "[MacDaemon]: ACK timeout times: {} on frame {}",
-                                    task.retry_times, task.cur_frame
-                                );
+                                // println!(
+                                //     "[MacDaemon]: ACK timeout times: {} on frame {}",
+                                //     task.retry_times, task.cur_frame
+                                // );
                                 task.retry_times += 1;
                                 if task.retry_times >= MAX_SEND {
                                     println!(
@@ -473,7 +477,7 @@ impl MacController {
                                 {
                                     task.timer.start(TimerType::ACK, 0, 0);
                                 } else {
-                                    println!("[MacDaemon]: Busy channel, set backoff");
+                                    // println!("[MacDaemon]: Busy channel, set backoff");
                                     task.resend_times += 1;
                                     task.timer.start(TimerType::BACKOFF, task.resend_times, 0);
                                 }

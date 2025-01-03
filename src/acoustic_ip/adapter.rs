@@ -238,12 +238,6 @@ impl Adapter {
     }
 
     async fn down_daemon(&mut self, forward_rx: &mut UnboundedReceiver<IpPacket>) {
-        if forward_rx.len() > 24 {
-            println!("forward_rx.len() > 24");
-            while forward_rx.len() > 16 {
-                let _ = forward_rx.recv().await;
-            }
-        }
         match self.receive_packet(forward_rx) {
             Ok(packet) => {
                 if packet.get_destination_ipv4_addr() == self.ip_addr {
@@ -259,8 +253,10 @@ impl Adapter {
                     }
                 } else if !self.if_router {
                     if packet.get_protocol() != IpProtocol::ICMP
-                        && packet.get_protocol() != IpProtocol::UDP
-                        && packet.get_protocol() != IpProtocol::TCP
+                        && packet.get_destination_ipv4_addr() != Ipv4Addr::new(10, 15, 44, 11)
+                        && packet.get_destination_ipv4_addr() != Ipv4Addr::new(121, 194, 11, 72)
+                        && packet.get_destination_ipv4_addr() != Ipv4Addr::new(202, 89, 233, 100)
+                        && packet.get_destination_ipv4_addr() != Ipv4Addr::new(202, 89, 233, 101)
                     {
                         return;
                     }
@@ -271,16 +267,13 @@ impl Adapter {
                         Ipv4Addr::from(packet.get_source_address())
                     );
 
-                    let _ = self
-                        .net_card
-                        .send_async(
-                            *self
-                                .arp_table
-                                .get(&self.ip_gateway.unwrap())
-                                .expect("No gateway"),
-                            packet.get_ip_packet_bytes(),
-                        )
-                        .await;
+                    let _ = self.net_card.send_unblocked(
+                        *self
+                            .arp_table
+                            .get(&self.ip_gateway.unwrap())
+                            .expect("No gateway"),
+                        packet.get_ip_packet_bytes(),
+                    );
                 }
             }
             Err(_) => {}
