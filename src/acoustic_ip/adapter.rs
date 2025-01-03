@@ -2,6 +2,7 @@ use crate::acoustic_ip::ip_packet::IpProtocol;
 use crate::acoustic_ip::protocols::icmp::{ICMPType, ICMP};
 use crate::acoustic_mac::net_card::NetCard;
 use crate::acoustic_modem::phy_frame;
+use rand::Rng;
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
@@ -252,6 +253,7 @@ impl Adapter {
                 } else if !self.if_router {
                     if packet.get_protocol() != IpProtocol::ICMP
                         && packet.get_protocol() != IpProtocol::UDP
+                        && packet.get_protocol() != IpProtocol::TCP
                     {
                         return;
                     }
@@ -261,6 +263,13 @@ impl Adapter {
                         packet.get_destination_ipv4_addr(),
                         Ipv4Addr::from(packet.get_source_address())
                     );
+
+                    let mut rng = rand::thread_rng();
+                    if rng.gen_range(0..4) != 0 {
+                        println!("Drop packet");
+                        return;
+                    }
+
                     let _ = self
                         .net_card
                         .send_async(
