@@ -238,6 +238,12 @@ impl Adapter {
     }
 
     async fn down_daemon(&mut self, forward_rx: &mut UnboundedReceiver<IpPacket>) {
+        if forward_rx.len() > 24 {
+            println!("forward_rx.len() > 24");
+            while forward_rx.len() > 16 {
+                let _ = forward_rx.recv().await;
+            }
+        }
         match self.receive_packet(forward_rx) {
             Ok(packet) => {
                 if packet.get_destination_ipv4_addr() == self.ip_addr {
@@ -264,17 +270,6 @@ impl Adapter {
                         packet.get_destination_ipv4_addr(),
                         Ipv4Addr::from(packet.get_source_address())
                     );
-
-                    let start = SystemTime::now();
-                    let since_the_epoch = start
-                        .duration_since(UNIX_EPOCH)
-                        .expect("Time went backwards");
-                    let seed = since_the_epoch.as_nanos() as u64;
-                    let mut rng = StdRng::seed_from_u64(seed);
-                    if rng.gen_range(0..4) != 0 {
-                        println!("Drop packet");
-                        return;
-                    }
 
                     let _ = self
                         .net_card
