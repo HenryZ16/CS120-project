@@ -165,7 +165,7 @@ impl Adapter {
                         "Drop packet. Its destination: {:?}",
                         Ipv4Addr::from_bits(packet.get_destination_address())
                     );
-                    self.send_to_ip(packet);
+                    // self.send_to_ip(packet);
                     return;
                 }
                 match packet.get_protocol() {
@@ -254,6 +254,11 @@ impl Adapter {
                         return;
                     }
                     println!("send: {:?}", packet.get_ip_packet_bytes());
+                    println!(
+                        "dst: {:?}, src: {:?}",
+                        packet.get_destination_ipv4_addr(),
+                        Ipv4Addr::from(packet.get_source_address())
+                    );
                     let _ = self
                         .net_card
                         .send_async(
