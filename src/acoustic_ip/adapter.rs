@@ -1,6 +1,7 @@
 use crate::acoustic_ip::ip_packet::IpProtocol;
 use crate::acoustic_ip::protocols::icmp::{ICMPType, ICMP};
 use crate::acoustic_mac::net_card::NetCard;
+use crate::acoustic_modem::phy_frame;
 use std::collections::HashMap;
 use std::net::Ipv4Addr;
 use std::sync::Arc;
@@ -54,6 +55,9 @@ impl Adapter {
         adapter.set_address(ip_addr).unwrap();
         adapter.set_netmask(ip_mask).unwrap();
         adapter.set_gateway(ip_gateway).unwrap();
+        adapter
+            .set_mtu(phy_frame::MAX_DIGITAL_FRAME_DATA_LENGTH / 8)
+            .unwrap();
         let session = Arc::new(adapter.start_session(wintun::MAX_RING_CAPACITY).unwrap());
 
         let arp_table = if if_static_arp {
@@ -243,7 +247,9 @@ impl Adapter {
                             .send_unblocked(dst_mac, packet.get_ip_packet_bytes());
                     }
                 } else if !self.if_router {
-                    if packet.get_protocol() != IpProtocol::ICMP {
+                    if packet.get_protocol() != IpProtocol::ICMP
+                        && packet.get_protocol() != IpProtocol::UDP
+                    {
                         return;
                     }
                     println!("send: {:?}", packet.get_ip_packet_bytes());
