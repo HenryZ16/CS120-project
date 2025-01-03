@@ -3,12 +3,13 @@ use crate::acoustic_ip::protocols::icmp::{ICMPType, ICMP};
 use crate::acoustic_mac::net_card::NetCard;
 use crate::acoustic_modem::phy_frame;
 use std::collections::HashMap;
-use std::net::Ipv4Addr;
+use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use wintun::Session;
 
 use super::ip_packet::IpPacket;
+const DNS_SERVER: IpAddr = IpAddr::V4(Ipv4Addr::new(10, 15, 44, 11));
 
 pub struct Adapter {
     // to IP layer
@@ -58,6 +59,7 @@ impl Adapter {
         adapter
             .set_mtu(phy_frame::MAX_DIGITAL_FRAME_DATA_LENGTH / 8)
             .unwrap();
+        adapter.set_dns_servers(&[DNS_SERVER]).unwrap();
         let session = Arc::new(adapter.start_session(wintun::MAX_RING_CAPACITY).unwrap());
 
         let arp_table = if if_static_arp {
