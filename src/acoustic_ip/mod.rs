@@ -1,7 +1,3 @@
-use plotters::data;
-use tokio::sync::mpsc::unbounded_channel;
-use tokio::sync::oneshot;
-
 use crate::{
     acoustic_mac::{
         controller::{MacController, MacSendTask},
@@ -13,7 +9,6 @@ use crate::{
 pub mod adapter;
 pub mod ip_packet;
 pub mod protocols;
-pub mod nat;
 
 #[tokio::test]
 async fn test_grab_packet() {
