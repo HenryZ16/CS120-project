@@ -169,7 +169,7 @@ impl Adapter {
                         "Drop packet. Its destination: {:?}",
                         Ipv4Addr::from_bits(packet.get_destination_address())
                     );
-                    // self.send_to_ip(packet);
+                    self.send_to_ip(packet);
                     return;
                 }
                 match packet.get_protocol() {
@@ -258,6 +258,11 @@ impl Adapter {
                     {
                         return;
                     }
+                    if !packet.dst_is_subnet(&self.ip_addr, &self.ip_mask)
+                        && !packet.src_is_subnet(&self.ip_addr, &self.ip_mask)
+                    {
+                        return;
+                    }
                     println!("send: {:?}", packet.get_ip_packet_bytes());
                     println!(
                         "dst: {:?}, src: {:?}",
@@ -271,7 +276,7 @@ impl Adapter {
                         .expect("Time went backwards");
                     let seed = since_the_epoch.as_nanos() as u64;
                     let mut rng = StdRng::seed_from_u64(seed);
-                    if rng.gen_range(0..4) != 0 {
+                    if rng.gen_range(0..2) != 0 {
                         println!("Drop packet");
                         return;
                     }
