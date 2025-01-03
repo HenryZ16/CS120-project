@@ -165,6 +165,7 @@ impl Adapter {
                         "Drop packet. Its destination: {:?}",
                         Ipv4Addr::from_bits(packet.get_destination_address())
                     );
+                    self.send_to_ip(packet);
                     return;
                 }
                 match packet.get_protocol() {
