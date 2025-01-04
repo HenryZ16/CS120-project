@@ -242,8 +242,7 @@ impl Adapter {
 
         let mut white_list: Vec<Ipv4Addr> = vec![];
         white_list.push(Ipv4Addr::new(10, 15, 44, 11));
-        white_list.push(Ipv4Addr::new(202, 89, 233, 100));
-        white_list.push(Ipv4Addr::new(202, 89, 233, 101));
+        white_list.push(Ipv4Addr::new(93, 184, 215, 14));
 
         let dst_int = u32::from(dst.clone());
         let mask_int = u32::from(self.ip_mask);
