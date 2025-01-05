@@ -26,6 +26,8 @@ pub struct Adapter {
     // to MAC layer
     mac_address: u8,
     net_card: NetCard,
+    // for pa4
+    task_seq_num: u32,
 }
 
 impl Adapter {
@@ -81,6 +83,7 @@ impl Adapter {
             arp_table,
             mac_address,
             net_card,
+            task_seq_num: 0x12345678,
         }
     }
 
@@ -147,6 +150,20 @@ impl Adapter {
             } else {
                 Err("Failed to receive packet")?
             }
+        }
+    }
+
+    fn task_ip_packet_converter(&mut self, packet: &mut IpPacket, if_send: bool) {
+        let if_gateway = Some(self.ip_addr) == self.ip_gateway;
+        if if_gateway || packet.get_protocol() != IpProtocol::TCP {
+            return;
+        }
+        let white = Ipv4Addr::new(93, 184, 215, 14);
+
+        if packet.get_destination_ipv4_addr() == white && if_send {
+            packet.set_tcp_seq_num();
+        } else if packet.get_source_ipv4_addr() == white && !if_send {
+            packet.set_tcp_ack_num();
         }
     }
 
@@ -229,6 +246,8 @@ impl Adapter {
                     }
                     _ => {
                         println!("Non ICMP packet, send to ip");
+                        let mut packet = packet;
+                        self.task_ip_packet_converter(&mut packet, false);
                         self.send_to_ip(packet);
                     }
                 }
@@ -261,22 +280,34 @@ impl Adapter {
         return res;
     }
 
+    fn contains_subsequence<T: PartialEq>(sequence: &[T], subsequence: &[T]) -> bool {
+        if subsequence.is_empty() {
+            return true;
+        }
+        if subsequence.len() > sequence.len() {
+            return false;
+        }
+        sequence
+            .windows(subsequence.len())
+            .any(|window| window == subsequence)
+    }
+
     fn dns_filter(&self, packet: &IpPacket) -> bool {
         if packet.get_destination_ipv4_addr() != Ipv4Addr::new(10, 15, 44, 11) {
             return true;
         }
         let context = packet.get_data();
-        match std::string::String::from_utf8(context) {
-            Ok(string) => {
-                if string.contains("google") || string.contains("microsoft") {
-                    return false;
-                }
-                return true;
-            }
-            Err(_) => {
-                return true;
+        let mut black_list: Vec<Vec<u8>> = vec![];
+        black_list.push(String::from("google").as_bytes().to_vec());
+        black_list.push(String::from("microsoft").as_bytes().to_vec());
+        black_list.push(String::from("edge").as_bytes().to_vec());
+
+        for black in black_list.into_iter() {
+            if Self::contains_subsequence(&context, &black) {
+                return false;
             }
         }
+        return true;
     }
 
     async fn down_daemon(&mut self, forward_rx: &mut UnboundedReceiver<IpPacket>) {
@@ -311,6 +342,8 @@ impl Adapter {
                         packet.get_destination_ipv4_addr(),
                         Ipv4Addr::from(packet.get_source_address())
                     );
+                    let mut packet = packet;
+                    self.task_ip_packet_converter(&mut packet, true);
 
                     let _ = self.net_card.send_unblocked(
                         *self

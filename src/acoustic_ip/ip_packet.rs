@@ -1,4 +1,5 @@
 use crate::utils::Byte;
+use rand::seq;
 use std::net::Ipv4Addr;
 use std::sync::Arc;
 use wintun::{Adapter, Packet, Session};
@@ -219,6 +220,9 @@ impl IpPacket {
     pub fn set_source_address(&mut self, source_address: u32) {
         self.source_address = source_address;
     }
+    pub fn get_source_ipv4_addr(&self) -> Ipv4Addr {
+        Ipv4Addr::from(self.get_source_address())
+    }
 
     pub fn get_destination_address(&self) -> u32 {
         self.destination_address
@@ -247,6 +251,89 @@ impl IpPacket {
 
     pub fn src_is_subnet(&self, domain: &Ipv4Addr, mask: &Ipv4Addr) -> bool {
         (domain & mask) == (Ipv4Addr::from(self.get_source_address()) & mask)
+    }
+
+    // tcp
+    pub fn update_tcp_header_checksum(&mut self) {
+        let mut sum = 0u32;
+        self.data[16] = 0;
+        self.data[17] = 0;
+
+        let source_address = self.get_source_address();
+        let destination_address = self.get_destination_address();
+        let protocol = self.protocol as u32;
+        let tcp_length = self.data.len() as u32;
+
+        sum += (source_address >> 16) + (source_address & 0xffff);
+        sum += (destination_address >> 16) + (destination_address & 0xffff);
+        sum += protocol + tcp_length;
+
+        let mut i = 0;
+        if self.data.len() & 1 == 1 {
+            self.data.push(0u8);
+        }
+        while i < self.data.len() {
+            sum += (self.data[i] as u32) << 8 | self.data[i + 1] as u32;
+            i += 2;
+        }
+        while sum >> 16 != 0 {
+            sum = (sum & 0xFFFF) + (sum >> 16);
+        }
+
+        self.data[16] = (!(sum as u16) >> 8) as u8;
+        self.data[17] = (!(sum as u16) & 0xff) as u8;
+    }
+    pub fn get_tcp_seq_num(&self) -> u32 {
+        if self.get_protocol() != IpProtocol::TCP {
+            return 0;
+        }
+
+        (self.data[4] as u32) << 24
+            | (self.data[5] as u32) << 16
+            | (self.data[6] as u32) << 8
+            | self.data[7] as u32
+    }
+    pub fn set_tcp_seq_num(&mut self) -> u32 {
+        if self.get_protocol() != IpProtocol::TCP {
+            return 0;
+        }
+
+        let mut origin = (self.data[4] as u32) << 24;
+        origin |= (self.data[5] as u32) << 16;
+        origin |= (self.data[6] as u32) << 8;
+        origin |= self.data[7] as u32;
+
+        let seq_num = origin + 0x1234567;
+
+        self.data[4] = (seq_num >> 24) as u8;
+        self.data[5] = ((seq_num >> 16) & 0xff) as u8;
+        self.data[6] = ((seq_num >> 8) & 0xff) as u8;
+        self.data[7] = (seq_num & 0xff) as u8;
+
+        self.update_tcp_header_checksum();
+        self.update_header_checksum();
+        return origin;
+    }
+    pub fn set_tcp_ack_num(&mut self) -> u32 {
+        if self.get_protocol() != IpProtocol::TCP {
+            return 0;
+        }
+
+        let mut origin = (self.data[8] as u32) << 24;
+        origin |= (self.data[9] as u32) << 16;
+        origin |= (self.data[10] as u32) << 8;
+        origin |= self.data[11] as u32;
+
+        let ack_num = origin - 0x1234567;
+
+        self.data[8] = (ack_num >> 24) as u8;
+        self.data[9] = ((ack_num >> 16) & 0xff) as u8;
+        self.data[10] = ((ack_num >> 8) & 0xff) as u8;
+        self.data[11] = (ack_num & 0xff) as u8;
+
+        self.update_tcp_header_checksum();
+        self.update_header_checksum();
+        return origin;
     }
 }
 
