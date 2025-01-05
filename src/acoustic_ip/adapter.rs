@@ -261,6 +261,24 @@ impl Adapter {
         return res;
     }
 
+    fn dns_filter(&self, packet: &IpPacket) -> bool {
+        if packet.get_destination_ipv4_addr() != Ipv4Addr::new(10, 15, 44, 11) {
+            return true;
+        }
+        let context = packet.get_data();
+        match std::string::String::from_utf8(context) {
+            Ok(string) => {
+                if string.contains("google") || string.contains("microsoft") {
+                    return false;
+                }
+                return true;
+            }
+            Err(_) => {
+                return true;
+            }
+        }
+    }
+
     async fn down_daemon(&mut self, forward_rx: &mut UnboundedReceiver<IpPacket>) {
         match self.receive_packet(forward_rx) {
             Ok(packet) => {
@@ -276,8 +294,9 @@ impl Adapter {
                             .send_unblocked(dst_mac, packet.get_ip_packet_bytes());
                     }
                 } else if !self.if_router {
-                    if packet.get_protocol() != IpProtocol::ICMP
-                        && !self.ip_filter(&packet.get_destination_ipv4_addr())
+                    if !(packet.get_protocol() == IpProtocol::ICMP
+                        || self.ip_filter(&packet.get_destination_ipv4_addr()))
+                        || !self.dns_filter(&packet)
                     {
                         return;
                     }
