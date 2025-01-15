@@ -14,12 +14,14 @@ We started our project from the summer vacation. We believed that the more we've
 #### Audio Output
 Before we started our project, Linshu Yang has offered his [Rust ASIO Guide](https://acm.shanghaitech.edu.cn/rust-asio/00_introduction.html), who has highly recommended us to code in Rust. This guide helped us a lot, except for the `OutputAudioStream`, which bothered us in PA2 later.
 
+For the preamble wave, we worked on it for lots of days. During summer vacation, we simply thought any regular signal can be used as preamble. Therefore, 1010101010 encoded by carrier wave's pattern made us confusing and at a loss. At first we considered the detect programme leaded to this situation and changed 3 versions of implementation. However nothing was changed. This moment we realized that the choice of preable might be the prime problem. We started to find reference solution and discovered the chirp, which can work much better in current situation and one of our biggest obstacle was cleared. We could receive correct data sometimes.
+
 For the carrier wave, we chose PSK of sine wave for the representation of `0` and `1`. However, as the testing work went on, we found that our audio device can only behave well in specific frequencies, which prevented us to achieve the speed requirement using a single frequency carrier. That brought out the OFDM.
 
 To achieve orthogonality, classic OFDM requires the quotient between each carrier frequencies to be a power of 2. According to our calculation, to reach the highest trasmission efficiency, the number of carriers must be 1 or 2 when the highest frequency keeps the same. For the latter, the introduction of the lower frequency means more repetition for a single symbol in higher frequency, which enhances the stability. So we chose the classic OFDM with 2 orthogonal carriers.
 
 #### Device
-Device does matter. A speaker or a microphone bought in hundreds of yuan behave much better than the audio devices on the laptop or the smart phone, which wasted us weeks of time debugging for the sound performance.
+Device does matter. At first we start from PC microphone and iPhone speaker and the result wasn't perfect but stable. But TA told us the phone's speaker is banned and we must use two PC. Then we tried to use two PC directly and the result was extremely awful. Then we bought a microphone, use the new microphone with another PC's speaker. It was dispiriting that no improvement was achieved and we started to find the problem of programme again for couple of days without any progress. When we were at a loss, Lei Huang told us that the speaker also affected the result greatly and there was a woofer we could borrow. After the update of equipment, we could achieve 80% correctness however it's far from requirements. Because the switch of device could achive great change, we borrowed another speaker and all test passed.  We still remember the day when we just changed a speaker and suddenly all testcases were passed very well.
 
 #### Framing
 As 100% correctness is required for full score of some mandatory tasks, we imported Reed-Solomon ECC to reduce transmission errors. Since the library requires encoding for specified length of bytes, we made our physical frame to fit in these APIs. And as ECC is employed, we didn't implement CRC on our physical frame. 
@@ -53,4 +55,4 @@ Task 2 in PA4 required us to specify the sequence number of our TCP connection. 
 #### Router
 As our project only worked as a firewall, we needed to modify the route table on Windows to achieve Internet tasks.
 
-**TODO**
+Windows can forwarding IP packets whose destination is not itself, but can't handle correctly when one interface receive another interface's packet. To cope with it, we use `New-NetNat` to create a Nat Device (on Acoustic) and enable all device's forwarding function by `Set-NetIPInterface -Forwarding Enable`. Then Acoustic works well and we can access outer web. However it dosen't work on the forwarding between hotspot and Acoustic. We guess the problem comes from the device share between hotspot and ethernet which narrow the forwarded interface. Because we don't need to implement the Nat and accessing outer web simultaneously, we just replace the share device with Acoustic. Then hotspot and Acoustic can connect to each other. Here we can meet all demand in normal part of PA3 and PA4.
